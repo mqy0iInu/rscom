@@ -1,0 +1,10 @@
+[package]
+name = "rust_rp2a03"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitflags = "2.1.0"
+lazy_static = "1.4.0"
+rand = "0.8.5"
+sdl2 = "0.35.2"
