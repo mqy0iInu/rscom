@@ -226,7 +226,6 @@ impl NESMemory {
             vram: [0; 2048],
             ppu_registers: [0; 8],
             apu_registers: [0; 24],
-
             chr_rom: Vec::new(),
             ext_ram: Vec::new(),
             prg_rom: Vec::new(),
@@ -274,14 +273,14 @@ where
     T: Copy + From<u8> + Into<u8> + std::ops::Add<Output = T> + std::ops::Sub<Output = T>
         + std::ops::BitAnd<Output = T> + std::ops::BitOr<Output = T>+ std::ops::BitXor<Output = T>
         + TryFrom<u16> + Into<u16> + Into<i32> + PartialEq + PartialOrd + std::ops::Shl<u8, Output = T>
-        + std::ops::Shr<Output = T> + std::ops::Shl<Output = T>,
+        + std::ops::Shr<Output = T> + std::ops::Shl<Output = T> + std::ops::BitOrAssign,
     <T as std::convert::TryFrom<u16>>::Error: std::fmt::Debug,i32: From<T>,
 {
     fn reset(&mut self){
         self.set_register(CPUReg::A, T::from(0u8));
         self.set_register(CPUReg::X, T::from(0u8));
         self.set_register(CPUReg::Y, T::from(0u8));
-        self.set_register(CPUReg::SP, T::from(0u8));
+        self.set_register(CPUReg::SP, T::from(0xFFu8));
     }
 
     fn read(&mut self, address: u16) -> T
@@ -977,12 +976,19 @@ where
 
             // Intrrupt Operations / 割込み関連
             OpcodeType::RTI => {
-                // TODO RTI実装
                 println!("RTI");
+                let status = self.pop_stack();
+                self.cpu_p_reg.set_status_flg_all(status.into());
+                let mut return_addr = self.pop_stack();
+                return_addr |= self.pop_stack() << 8;
+                self.cpu_pc.pc = return_addr.try_into().unwrap();
             }
             OpcodeType::RTS => {
-                // TODO RTS実装
                 println!("RTS");
+                let mut return_addr = self.pop_stack();
+                return_addr |= self.pop_stack() << 8;
+                self.cpu_pc.pc = return_addr.try_into().unwrap();
+                self.cpu_pc.pc = self.cpu_pc.pc + 1;
             }
             OpcodeType::BRK => {
                 if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
@@ -1016,6 +1022,7 @@ where
     }
 
     fn push_stack(&mut self, data: T) {
+        println!("Push Stack");
         let sp = self.get_register(CPUReg::SP);
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
         self.write(address, data);
@@ -1023,6 +1030,7 @@ where
     }
 
     fn pop_stack(&mut self) -> T {
+        println!("POP Stack");
         let sp = self.get_register(CPUReg::SP);
         self.set_register(CPUReg::SP, sp + T::from(1u8));
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
@@ -1165,7 +1173,6 @@ fn main()
 mod cpu_test {
     use super::*;
 
-    // [単体テスト... メモリRead、レジスタW/R、フェッチ、デコード、実行]
     #[test]
     fn cpu_test_func()
     {
@@ -1182,7 +1189,6 @@ mod cpu_test {
         // prg_rom[rom_len - 2] = 0x00;
         // prg_rom.push(0x80);
         // CPU Init
-
         cpu.reset();
 
         // [Test Asm] SEC, SED, SEI, CLC, CLD, CLI, CLV
@@ -1219,7 +1225,7 @@ mod cpu_test {
         cpu.nes_mem.prg_rom.extend([0x4C, 0x00, 0x80].iter().cloned());
 
         // ROM Dump
-        println!("[TEST] : ROM = {:02X?}", cpu.nes_mem.prg_rom);
+        // println!("[TEST] : ROM = {:02X?}", cpu.nes_mem.prg_rom);
         let len = cpu.nes_mem.prg_rom.len();
 
         for _ in 1..len
