@@ -2,8 +2,8 @@ use std::thread;
 use std::time::Duration;
 use std::convert::TryInto;
 use std::convert::From;
-// use std::num::Wrapping;
 use std::rc::Rc;
+// use std::num::Wrapping;
 
 pub const BIN_BIT_7: u8 = 0x80;                     // bit7
 pub const BIN_BIT_6: u8 = 0x40;                     // bit6
@@ -74,13 +74,12 @@ enum AddrMode {
 
 struct Opcode {
     opcode_type: OpcodeType,
-    // Add other fields here
+
 }
 
 #[derive(Clone)]
 struct Addressing {
     addr_mode: Rc<AddrMode>,
-    // Add other fields here
 }
 
 trait CPU<T> {
@@ -105,7 +104,6 @@ impl ProgramCounter {
     fn new() -> Self {
         ProgramCounter {
             // TODO PCの初期位置
-            // pc : Self::ADDR_VEC_TBL_RST,
             pc : ADDR_PRG_ROM,
 
              // リセットベクタ
@@ -216,8 +214,8 @@ struct NESMemory {
     ppu_registers: [u8; 8],   // PPUレジスタ
     apu_registers: [u8; 24],  // APUレジスタ
 
-    ext_rom: Vec<u8>,         // CHR ROM ... 8KB or 16KB
-    prg_ram: Vec<u8>,         // PRG RAM
+    chr_rom: Vec<u8>,         // CHR ROM ... 8KB or 16KB
+    ext_ram: Vec<u8>,         // Ext RAM
     prg_rom: Vec<u8>,         // PRG ROM ... 8KB ~ 1MB
 }
 
@@ -229,8 +227,8 @@ impl NESMemory {
             ppu_registers: [0; 8],
             apu_registers: [0; 24],
 
-            ext_rom: Vec::new(),
-            prg_ram: Vec::new(),
+            chr_rom: Vec::new(),
+            ext_ram: Vec::new(),
             prg_rom: Vec::new(),
         }
     }
@@ -242,8 +240,8 @@ impl NESMemory {
             0x2000..=0x2007 => self.ppu_registers[(address - 0x2000) as usize], // PPUレジスタ
             0x2008..=0x3FFF => self.vram[(address - 0x2000) as usize],          // VRAM ... 2KB (For PPU)
             0x4000..=0x4017 => self.apu_registers[(address - 0x4000) as usize], // APUレジスタ
-            0x4020..=0x5FFF => self.ext_rom[(address - 0x4020) as usize],       // CHR ROM ... 8KB or 16KB
-            0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize],       // PRG RAM
+            0x4020..=0x5FFF => self.chr_rom[(address - 0x4020) as usize],       // CHR ROM ... 8KB or 16KB
+            0x6000..=0x7FFF => self.ext_ram[(address - 0x6000) as usize],       // Ext RAM
             0x8000..=0xFFFF => self.prg_rom[(address - 0x8000) as usize],       // PRG ROM ... 8KB ~ 1MB
             _ => panic!("Invalid memory address: {:#06x}", address),
         }
@@ -256,8 +254,8 @@ impl NESMemory {
             0x2000..=0x2007 => self.ppu_registers[(address - 0x2000) as usize] = data, // PPUレジスタ
             0x2008..=0x3FFF => self.vram[(address - 0x2000) as usize] = data,          // VRAM ... 2KB (For PPU)
             0x4000..=0x4017 => self.apu_registers[(address - 0x4000) as usize] = data, // APUレジスタ
-            0x4020..=0x5FFF => self.ext_rom[(address - 0x4020) as usize] = data,       // CHR ROM ... 8KB or 16KB
-            0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize] = data,       // PRG RAM
+            0x4020..=0x5FFF => self.chr_rom[(address - 0x4020) as usize] = data,       // CHR ROM ... 8KB or 16KB
+            0x6000..=0x7FFF => self.ext_ram[(address - 0x6000) as usize] = data,       // Ext RAM
             0x8000..=0xFFFF => self.prg_rom[(address - 0x8000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
             _ => panic!("Invalid memory address: {:#06x}", address),
         }
@@ -275,14 +273,15 @@ impl<T> CPU<T> for RP2A03<T>
 where
     T: Copy + From<u8> + Into<u8> + std::ops::Add<Output = T> + std::ops::Sub<Output = T>
         + std::ops::BitAnd<Output = T> + std::ops::BitOr<Output = T>+ std::ops::BitXor<Output = T>
-        + TryFrom<u16> + Into<u16> + Into<i32> + PartialEq + PartialOrd + std::ops::Shl<u8, Output = T>,
+        + TryFrom<u16> + Into<u16> + Into<i32> + PartialEq + PartialOrd + std::ops::Shl<u8, Output = T>
+        + std::ops::Shr<Output = T> + std::ops::Shl<Output = T>,
     <T as std::convert::TryFrom<u16>>::Error: std::fmt::Debug,i32: From<T>,
 {
     fn reset(&mut self){
         self.set_register(CPUReg::A, T::from(0u8));
         self.set_register(CPUReg::X, T::from(0u8));
         self.set_register(CPUReg::Y, T::from(0u8));
-        self.set_register(CPUReg::SP, T::from(0x00u8));
+        self.set_register(CPUReg::SP, T::from(0u8));
     }
 
     fn read(&mut self, address: u16) -> T
@@ -848,13 +847,14 @@ where
             }
             OpcodeType::JSR => {
                 self.cpu_pc.pc = self.cpu_pc.pc + 1;
-                let return_addr: T = self.cpu_pc.pc.try_into().unwrap();
-                self.push_stack(return_addr);
+                let return_addr: u16 = self.cpu_pc.pc;
+                self.push_stack((return_addr & 0x00FF).try_into().unwrap());
+                self.push_stack(((return_addr & 0xFF00) >> 0x0008).try_into().unwrap());
 
                 if let Some(value) = operand {
                     let val: u16 = value.into();
                     let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                    let jump_addr = val | (val_second << 8);
+                    let jump_addr: u16 = val | (val_second << 8);
                     self.cpu_pc.pc = jump_addr;
                     println!("JSR ${:04X}", jump_addr);
                 }
@@ -985,18 +985,20 @@ where
                 println!("RTS");
             }
             OpcodeType::BRK => {
-                // PC++してフラグBとⅠを立てる
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
-                self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
-                self.cpu_p_reg.set_status_flg(INTERRUPT_DISABLE_FLG);
-                // スタックにPCとステータスを退避
-                self.push_stack(self.cpu_pc.pc.try_into().unwrap());
-                self.push_stack(self.cpu_p_reg.get_status_flg_all().try_into().unwrap());
-                // TODO IRQのベクタテーブル(0xFFFE,0xFFFE)の2バイトをPCにセット
-                // TODO IRQのベクタテーブル(0xFFFE)にPCセット
-                // 上の処理は結局、0x8000に飛ぶからもうここで直接PCをいじっとく
-                self.cpu_pc.pc = ADDR_PRG_ROM;
-                println!("BRK");
+                if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
+                    print!("BRK(INT)");
+                    self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                    self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
+                    self.push_stack((self.cpu_pc.pc & 0x00FF).try_into().unwrap());
+                    self.push_stack(((self.cpu_pc.pc & 0xFF00) >> 0x0008).try_into().unwrap());
+                    self.push_stack(self.cpu_p_reg.get_status_flg_all().try_into().unwrap());
+                    self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
+                    let mut _jmp_addr: T = self.read(ADDR_VEC_TBL_IRQ);
+                    _jmp_addr = self.read(ADDR_VEC_TBL_IRQ + 1) << 0x0008;
+                    self.cpu_pc.pc = _jmp_addr.try_into().unwrap();
+                    print!("Jmp to: ${:04X}", self.cpu_pc.pc);
+                }
+                println!("BRK(INT Mask)");
             }
 
             // Other
@@ -1173,6 +1175,15 @@ mod cpu_test {
             cpu_pc: ProgramCounter::new(),
             nes_mem: NESMemory::new(),
         };
+
+        // (DEBUG) Dmy IRQ Vector
+        // let prg_rom = &mut cpu.nes_mem.prg_rom;
+        // let rom_len = prg_rom.len();
+        // prg_rom[rom_len - 2] = 0x00;
+        // prg_rom.push(0x80);
+        // CPU Init
+
+        cpu.reset();
 
         // [Test Asm] SEC, SED, SEI, CLC, CLD, CLI, CLV
         //      0) 初期状態（bit5と、Vフラグが立っている）:     0110_0000
