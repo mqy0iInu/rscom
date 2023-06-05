@@ -795,6 +795,7 @@ where
             OpcodeType::PLA => {
                 let value = self.pop_stack();
                 self.set_register(CPUReg::A, value);
+                self.cpu_p_reg.nzv_flg_update(value.try_into().unwrap());
                 println!("PLA");
             }
             OpcodeType::PLP => {
@@ -1183,11 +1184,6 @@ mod cpu_test {
             nes_mem: NESMemory::new(),
         };
 
-        // (DEBUG) Dmy IRQ Vector
-        // let prg_rom = &mut cpu.nes_mem.prg_rom;
-        // let rom_len = prg_rom.len();
-        // prg_rom[rom_len - 2] = 0x00;
-        // prg_rom.push(0x80);
         // CPU Init
         cpu.reset();
 
@@ -1203,22 +1199,22 @@ mod cpu_test {
         cpu.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
         cpu.nes_mem.prg_rom.extend([0x38, 0xF8, 0x78, 0x18, 0xD8, 0x58, 0xB8].iter().cloned());
 
-        // ; [Test Asm]
-        // LDA #$0A ; A = 0x0A
-        // TAX      ; A = 0, X = 0x0A
-        // TXA      ; A = 0x0A, X = 0
+        // ; [Test Asm] TAX TXA TAY TYA
+        // LDA #$0A ; A:0x0A
+        // TAX      ; A:0x0A, X:0x0A
+        // TXA      ; A:0x0A, X:0x0A
         //
-        // LDA #$0B ; A = 0x0B
-        // TAY      ; A = 0, X:0x0A, Y = 0x0B
-        // TYA      ; A = 0x0B, X:0x0A, Y = 0
+        // LDA #$0B ; A:0x0B
+        // TAY      ; A:0x0B, X:0x0A, Y:0x0B
+        // TYA      ; A:0x0B, X:0x0A, Y:0x0B
         cpu.nes_mem.prg_rom.extend([0xA9, 0x0A, 0xAA, 0x8A, 0xA9, 0x0B, 0xA8, 0x98].iter().cloned());
 
 
-        // ; [Test Asm]
-        //          ; A = 0x0B,
-        // ORA #$A0 ; A = 0xAB (0xA0 | 0x0B = 0xAB)
-        // EOR #$BA ; A = 0x11 (0xAB ^ 0xBA = 0x11)
-        // AND #$44 ; A = 0x00 (0x44 & 0x11 = 0x00)
+        // ; [Test Asm] ORA EOR AND
+        //          ; A:0x0B, X:0x0A, Y:0x0B
+        // ORA #$A0 ; A:0xAB (0xA0 | 0x0B = 0xAB), X:0x0A, Y:0x0B
+        // EOR #$BA ; A:0x11 (0xAB ^ 0xBA:0x11), X:0x0A, Y:0x0B
+        // AND #$44 ; A:0x00 (0x44 & 0x11 = 0x00), X:0x0A, Y:0x0B
         cpu.nes_mem.prg_rom.extend([0x09, 0xA0, 0x49, 0xBA, 0x29, 0x44].iter().cloned());
 
         // [Test Asm] JMP $8000
@@ -1226,8 +1222,8 @@ mod cpu_test {
 
         // ROM Dump
         // println!("[TEST] : ROM = {:02X?}", cpu.nes_mem.prg_rom);
-        let len = cpu.nes_mem.prg_rom.len();
 
+        let len = cpu.nes_mem.prg_rom.len();
         for _ in 1..len
         {
             cpu_proc(&mut cpu);

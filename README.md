@@ -1,5 +1,5 @@
 # PJ進捗
-`進捗率` ... `18.75%`  
+`進捗率` ... **37.50%**  
 
 <img src="dev/pj_status.png" alt="file">
 
