@@ -73,7 +73,6 @@ impl APUReg {
         }
     }
 
-
     fn apu_reg_read(&self, address: u16) -> u8 {
         match address {
             APU_SQUARE_WAVE_1_CTRL_1_REG_ADDR => self.square_wave_1_ctrl_1_reg,

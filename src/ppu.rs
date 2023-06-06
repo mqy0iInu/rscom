@@ -11,9 +11,6 @@ const PPU_PPU_MEM_DATA_REG_ADDR: u16 = 0x2007;
 
 // ==================================================================================
 // PPU Memory
-// const PPU_VRAM_SIZE: u16 = 0x4000;      // PPUのメモリサイズ (16KB)
-// const PPU_VRAM_START_ADDR: u16 = 0x0000;  // PPUメモリの開始アドレス
-// const PPU_VRAM_END_ADDR: u16 = PPU_VRAM_SIZE - 1;
 // const PPU_OAM_SIZE: usize = 0x0100;  // OAM（Object Attribute Memory）のサイズ (256バイト)
 // const PPU_OAM_START_ADDR: u16 = 0x0000;  // OAMの開始アドレス
 // const PPU_OAM_END_ADDR: u16 = PPU_OAM_START_ADDR + PPU_OAM_SIZE as u16 - 1;  // OAMの終了アドレス
@@ -70,6 +67,7 @@ pub struct PPUReg {
     bg_scroll_reg: u8,       // ($2005) (RW) BG Scroll Register
     ppu_mem_addr_reg: u8,    // ($2006) (RW) PPU Mem, Addr Register
     ppu_mem_data_reg: u8,    // ($2007) (RW) PPU Mem, Data Register
+    oam: [u8; 0x100],        // OAM
 }
 
 impl PPUReg {
@@ -83,6 +81,7 @@ impl PPUReg {
             bg_scroll_reg: 0,       // ($2005) (RW) BG Scroll Register
             ppu_mem_addr_reg: 0,    // ($2006) (RW) PPU Mem, Addr Register
             ppu_mem_data_reg: 0,    // ($2007) (RW) PPU Mem, Data Register
+            oam: [0; 0x100],
         }
     }
 
@@ -124,6 +123,16 @@ impl PPUReg {
         }else{
             self.ppu_reg_read(addr)
         }
+    }
+
+    pub fn ppu_oam_read(&mut self, addr: u8) -> u8
+    {
+        self.oam[addr as usize]
+    }
+
+    pub fn ppu_oam_write(&mut self, addr: u8, data: u8)
+    {
+        self.oam[addr as usize] = data;
     }
 }
 

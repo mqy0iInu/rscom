@@ -16,29 +16,27 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
     - `5 Key Input Polling(SDL2)🔎🖱️⌨`
   - `PPU Thread🧑‍💻`
     - `Screen Rendering(SDL2)🎞️📺📺`
-  - `APUスレッド🧑‍💻`
+  - `APU Thread🧑‍💻`
     - `Audio Output(SDL2)🎵🎶🔊`
   - `Main Functuion Loop🧑‍💻`
     - (TBD)Emu Stop,Emu Rewinding, etc.
 
 # 📍PJ Status / PJ進捗状況📊
-`PJ Status / 進捗率` ... `📊43.75%📊`  
+## `PJ Status / 進捗率` ... `📊58.824%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file">
 
-# 📍Reference / 参考文献🎓📘📖
+# 📍Reference🎓📘📖
 下記に参考文献を示す。
 
-# 📍Book Reference / 参考書籍🎓📘📖
+## 📍Book Referenc🎓📘📖
 
+`👇This is my NES Bible 🤣👼👼‼`  
 >PCポケットカルチャーシリーズ ファミコンの驚くべき発想力 ―限界を突破する技術に学べ―  
 [About]💰💸🤑 -> : https://gihyo.jp/book/2010/978-4-7741-4429-0
 
-`This is my NES Bible 🤣👼👼‼`  
-
 <img src="dev/nes_refarence_book.jpg" alt="book">
-
 
 ## Block Diagram Reference🎓📘📖
 👇Very Very Nice! Block Diagram Reference!👇
@@ -68,7 +66,7 @@ https://zenn.dev/hankei6km/articles/using-jemalloc-in-rust-speeds-up-parallelism
 https://zenn.dev/khale/articles/rust-beginners-catchup  
 https://qiita.com/yoshii0110/items/6d70323f01fefcf09682  
 
-## Emmbed Rust Reference🎓🎓🎓
+## Emmbed Rust Reference🎓📘📖
 https://tomoyuki-nakabayashi.github.io/book/intro/index.html  
 https://qiita.com/ochaochaocha3/items/1969d76debd6d3b42269  
 https://lab.seeed.co.jp/entry/2021/04/30/180000  

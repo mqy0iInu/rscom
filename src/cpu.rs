@@ -4,15 +4,6 @@ use std::convert::From;
 use std::rc::Rc;
 // use std::num::Wrapping;
 
-pub const BIN_BIT_7: u8 = 0x80;                     // bit7
-pub const BIN_BIT_6: u8 = 0x40;                     // bit6
-pub const BIN_BIT_5: u8 = 0x20;                     // bit5
-pub const BIN_BIT_4: u8 = 0x10;                     // bit4
-pub const BIN_BIT_3: u8 = 0x08;                     // bit3
-pub const BIN_BIT_2: u8 = 0x04;                     // bit2
-pub const BIN_BIT_1: u8 = 0x02;                     // bit1
-pub const BIN_BIT_0: u8 = 0x01;                     // bit0
-
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
 pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
 pub const R_FLG: u8 = 0b0010_0000;                  // bit5: R Flag. Reaerved.予約済 (常に1固定)
@@ -1083,6 +1074,17 @@ fn cpu_proc(cpu :&mut RP2A03<u8>)
 
 
 static mut S_CPU: Option<RP2A03<u8>> = None;
+static mut S_CPU_STOP: bool = false;
+
+pub fn cpu_stop(flg: bool)
+{
+    unsafe {
+        if S_CPU_STOP != false
+        {
+            println!("[DEBUG] : CPU Stop");
+        }
+    }
+}
 
 pub fn cpu_reset() {
     unsafe {
@@ -1105,13 +1107,17 @@ pub fn cpu_reset() {
     }
 }
 
-pub fn cpu_main() {
-    println!("[DEBUG] : CPU Main Loop");
+pub fn cpu_main()
+{
     unsafe {
-        if let Some(ref mut cpu) = S_CPU {
-            cpu_proc(cpu);
-            cpu_reg_show(cpu);
-        }
+        if S_CPU_STOP != true
+        {
+            println!("[DEBUG] : CPU Main Loop");
+                if let Some(ref mut cpu) = S_CPU {
+                    cpu_proc(cpu);
+                    cpu_reg_show(cpu);
+                }
+            }
     }
 }
 
