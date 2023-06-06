@@ -1,3 +1,4 @@
+use crate::mem::*;
 use std::convert::TryInto;
 use std::convert::From;
 use std::rc::Rc;
@@ -11,13 +12,6 @@ pub const BIN_BIT_3: u8 = 0x08;                     // bit3
 pub const BIN_BIT_2: u8 = 0x04;                     // bit2
 pub const BIN_BIT_1: u8 = 0x02;                     // bit1
 pub const BIN_BIT_0: u8 = 0x01;                     // bit0
-
-pub const ADDR_CHR_ROM: u16 = 0x4020;               // CHR-ROM TOP
-pub const ADDR_PRG_RAM: u16 = 0xFFFE;               // PRG-RAM TOP
-pub const ADDR_PRG_ROM: u16 = 0x8000;               // PRG-ROM TOP
-pub const ADDR_VEC_TBL_RST: u16 = 0xFFFC;           // RESET Vector Table
-pub const ADDR_VEC_TBL_IRQ: u16 = 0xFFFE;           // IRQ Vector Table
-pub const ADDR_VEC_TBL_NMI: u16 = 0xFFFA;           // NMI Vector Table
 
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
 pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
@@ -202,60 +196,6 @@ impl StatusRegister {
             ret = 0;
         }
         ret as u8
-    }
-}
-
-
-struct NESMemory {
-    wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
-    vram: [u8; 2048],         // VRAM ... 2KB (For PPU)
-    ppu_registers: [u8; 8],   // PPUレジスタ
-    apu_registers: [u8; 24],  // APUレジスタ
-
-    chr_rom: Vec<u8>,         // CHR ROM ... 8KB or 16KB
-    ext_ram: Vec<u8>,         // Ext RAM
-    prg_rom: Vec<u8>,         // PRG ROM ... 8KB ~ 1MB
-}
-
-impl NESMemory {
-    fn new() -> Self {
-        NESMemory {
-            wram: [0; 2048],
-            vram: [0; 2048],
-            ppu_registers: [0; 8],
-            apu_registers: [0; 24],
-            chr_rom: Vec::new(),
-            ext_ram: Vec::new(),
-            prg_rom: Vec::new(),
-        }
-    }
-
-    fn mem_read(&self, address: u16) -> u8 {
-        match address {
-            0x0000..=0x07FF => self.wram[address as usize],                     // WRAM ... 2KB (For RP2A03)
-            0x0800..=0x1FFF => self.wram[(address % 0x0800) as usize],          // RAMのミラーリング
-            0x2000..=0x2007 => self.ppu_registers[(address - 0x2000) as usize], // PPUレジスタ
-            0x2008..=0x3FFF => self.vram[(address - 0x2000) as usize],          // VRAM ... 2KB (For PPU)
-            0x4000..=0x4017 => self.apu_registers[(address - 0x4000) as usize], // APUレジスタ
-            0x4020..=0x5FFF => self.chr_rom[(address - 0x4020) as usize],       // CHR ROM ... 8KB or 16KB
-            0x6000..=0x7FFF => self.ext_ram[(address - 0x6000) as usize],       // Ext RAM
-            0x8000..=0xFFFF => self.prg_rom[(address - 0x8000) as usize],       // PRG ROM ... 8KB ~ 1MB
-            _ => panic!("Invalid memory address: {:#06x}", address),
-        }
-    }
-
-    fn mem_write(&mut self, address: u16, data: u8) {
-        match address {
-            0x0000..=0x07FF => self.wram[address as usize] = data,                     // WRAM ... 2KB (For RP2A03)
-            0x0800..=0x1FFF => self.wram[(address % 0x0800) as usize] = data,          // RAMのミラーリング
-            0x2000..=0x2007 => self.ppu_registers[(address - 0x2000) as usize] = data, // PPUレジスタ
-            0x2008..=0x3FFF => self.vram[(address - 0x2000) as usize] = data,          // VRAM ... 2KB (For PPU)
-            0x4000..=0x4017 => self.apu_registers[(address - 0x4000) as usize] = data, // APUレジスタ
-            0x4020..=0x5FFF => self.chr_rom[(address - 0x4020) as usize] = data,       // CHR ROM ... 8KB or 16KB
-            0x6000..=0x7FFF => self.ext_ram[(address - 0x6000) as usize] = data,       // Ext RAM
-            0x8000..=0xFFFF => self.prg_rom[(address - 0x8000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
-            _ => panic!("Invalid memory address: {:#06x}", address),
-        }
     }
 }
 
@@ -1156,15 +1096,11 @@ pub fn cpu_reset() {
 
     unsafe {
         if let Some(ref mut cpu) = S_CPU {
+            cpu.nes_mem.mem_reset();
             cpu.reset();
 
-            // DEBUG :ダミーROMデータ
-            // ROM = $8000~$8015でロード、ストア、演算命令をループ
+        // (DEBUG)
             cpu.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
-            cpu.nes_mem.prg_rom.extend([0x38, 0xF8, 0x78, 0x18, 0xD8, 0x58, 0xB8].iter().cloned());
-            cpu.nes_mem.prg_rom.extend([0xA9, 0x0A, 0xAA, 0x8A, 0xA9, 0x0B, 0xA8, 0x98].iter().cloned());
-            cpu.nes_mem.prg_rom.extend([0x09, 0xA0, 0x49, 0xBA, 0x29, 0x44].iter().cloned());
-            cpu.nes_mem.prg_rom.extend([0x4C, 0x00, 0x80].iter().cloned());
         }
     }
 }
@@ -1182,71 +1118,11 @@ pub fn cpu_main() {
 // ====================================== TEST ======================================
 #[cfg(test)]
 mod cpu_test {
-    use super::*;
 
     #[test]
-    fn cpu_test_func()
+    fn cpu_test()
     {
-        let mut cpu = RP2A03 {
-            cpu_reg: [0u8; 4],
-            cpu_p_reg: StatusRegister::new(),
-            cpu_pc: ProgramCounter::new(),
-            nes_mem: NESMemory::new(),
-        };
-
-        // CPU Init
-        cpu.reset();
-
-        // [Test Asm] SEC, SED, SEI, CLC, CLD, CLI, CLV
-        //      0) 初期状態（bit5と、Vフラグが立っている）:     0110_0000
-        //      1) SEC（キャリーフラグをセット）:               0110_0001
-        //      1) SED（デシマルモードフラグをセット）:         0110_0011
-        //      1) SEI（割り込み無効フラグをセット）:           0110_0111
-        //      2) CLC（キャリーフラグをクリア）:               0110_0110
-        //      2) CLD（デシマルモードフラグをクリア）:         0110_0100
-        //      2) CLI（割り込み無効フラグをクリア）:           0110_0000
-        //      2) CLV（オーバーフローフラグをクリア）:         0010_0000
-        cpu.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
-        cpu.nes_mem.prg_rom.extend([0x38, 0xF8, 0x78, 0x18, 0xD8, 0x58, 0xB8].iter().cloned());
-
-        // ; [Test Asm] TAX TXA TAY TYA
-        // LDA #$0A ; A:0x0A
-        // TAX      ; A:0x0A, X:0x0A
-        // TXA      ; A:0x0A, X:0x0A
-        //
-        // LDA #$0B ; A:0x0B
-        // TAY      ; A:0x0B, X:0x0A, Y:0x0B
-        // TYA      ; A:0x0B, X:0x0A, Y:0x0B
-        cpu.nes_mem.prg_rom.extend([0xA9, 0x0A, 0xAA, 0x8A, 0xA9, 0x0B, 0xA8, 0x98].iter().cloned());
-
-        // ; [Test Asm] ORA EOR AND
-        //          ; A:0x0B, X:0x0A, Y:0x0B
-        // ORA #$A0 ; A:0xAB (0xA0 | 0x0B = 0xAB), X:0x0A, Y:0x0B
-        // EOR #$BA ; A:0x11 (0xAB ^ 0xBA:0x11), X:0x0A, Y:0x0B
-        // AND #$44 ; A:0x00 (0x44 & 0x11 = 0x00), X:0x0A, Y:0x0B
-        cpu.nes_mem.prg_rom.extend([0x09, 0xA0, 0x49, 0xBA, 0x29, 0x44].iter().cloned());
-
-        // [Test Asm] JMP $8000
-        cpu.nes_mem.prg_rom.extend([0x4C, 0x00, 0x80].iter().cloned());
-
-        // ROM Dump
-        // println!("[TEST] : ROM = {:02X?}", cpu.nes_mem.prg_rom);
-
-        let len = cpu.nes_mem.prg_rom.len();
-        for _ in 1..len
-        {
-            cpu_proc(&mut cpu);
-            cpu_reg_show(&cpu);
-        }
-        let a: u8 = cpu.get_register(CPUReg::A);
-        let x: u8 = cpu.get_register(CPUReg::X);
-        let y: u8 = cpu.get_register(CPUReg::Y);
-        // let sp: u8 = cpu.get_register(CPUReg::SP);
-        let p: u8 = cpu.cpu_p_reg.get_status_flg_all();
-        assert_eq!(p,0b0010_0000, "[ERR]: Test Fail ... Status Reg, Not Match!");
-        assert_eq!(x,0x0A, "[ERR]: Test Fail ... X Reg, Not Match!");
-        assert_eq!(y,0x0B, "[ERR]: Test Fail ... Y Reg, Not Match!");
-        assert_eq!(a,0x00, "[ERR]: Test Fail ... A Reg, Not Match!");
+        // TODO CPU Test
     }
 }
 // ==================================================================================

@@ -1,9 +1,10 @@
+mod mem;
 mod cpu;
 mod ppu;
 mod apu;
-use cpu::{cpu_main, cpu_reset};
-use ppu::{ppu_main, ppu_reset};
-use apu::{apu_main, apu_reset};
+use cpu::{cpu_reset, cpu_main};
+use ppu::{ppu_reset, ppu_main};
+use apu::{apu_reset, apu_main};
 use std::thread;
 use std::time::Duration;
 
