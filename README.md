@@ -22,7 +22,7 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
     - (TBD)Emu Stop,Emu Rewinding, etc.
 
 # 📍PJ Status / PJ進捗状況📊
-## `PJ Status / 進捗率` ... `📊58.824%📊`  
+## `PJ Status / 進捗率` ... `📊70.588%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file">
@@ -46,10 +46,20 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 > 引用元(Reference From): https://forums.nesdev.org/viewtopic.php?t=20685&start=75
 
 ## 6502 & RP2A03 Reference🎓📘📖
-https://bugzmanov.github.io/nes_ebook/index.html  
 https://www.nesdev.org/wiki/NES_reference_guide  
 https://www.nesdev.org/obelisk-6502-guide/reference.html  
 https://pgate1.at-ninja.jp/NES_on_FPGA/  
+https://github.com/suzukiplan/mgp-fc
+
+## NES Reference🎓📘📖
+[MMU & Mapper]  
+http://pasofami.game.coocan.jp/FamTitleList.htm  
+
+[Emu]
+https://bugzmanov.github.io/nes_ebook/index.html  
+
+[iNES]
+https://www.nesdev.org/wiki/INES
 
 ## Rust Reference🎓📘📖
 https://doc.rust-jp.rs/book-ja/  

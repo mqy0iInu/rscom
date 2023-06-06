@@ -2,6 +2,7 @@ mod mem;
 mod cpu;
 mod ppu;
 mod apu;
+mod cassette;
 use cpu::{cpu_reset, cpu_main};
 use ppu::{ppu_reset, ppu_main};
 use apu::{apu_reset, apu_main};
