@@ -657,18 +657,57 @@ where
             }
             OpcodeType::STA => {
                 let a: T = self.get_register(CPUReg::A);
-                self.write(self.cpu_pc.pc, a);
-                println!("STA");
+                let mut addr: u16 = 0;
+
+                if let Some(value) = operand {
+                    let val: u8 = value.try_into().unwrap();
+                    addr = self.cpu_pc.pc | val as u16;
+                    println!("STA {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        addr = (val2 as u16) << 8 | val as u16;
+                        println!("STA {:#02X} {:#02X}", val, val2);
+                    }
+                }
+                self.write(addr, a);
             }
             OpcodeType::STX => {
                 let x: T = self.get_register(CPUReg::X);
-                self.write(self.cpu_pc.pc, x);
-                println!("STX");
+                let mut addr: u16 = 0;
+
+                if let Some(value) = operand {
+                    let val: u8 = value.try_into().unwrap();
+                    addr = self.cpu_pc.pc | val as u16;
+                    println!("STX {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        addr = (val2 as u16) << 8 | val as u16;
+                        println!("STX {:#02X} {:#02X}", val, val2);
+                    }
+                }
+                self.write(addr, x);
             }
             OpcodeType::STY => {
                 let y: T = self.get_register(CPUReg::Y);
-                self.write(self.cpu_pc.pc, y);
-                println!("STY");
+                let mut addr: u16 = 0;
+
+                if let Some(value) = operand {
+                    let val: u8 = value.try_into().unwrap();
+                    addr = self.cpu_pc.pc | val as u16;
+                    println!("STY {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        addr = (val2 as u16) << 8 | val as u16;
+                        println!("STY {:#02X} {:#02X}", val, val2);
+                    }
+                }
+                self.write(addr, y);
             }
 
             // Register Transfer Operations/レジスタ転送関連の命令
