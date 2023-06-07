@@ -635,25 +635,46 @@ where
 
             // Load/Store Operations
             OpcodeType::LDA => {
+                let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val = value.into();
-                    self.set_register(CPUReg::A, val);
+                    let val: u8 = value.try_into().unwrap();
+                    ret = val;
+                    println!("LDA {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val2: u8 = value2.try_into().unwrap();
+                        println!("LDA {:#02X} {:#02X}", val, val2);
+                    }
                 }
-                println!("LDA");
+                self.set_register(CPUReg::A, ret.try_into().unwrap());
             }
             OpcodeType::LDX => {
+                let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val = value.into();
-                    self.set_register(CPUReg::X, val);
+                    let val: u8 = value.try_into().unwrap();
+                    ret = val;
+                    println!("LDX {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val2: u8 = value2.try_into().unwrap();
+                        println!("LDX {:#02X} {:#02X}", val, val2);
+                    }
                 }
-                println!("LDX");
+                self.set_register(CPUReg::X, ret.try_into().unwrap());
             }
             OpcodeType::LDY => {
+                let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val = value.into();
-                    self.set_register(CPUReg::Y, val);
+                    let val: u8 = value.try_into().unwrap();
+                    ret = val;
+                    println!("LDY {:#02X}", val);
+
+                    if let Some(value2) = operand_second {
+                        let val2: u8 = value2.try_into().unwrap();
+                        println!("LDY {:#02X} {:#02X}", val, val2);
+                    }
                 }
-                println!("LDY");
+                self.set_register(CPUReg::Y, ret.try_into().unwrap());
             }
             OpcodeType::STA => {
                 let a: T = self.get_register(CPUReg::A);
