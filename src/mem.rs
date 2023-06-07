@@ -25,14 +25,14 @@ pub const DMA_START_ADDR:u16 = 0x4014;
 pub const DMA_SIZE:u16 = 0x4014;
 
 pub struct NESMemory {
-    wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
-    vram: [u8; 2048],         // VRAM ... 2KB (For PPU)
-    dma_start_addr: u8,
-    apu_reg: APUReg,          // APUレジスタ
-    ppu_reg: PPUReg,          // PPUレジスタ
-    chr_rom: Vec<u8>,         // CHR ROM ... 8KB or 16KB
-    ext_ram: Vec<u8>,         // Ext RAM
-    prg_rom: Vec<u8>,         // PRG ROM ... 8KB ~ 1MB
+    pub wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
+    pub vram: [u8; 2048],         // VRAM ... 2KB (For PPU)
+    pub dma_start_addr: u8,
+    pub apu_reg: APUReg,          // APUレジスタ
+    pub ppu_reg: PPUReg,          // PPUレジスタ
+    pub chr_rom: Vec<u8>,         // CHR ROM ... 8KB or 16KB
+    pub ext_ram: Vec<u8>,         // Ext RAM
+    pub prg_rom: Vec<u8>,         // PRG ROM ... 8KB ~ 1MB
 }
 
 impl NESMemory {

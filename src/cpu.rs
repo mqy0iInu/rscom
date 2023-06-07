@@ -20,6 +20,22 @@ enum CPUReg {
     SP,  // スタックポインタ              ... スタックのトップアドレスを示す。
 }
 
+struct ProgramCounter {
+    pc: u16,
+}
+
+impl ProgramCounter {
+    fn new() -> Self {
+        ProgramCounter {
+            // TODO PCの初期位置
+            pc : ADDR_PRG_ROM,
+
+             // リセットベクタ
+            // pc : Self::ADDR_VEC_TBL_RST,
+        }
+    }
+}
+
 enum OpcodeType {
     // Load/Store Operations
     LDA, LDX, LDY, STA, STX, STY,
@@ -57,7 +73,6 @@ enum AddrMode {
 
 struct Opcode {
     opcode_type: OpcodeType,
-
 }
 
 #[derive(Clone)]
@@ -72,27 +87,11 @@ trait CPU<T> {
     fn get_register(&self, register: CPUReg) -> T;
     fn set_register(&mut self, register: CPUReg, value: T);
     fn fetch_instruction(&mut self) -> T;
+    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>);
     fn decode_instruction(&mut self, op_code: T) -> (Opcode, Addressing);
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing);
     fn push_stack(&mut self, data: T);
     fn pop_stack(&mut self) -> T;
-    fn read_operand(&mut self, addressing: Addressing) -> Option<T>;
-}
-
-struct ProgramCounter {
-    pc: u16,
-}
-
-impl ProgramCounter {
-    fn new() -> Self {
-        ProgramCounter {
-            // TODO PCの初期位置
-            pc : ADDR_PRG_ROM,
-
-             // リセットベクタ
-            // pc : Self::ADDR_VEC_TBL_RST,
-        }
-    }
 }
 
 /// RP2A03のステータスレジスタ
@@ -430,20 +429,7 @@ where
     }
 
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing) {
-        let addressing_temp = addressing.clone();
-        let operand = self.read_operand(addressing);
-        let operand_second;
-        let mut jmp_flg = false;
-
-        match *addressing_temp.addr_mode {
-            AddrMode::IND | AddrMode::IndX | AddrMode::IndY |
-            AddrMode::ABS | AddrMode::AbsX | AddrMode::AbsY => {
-                operand_second = self.read_operand(addressing_temp.clone());
-            },
-            _ => {
-                operand_second = None;
-            }
-        };
+        let (operand,operand_second) = self.read_operand(addressing);
 
         match opcode.opcode_type {
             OpcodeType::NOP => {
@@ -772,28 +758,30 @@ where
             // Jump and Call Operations
             OpcodeType::JMP => {
                 if let Some(value) = operand {
-                    let val: u16 = value.into();
-                    let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                    let jump_addr = val | (val_second << 8);
-                    self.cpu_pc.pc = jump_addr;
-                    println!("JMP ${:04X}", jump_addr);
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
+                        self.cpu_pc.pc = jump_addr;
+                        println!("JMP ${:04X}",jump_addr);
+                    }
                 }
-                jmp_flg = true;
             }
             OpcodeType::JSR => {
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                self.cpu_pc.pc += 1;
                 let return_addr: u16 = self.cpu_pc.pc;
                 self.push_stack((return_addr & 0x00FF).try_into().unwrap());
                 self.push_stack(((return_addr & 0xFF00) >> 0x0008).try_into().unwrap());
 
                 if let Some(value) = operand {
-                    let val: u16 = value.into();
-                    let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                    let jump_addr: u16 = val | (val_second << 8);
-                    self.cpu_pc.pc = jump_addr;
-                    println!("JSR ${:04X}", jump_addr);
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
+                        self.cpu_pc.pc = jump_addr;
+                        println!("JSR {:#02X},{:#02X}(${:04X})", val,val2,jump_addr);
+                    }
                 }
-                jmp_flg = true;
             }
 
             // Branch Operations / 分岐命令
@@ -807,7 +795,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BCC ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BCC Not Jump!");
             }
@@ -821,7 +808,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BCS ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BCS Not Jump!");
             }
@@ -835,7 +821,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BEQ ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BEQ Not Jump!");
             }
@@ -849,7 +834,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BNE ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BNE Not Jump!");
             }
@@ -863,7 +847,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BVC ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BVC Not Jump!");
             }
@@ -877,7 +860,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BVS ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BVS Not Jump!");
             }
@@ -891,7 +873,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BPL ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BPL Not Jump!");
             }
@@ -905,7 +886,6 @@ where
                         self.cpu_pc.pc = jump_addr;
                         println!("BMI ${:04X}", jump_addr);
                     }
-                    jmp_flg = true;
                 }
                 println!("BMI Not Jump!");
             }
@@ -924,12 +904,12 @@ where
                 let mut return_addr = self.pop_stack();
                 return_addr |= self.pop_stack() << 8;
                 self.cpu_pc.pc = return_addr.try_into().unwrap();
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                self.cpu_pc.pc += 1;
             }
             OpcodeType::BRK => {
                 if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
                     print!("BRK(INT)");
-                    self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                    self.cpu_pc.pc += 1;
                     self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
                     self.push_stack((self.cpu_pc.pc & 0x00FF).try_into().unwrap());
                     self.push_stack(((self.cpu_pc.pc & 0xFF00) >> 0x0008).try_into().unwrap());
@@ -951,10 +931,10 @@ where
         }
 
         // pc ++
-        if jmp_flg != true {
-            self.cpu_pc.pc = self.cpu_pc.pc + 1;
+        if operand != None
+        {
+            self.cpu_pc.pc += 1;
         }
-
     }
 
     fn push_stack(&mut self, data: T) {
@@ -973,75 +953,79 @@ where
         self.read(address)
     }
 
-    fn read_operand(&mut self, addressing: Addressing) -> Option<T>
+    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>)
     {
-        self.cpu_pc.pc = self.cpu_pc.pc + 1;
-
+        self.cpu_pc.pc += 1;
         match *addressing.addr_mode {
             AddrMode::ACC => {
                 print!("OP-Code:(ACC) ");
-                Some(self.get_register(CPUReg::A))
+                (Some(self.get_register(CPUReg::A)), None)
             }
             AddrMode::IMM => {
                 print!("OP-Code:(IMM) ");
-                Some(self.read(self.cpu_pc.pc))
+                (Some(self.read(self.cpu_pc.pc)), None)
             }
             AddrMode::ZPG => {
                 print!("OP-Code:(ZPG) ");
-                Some(self.read(self.cpu_pc.pc))
+                (Some(self.read(self.cpu_pc.pc)), None)
             }
             AddrMode::ZpgX => {
                 print!("OP-Code:(ZpgX) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
-                Some(self.read(address.try_into().unwrap()))
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::ZpgY => {
                 print!("OP-Code:(ZpgY) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                Some(self.read(address.try_into().unwrap()))
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::ABS => {
                 print!("OP-Code:(ABS) ");
-                Some(self.read(self.cpu_pc.pc))
+                let address_l:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                self.cpu_pc.pc += 1;
+                let address_u:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
             }
             AddrMode::AbsX => {
                 print!("OP-Code:(AbsX) ");
-                let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
-                Some(self.read(address.try_into().unwrap()))
+                let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
+                (Some(self.read(address.try_into().unwrap())),
+                Some(self.read(address.try_into().unwrap())))
             }
             AddrMode::AbsY => {
                 print!("OP-Code:(AbsY) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                Some(self.read(address.try_into().unwrap()))
+                (Some(self.read(address.try_into().unwrap())),
+                Some(self.read(address.try_into().unwrap())))
             }
             AddrMode::IND => {
                 print!("OP-Code:(IND) ");
-                let indirect_address: T = self.read(self.cpu_pc.pc);
-                Some(self.read(indirect_address.try_into().unwrap()))
+                let address: T = self.read(self.cpu_pc.pc);
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::IndX => {
                 print!("OP-Code:(IndX) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
-                let indirect_address: T = self.read(base_address.try_into().unwrap());
-                Some(self.read(indirect_address.try_into().unwrap()))
+                let address: T = self.read(base_address.try_into().unwrap());
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::IndY => {
                 print!("OP-Code:(IndY) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                let indirect_address: T = self.read(base_address.try_into().unwrap());
-                Some(self.read(indirect_address.try_into().unwrap()))
+                let address: T = self.read(base_address.try_into().unwrap());
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::REL => {
                 print!("OP-Code:(REL) ");
                 let offset = self.read(self.cpu_pc.pc);
-                let target_address: u16 = self.cpu_pc.pc.wrapping_add(offset.try_into().unwrap());
-                Some(self.read(target_address.try_into().unwrap()))
+                let address: u16 = self.cpu_pc.pc.wrapping_add(offset.try_into().unwrap());
+                (Some(self.read(address.try_into().unwrap())),None)
             }
             AddrMode::IMPL => {
                 print!("OP-Code:(IMPL) ");
                 // Not, Have Operand
-                self.cpu_pc.pc = self.cpu_pc.pc - 1;
-                None
+                // self.cpu_pc.pc = self.cpu_pc.pc - 1;
+                (None, None)
             }
         }
     }
@@ -1067,7 +1051,6 @@ fn cpu_proc(cpu :&mut RP2A03<u8>)
     // println!("[DEBUG] : Execute!");
     cpu.execute_instruction(opcode, addressing);
 }
-
 
 static mut S_CPU: Option<RP2A03<u8>> = None;
 static mut S_CPU_STOP: bool = false;
