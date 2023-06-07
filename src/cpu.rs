@@ -988,15 +988,21 @@ where
             }
             AddrMode::AbsX => {
                 print!("OP-Code:(AbsX) ");
-                let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                (Some(self.read(address.try_into().unwrap())),
-                Some(self.read(address.try_into().unwrap())))
+                let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::X)).unwrap();
+                self.cpu_pc.pc += 1;
+                let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                address_u |= address_l;
+                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
             }
             AddrMode::AbsY => {
                 print!("OP-Code:(AbsY) ");
-                let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                (Some(self.read(address.try_into().unwrap())),
-                Some(self.read(address.try_into().unwrap())))
+                let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::Y)).unwrap();
+                self.cpu_pc.pc += 1;
+                let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                address_u |= address_l;
+                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
             }
             AddrMode::IND => {
                 print!("OP-Code:(IND) ");

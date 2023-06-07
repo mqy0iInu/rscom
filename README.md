@@ -35,9 +35,11 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 `👇This is my NES Bible 🤣👼👼‼`  
 >PCポケットカルチャーシリーズ ファミコンの驚くべき発想力 ―限界を突破する技術に学べ―  
 [About]💰💸🤑 -> : https://gihyo.jp/book/2010/978-4-7741-4429-0
-
-<img src="dev/nes_refarence_book.jpg" alt="book">
-
+  
+<div align="center">
+<img src="dev/nes_refarence_book.jpg" alt="book" width="50%">
+</div>
+  
 ## Block Diagram Reference🎓📘📖
 👇Very Very Nice! Block Diagram Reference!👇
 
