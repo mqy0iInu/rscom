@@ -143,7 +143,7 @@ pub fn apu_reset()
 
 pub fn apu_main()
 {
-    println!("[DEBUG] : APU Main Loop");
+    // println!("[DEBUG] : APU Main Loop");
 }
 
 // ====================================== TEST ======================================

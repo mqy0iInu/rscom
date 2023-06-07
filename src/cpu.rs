@@ -520,12 +520,18 @@ where
                     let val: T = value.into();
                     let a = self.get_register(CPUReg::A);
                     let mut carry: T = T::from(0x00);
+                    let mut ret = T::from(0x00);
                     if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
                         carry = T::from(0x01);
+                        // A = A-M-(1-C)
+                        let result: T = a - val;
+                        ret = result;
+                    }else{
+                        let result: T = a - val - carry;
+                        ret = result;
                     }
-                    let result: T = a - val - carry;
-                    self.set_register(CPUReg::A, result);
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                    self.set_register(CPUReg::A, ret);
+                    self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
                 println!("SBC");
             }
@@ -969,82 +975,72 @@ where
 
     fn read_operand(&mut self, addressing: Addressing) -> Option<T>
     {
+        self.cpu_pc.pc = self.cpu_pc.pc + 1;
+
         match *addressing.addr_mode {
             AddrMode::ACC => {
-                // アキュムレータモードではオペランドが不要
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
-                // アキュムレータレジスタの値を返す
+                print!("OP-Code:(ACC) ");
                 Some(self.get_register(CPUReg::A))
             }
             AddrMode::IMM => {
-                // イミディエイトモードでは次のバイトが即値データ
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
-                Some(self.read(self.cpu_pc.pc))
-            }
-            AddrMode::ABS => {
-                // アブソリュートモードでは次の2バイトが絶対アドレス
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(IMM) ");
                 Some(self.read(self.cpu_pc.pc))
             }
             AddrMode::ZPG => {
-                // ゼロページモードでは次のバイトがゼロページアドレス
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(ZPG) ");
                 Some(self.read(self.cpu_pc.pc))
             }
             AddrMode::ZpgX => {
-                // ゼロページ、Xインデックスモードでは次のバイトがゼロページアドレスとXレジスタの値の和
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(ZpgX) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
                 Some(self.read(address.try_into().unwrap()))
             }
             AddrMode::ZpgY => {
-                // ゼロページ、Yインデックスモードでは次のバイトがゼロページアドレスとYレジスタの値の和
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(ZpgY) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
                 Some(self.read(address.try_into().unwrap()))
             }
+            AddrMode::ABS => {
+                print!("OP-Code:(ABS) ");
+                Some(self.read(self.cpu_pc.pc))
+            }
             AddrMode::AbsX => {
-                // アブソリュート、Xインデックスモードでは次の2バイトが絶対アドレスとXレジスタの値の和
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(AbsX) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
                 Some(self.read(address.try_into().unwrap()))
             }
             AddrMode::AbsY => {
-                // アブソリュート、Yインデックスモードでは次の2バイトが絶対アドレスとYレジスタの値の和
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(AbsY) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-
                 Some(self.read(address.try_into().unwrap()))
             }
             AddrMode::IND => {
-                // インダイレクトモードでは次の2バイトがジャンプ先の絶対アドレスを格納しているアドレス
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(IND) ");
                 let indirect_address: T = self.read(self.cpu_pc.pc);
                 Some(self.read(indirect_address.try_into().unwrap()))
             }
             AddrMode::IndX => {
-                // インデックスインダイレクト、Xインデックスモードでは次のバイトがアドレスの基準となる値
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(IndX) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
                 let indirect_address: T = self.read(base_address.try_into().unwrap());
                 Some(self.read(indirect_address.try_into().unwrap()))
             }
             AddrMode::IndY => {
-                // インダイレクトインデックス、Yインデックスモードでは次のバイトがアドレスの基準となる値
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(IndY) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
                 let indirect_address: T = self.read(base_address.try_into().unwrap());
                 Some(self.read(indirect_address.try_into().unwrap()))
             }
             AddrMode::REL => {
-                // リラティブモードでは次のバイトが相対的なジャンプオフセット
-                self.cpu_pc.pc = self.cpu_pc.pc + 1;
+                print!("OP-Code:(REL) ");
                 let offset = self.read(self.cpu_pc.pc);
                 let target_address: u16 = self.cpu_pc.pc.wrapping_add(offset.try_into().unwrap());
                 Some(self.read(target_address.try_into().unwrap()))
             }
             AddrMode::IMPL => {
-                // インプライドモードではオペランドが存在しない
+                print!("OP-Code:(IMPL) ");
+                // Not, Have Operand
+                self.cpu_pc.pc = self.cpu_pc.pc - 1;
                 None
             }
         }
@@ -1064,11 +1060,11 @@ fn cpu_reg_show(cpu :&RP2A03<u8>)
 
 fn cpu_proc(cpu :&mut RP2A03<u8>)
 {
-    println!("[DEBUG] : Fetch!");
+    // println!("[DEBUG] : Fetch!");
     let op_code = cpu.fetch_instruction();
-    println!("[DEBUG] : Decode!");
+    // println!("[DEBUG] : Decode!");
     let (opcode, addressing) = cpu.decode_instruction(op_code);
-    println!("[DEBUG] : Execute!");
+    // println!("[DEBUG] : Execute!");
     cpu.execute_instruction(opcode, addressing);
 }
 
@@ -1112,7 +1108,7 @@ pub fn cpu_main()
     unsafe {
         if S_CPU_STOP != true
         {
-            println!("[DEBUG] : CPU Main Loop");
+            // println!("[DEBUG] : CPU Main Loop");
                 if let Some(ref mut cpu) = S_CPU {
                     cpu_proc(cpu);
                     cpu_reg_show(cpu);

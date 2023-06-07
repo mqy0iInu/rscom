@@ -28,29 +28,29 @@ fn main()
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            thread::sleep(Duration::from_millis(300));
+            thread::sleep(Duration::from_secs(3));
         }
     });
 
     let _ppu_thread = thread::spawn(|| {
         loop {
             ppu_main();
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_secs(3));
         }
     });
 
     let _apu_thread = thread::spawn(|| {
         loop {
             apu_main();
-            thread::sleep(Duration::from_millis(800));
+            thread::sleep(Duration::from_secs(3));
         }
     });
 
 // ==================================================================================
 // [Main Loop]
     loop {
-        println!("[DEBUG] : App Main Loop");
-        thread::sleep(Duration::from_millis(999));
+        // println!("[DEBUG] : App Main Loop");
+        thread::sleep(Duration::from_secs(3));
     }
 // ==================================================================================
 }

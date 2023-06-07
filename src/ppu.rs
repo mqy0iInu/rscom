@@ -143,7 +143,7 @@ pub fn ppu_reset()
 
 pub fn ppu_main()
 {
-    println!("[DEBUG] : PPU Main Loop");
+    // println!("[DEBUG] : PPU Main Loop");
 }
 
 // ====================================== TEST ======================================
