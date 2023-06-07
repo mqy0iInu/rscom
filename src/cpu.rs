@@ -435,7 +435,7 @@ where
         match opcode.opcode_type {
             OpcodeType::NOP => {
                 // No operation, do nothing
-                println!("NOP");
+                println!("{}",format!("[DEBUG]: NOP ${}",dbg_str));
             }
 
             // // Logical Operations / 論理演算命令
@@ -445,7 +445,7 @@ where
                     let result: T = a & operand_value;
                     self.set_register(CPUReg::A, result);
                 }
-                println!("AND");
+                println!("{}",format!("[DEBUG]: AND ${}",dbg_str));
             }
             OpcodeType::ORA => {
                 let a: T = self.get_register(CPUReg::A);
@@ -453,7 +453,7 @@ where
                     let result: T = a | operand_value;
                     self.set_register(CPUReg::A, result);
                 }
-                println!("ORA");
+                println!("{}",format!("[DEBUG]: ORA ${}",dbg_str));
             }
             OpcodeType::EOR => {
                 let a: T = self.get_register(CPUReg::A);
@@ -461,7 +461,7 @@ where
                     let result: T = a ^ operand_value;
                     self.set_register(CPUReg::A, result);
                 }
-                println!("EOR");
+                println!("{}",format!("[DEBUG]: EOR ${}",dbg_str));
             }
             OpcodeType::BIT => {
                 let a: T = self.get_register(CPUReg::A);
@@ -483,7 +483,7 @@ where
                         self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
                     }
                 }
-                println!("BIT");
+                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
             }
 
             // Arithmetic Operations / 算術倫理演算
@@ -500,7 +500,7 @@ where
                     self.set_register(CPUReg::A, ret.try_into().unwrap());
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("ADC");
+                println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
             }
             OpcodeType::SBC => {
                 if let Some(value) = operand {
@@ -520,7 +520,7 @@ where
                     self.set_register(CPUReg::A, ret);
                     self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
-                println!("SBC");
+                println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
             }
             OpcodeType::CMP => {
                 if let Some(operand_value) = operand {
@@ -528,7 +528,7 @@ where
                     let result: T = a - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("CMP");
+                println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
             }
             OpcodeType::CPX => {
                 if let Some(operand_value) = operand {
@@ -536,7 +536,7 @@ where
                     let result: T = x - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("CPX");
+                println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
             }
             OpcodeType::CPY => {
                 if let Some(operand_value) = operand {
@@ -544,7 +544,7 @@ where
                     let result: T = y - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("CPY");
+                println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
             }
             OpcodeType::INC => {
                 if let Some(operand_value) = operand {
@@ -552,21 +552,21 @@ where
                     self.set_register(CPUReg::A, ret.try_into().unwrap());
                     self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
-                println!("INC");
+                println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
             }
             OpcodeType::INX => {
                 let x: T = self.get_register(CPUReg::X);
                 let ret: u8 = self.cpu_p_reg.c_flg_update_add(x.try_into().unwrap(), 1);
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                println!("INX");
+                println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
             }
             OpcodeType::INY => {
                 let y: T = self.get_register(CPUReg::Y);
                 let ret: u8 = self.cpu_p_reg.c_flg_update_add(y.try_into().unwrap(), 1);
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                println!("INY");
+                println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
             }
             OpcodeType::DEC => {
                 if let Some(operand_value) = operand {
@@ -574,21 +574,21 @@ where
                     self.set_register(CPUReg::A, result);
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("DEC");
+                println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
             }
             OpcodeType::DEX => {
                 let x: T = self.get_register(CPUReg::X);
                 let result: T = x - T::from(0x01);
                 self.set_register(CPUReg::X, result);
                 self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
-                println!("DEX");
+                println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
             }
             OpcodeType::DEY => {
                 let y: T = self.get_register(CPUReg::Y);
                 let result: T = y - T::from(0x01);
                 self.set_register(CPUReg::Y, result);
                 self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
-                println!("DEY");
+                println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
             }
 
             // Shift and Rotate Operations
@@ -598,7 +598,7 @@ where
                 ret = ret & 0xFE; // bit0, clear
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
-                println!("ASL");
+                println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
             }
             OpcodeType::LSR => {
                 let a: T = self.get_register(CPUReg::A);
@@ -606,7 +606,7 @@ where
                 ret = ret & 0x7F; // bit7, clear
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
-                println!("LSR");
+                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
             }
             OpcodeType::ROL => {
                 let a: T = self.get_register(CPUReg::A);
@@ -618,7 +618,7 @@ where
                 ret = ret | carry; // bit0 = C Flag Set
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
-                println!("ROL");
+                println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
             }
             OpcodeType::ROR => {
                 let a: T = self.get_register(CPUReg::A);
@@ -630,7 +630,7 @@ where
                 ret = ret | carry; // bit7 = C Flag Set
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
-                println!("ROR");
+                println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
             }
 
             // Load/Store Operations
@@ -639,41 +639,31 @@ where
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     ret = val;
-
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2.try_into().unwrap();
-                    }
-                    println!("{}",format!("LDA ${}",dbg_str));
                 }
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
+                println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
             }
             OpcodeType::LDX => {
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     ret = val;
-                    println!("LDX {:#02X}", val);
-
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2.try_into().unwrap();
-                        println!("LDX {:#02X} {:#02X}", val, val2);
-                    }
                 }
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
+                println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
             }
             OpcodeType::LDY => {
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     ret = val;
-                    println!("LDY {:#02X}", val);
 
                     if let Some(value2) = operand_second {
                         let val2: u8 = value2.try_into().unwrap();
-                        println!("LDY {:#02X} {:#02X}", val, val2);
                     }
                 }
                 self.set_register(CPUReg::Y, ret.try_into().unwrap());
+                println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
             }
             OpcodeType::STA => {
                 let a: T = self.get_register(CPUReg::A);
@@ -682,16 +672,15 @@ where
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     addr = self.cpu_pc.pc | val as u16;
-                    println!("STA {:#02X}", val);
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
                         let val2: u8 = value2.try_into().unwrap();
                         addr = (val2 as u16) << 8 | val as u16;
-                        println!("STA {:#02X} {:#02X}", val, val2);
                     }
                 }
                 self.write(addr, a);
+                println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
             }
             OpcodeType::STX => {
                 let x: T = self.get_register(CPUReg::X);
@@ -700,16 +689,15 @@ where
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     addr = self.cpu_pc.pc | val as u16;
-                    println!("STX {:#02X}", val);
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
                         let val2: u8 = value2.try_into().unwrap();
                         addr = (val2 as u16) << 8 | val as u16;
-                        println!("STX {:#02X} {:#02X}", val, val2);
                     }
                 }
                 self.write(addr, x);
+                println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
             }
             OpcodeType::STY => {
                 let y: T = self.get_register(CPUReg::Y);
@@ -718,101 +706,100 @@ where
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     addr = self.cpu_pc.pc | val as u16;
-                    println!("STY {:#02X}", val);
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
                         let val2: u8 = value2.try_into().unwrap();
                         addr = (val2 as u16) << 8 | val as u16;
-                        println!("STY {:#02X} {:#02X}", val, val2);
                     }
                 }
                 self.write(addr, y);
+                println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
             }
 
             // Register Transfer Operations/レジスタ転送関連の命令
             OpcodeType::TAX => {
                 let a = self.get_register(CPUReg::A);
                 self.set_register(CPUReg::X, a);
-                println!("TAX");
+                println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
             }
             OpcodeType::TAY => {
                 let a = self.get_register(CPUReg::A);
                 self.set_register(CPUReg::Y, a);
-                println!("TAY");
+                println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
             }
             OpcodeType::TXA => {
                 let x = self.get_register(CPUReg::X);
                 self.set_register(CPUReg::A, x);
-                println!("TXA");
+                println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
             }
             OpcodeType::TYA => {
                 let y = self.get_register(CPUReg::Y);
                 self.set_register(CPUReg::A, y);
-                println!("TYA");
+                println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
             }
 
             // Stack Operations / スタック関連の命令
             OpcodeType::TSX => {
                 let sp = self.get_register(CPUReg::SP);
                 self.set_register(CPUReg::X, sp);
-                println!("TSX");
+                println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
             }
             OpcodeType::TXS => {
                 let x = self.get_register(CPUReg::X);
                 self.set_register(CPUReg::SP, x);
-                println!("TXS");
+                println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
             }
             OpcodeType::PHA => {
                 let a = self.get_register(CPUReg::A);
                 self.push_stack(a);
-                println!("PHA");
+                println!("{}",format!("[DEBUG]: PHA ${}",dbg_str));
             }
             OpcodeType::PHP => {
                 let p = self.cpu_p_reg.get_status_flg_all();
                 self.push_stack(p.try_into().unwrap());
-                println!("PHP");
+                println!("{}",format!("[DEBUG]: PHP ${}",dbg_str));
             }
             OpcodeType::PLA => {
                 let value = self.pop_stack();
                 self.set_register(CPUReg::A, value);
                 self.cpu_p_reg.nzv_flg_update(value.try_into().unwrap());
-                println!("PLA");
+                println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
             }
             OpcodeType::PLP => {
                 let value = self.pop_stack();
                 self.cpu_p_reg.set_status_flg_all(value.try_into().unwrap());
-                println!("PLP");
+                println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
             OpcodeType::CLC => {
                 self.cpu_p_reg.cls_status_flg(CARRY_FLG);
-                println!("CLC");
+                println!("{}",format!("[DEBUG]: CLC ${}",dbg_str));
             }
             OpcodeType::CLD => {
                 self.cpu_p_reg.cls_status_flg(DECIMAL_MODE_FLG);
-                println!("CLD");
+                println!("{}",format!("[DEBUG]: CLD ${}",dbg_str));
             }
             OpcodeType::CLI => {
                 self.cpu_p_reg.cls_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("CLI");
+                println!("{}",format!("[DEBUG]: CLI ${}",dbg_str));
             }
             OpcodeType::CLV => {
                 self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
-                println!("CLV");
+                println!("{}",format!("[DEBUG]: CLV ${}",dbg_str));
             }
             OpcodeType::SEC => {
                 self.cpu_p_reg.set_status_flg(CARRY_FLG);
-                println!("SEC");
+                println!("{}",format!("[DEBUG]: SEC ${}",dbg_str));
             }
             OpcodeType::SED => {
                 self.cpu_p_reg.set_status_flg(DECIMAL_MODE_FLG);
-                println!("SED");
+                println!("{}",format!("[DEBUG]: SED ${}",dbg_str));
             }
             OpcodeType::SEI => {
                 self.cpu_p_reg.set_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("SEI");
+                println!("{}",format!("[DEBUG]: SEI ${}",dbg_str));
             }
 
             // Jump and Call Operations
@@ -823,7 +810,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("{}",format!("JMP ${}",dbg_str));
+                        println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
                     }
                 }
             }
@@ -839,7 +826,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("{}",format!("JSR ${}",dbg_str));
+                        println!("{}",format!("[DEBUG]: JSR ${}",dbg_str));
                     }
                 }
             }
@@ -854,11 +841,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BCC (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
                         }
                     }
                 }
-                println!("BCC Not Branch!");
             }
             OpcodeType::BCS => {
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
@@ -869,11 +855,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BCS (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
                         }
                     }
                 }
-                println!("BCS Not Branch!");
             }
             OpcodeType::BEQ => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
@@ -884,11 +869,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BEQ (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
                         }
                     }
                 }
-                println!("BEQ Not Branch!");
             }
             OpcodeType::BNE => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
@@ -899,11 +883,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BNE (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
                         }
                     }
                 }
-                println!("BNE Not Branch!");
             }
             OpcodeType::BVC => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
@@ -914,11 +897,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BVC (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
                         }
                     }
                 }
-                println!("BVC Not Branch!");
             }
             OpcodeType::BVS => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
@@ -929,11 +911,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BVS (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
                         }
                     }
                 }
-                println!("BVS Not Branch!");
             }
             OpcodeType::BPL => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
@@ -944,11 +925,10 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BPK (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
                         }
                     }
                 }
-                println!("BPL Not Branch!");
             }
             OpcodeType::BMI => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
@@ -959,32 +939,30 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
-                            println!("BMI (Branch ${:#04X})", branch_addr);
+                            println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
                         }
                     }
                 }
-                println!("BMI Not Branch!");
             }
 
             // Intrrupt Operations / 割込み関連
             OpcodeType::RTI => {
-                println!("RTI");
                 let status = self.pop_stack();
                 self.cpu_p_reg.set_status_flg_all(status.into());
                 let mut return_addr = self.pop_stack();
                 return_addr |= self.pop_stack() << 8;
                 self.cpu_pc.pc = return_addr.try_into().unwrap();
+                println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
             }
             OpcodeType::RTS => {
-                println!("RTS");
                 let mut return_addr = self.pop_stack();
                 return_addr |= self.pop_stack() << 8;
                 self.cpu_pc.pc = return_addr.try_into().unwrap();
                 self.cpu_pc.pc += 1;
+                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
             }
             OpcodeType::BRK => {
                 if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
-                    print!("BRK(INT)");
                     self.cpu_pc.pc += 1;
                     self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
                     self.push_stack((self.cpu_pc.pc & 0x00FF).try_into().unwrap());
@@ -994,9 +972,9 @@ where
                     let mut _jmp_addr: T = self.read(ADDR_VEC_TBL_IRQ);
                     _jmp_addr = self.read(ADDR_VEC_TBL_IRQ + 1) << 0x0008;
                     self.cpu_pc.pc = _jmp_addr.try_into().unwrap();
+                    println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
                     print!("Jmp to: ${:04X}", self.cpu_pc.pc);
                 }
-                println!("BRK(INT Mask)");
             }
 
             // Other
@@ -1134,7 +1112,7 @@ fn cpu_reg_show(cpu :&RP2A03<u8>)
     let sp: u8 = cpu.get_register(CPUReg::SP);
     let p: u8 = cpu.cpu_p_reg.get_status_flg_all();
     let pc: u16 = cpu.cpu_pc.pc;
-    println!("[DEBUG] A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",a,x,y,sp,p,pc);
+    println!("[DEBUG]: A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",a,x,y,sp,p,pc);
 }
 
 fn cpu_proc(cpu :&mut RP2A03<u8>)
@@ -1155,7 +1133,7 @@ pub fn cpu_stop(flg: bool)
     unsafe {
         if S_CPU_STOP != false
         {
-            println!("[DEBUG] : CPU Stop");
+            println!("[DEBUG]: CPU Stop");
         }
     }
 }
