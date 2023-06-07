@@ -198,9 +198,10 @@ struct RP2A03<T> {
 
 impl<T> CPU<T> for RP2A03<T>
 where
-    T: Copy + From<u8> + Into<u8> + std::ops::Add<Output = T> + std::ops::Sub<Output = T>
+    T: Copy + From<u8> + std::ops::Add<Output = T> + std::ops::Sub<Output = T>
         + std::ops::BitAnd<Output = T> + std::ops::BitOr<Output = T>+ std::ops::BitXor<Output = T>
-        + TryFrom<u16> + Into<u16> + Into<i32> + PartialEq + PartialOrd + std::ops::Shl<u8, Output = T>
+        + TryFrom<u16> + Into<u8> + Into<u16> + Into<u32> + Into<i16> + Into<i32>
+        + PartialEq + PartialOrd + std::ops::Shl<u8, Output = T>
         + std::ops::Shr<Output = T> + std::ops::Shl<Output = T> + std::ops::BitOrAssign,
     <T as std::convert::TryFrom<u16>>::Error: std::fmt::Debug,i32: From<T>,
 {
@@ -779,7 +780,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("JSR {:#02X},{:#02X}(${:04X})", val,val2,jump_addr);
+                        println!("JSR ${:04X}",jump_addr);
                     }
                 }
             }
@@ -789,105 +790,121 @@ where
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
                 if ret != true {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BCC ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BCC (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BCC Not Jump!");
+                println!("BCC Not Branch!");
             }
             OpcodeType::BCS => {
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
                 if ret != false {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BCS ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BCS (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BCS Not Jump!");
+                println!("BCS Not Branch!");
             }
             OpcodeType::BEQ => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
                 if ret != false {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BEQ ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BEQ (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BEQ Not Jump!");
+                println!("BEQ Not Branch!");
             }
             OpcodeType::BNE => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
                 if ret != true {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BNE ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BNE (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BNE Not Jump!");
+                println!("BNE Not Branch!");
             }
             OpcodeType::BVC => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
                 if ret != true {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BVC ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BVC (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BVC Not Jump!");
+                println!("BVC Not Branch!");
             }
             OpcodeType::BVS => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
                 if ret != false {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BVS ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BVS (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BVS Not Jump!");
+                println!("BVS Not Branch!");
             }
             OpcodeType::BPL => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
                 if ret != true {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BPL ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BPK (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BPL Not Jump!");
+                println!("BPL Not Branch!");
             }
             OpcodeType::BMI => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
                 if ret != false {
                     if let Some(value) = operand {
-                        let val: u16 = value.into();
-                        let val_second: u16 = operand_second.unwrap_or(T::from(0x00)).try_into().unwrap();
-                        let jump_addr = val | (val_second << 8);
-                        self.cpu_pc.pc = jump_addr;
-                        println!("BMI ${:04X}", jump_addr);
+                        if let Some(value2) = operand_second {
+                            let val: u8 = value.try_into().unwrap();
+                            let val2: u8 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            self.cpu_pc.pc = branch_addr;
+                            println!("BMI (Branch ${:#04X})", branch_addr);
+                        }
                     }
                 }
-                println!("BMI Not Jump!");
+                println!("BMI Not Branch!");
             }
 
             // Intrrupt Operations / 割込み関連
@@ -1021,13 +1038,13 @@ where
                 let address: T = self.read(base_address.try_into().unwrap());
                 (Some(self.read(address.try_into().unwrap())),None)
             }
-            AddrMode::REL => {
-                print!("OP-Code:(REL) ");
-                let offset = self.read(self.cpu_pc.pc);
-                let address: u16 = self.cpu_pc.pc.wrapping_add(offset.try_into().unwrap());
-                (Some(self.read(address.try_into().unwrap())),None)
+            AddrMode::REL => { // Relative Addressing(相対アドレッシング)
+                let offset: i16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                print!("OP-Code:(REL (Offset:{}))", offset);
+                let addr: u16 = self.cpu_pc.pc.wrapping_add((offset & 0xff) as i16 as u16).wrapping_add(2).try_into().unwrap();
+                (Some(addr.try_into().unwrap()), Some((addr >> 8).try_into().unwrap()))
             }
-            AddrMode::IMPL => {
+            AddrMode::IMPL => { // Implied Addressing
                 print!("OP-Code:(IMPL) ");
                 // Not, Have Operand
                 // self.cpu_pc.pc = self.cpu_pc.pc - 1;
