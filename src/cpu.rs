@@ -87,7 +87,7 @@ trait CPU<T> {
     fn get_register(&self, register: CPUReg) -> T;
     fn set_register(&mut self, register: CPUReg, value: T);
     fn fetch_instruction(&mut self) -> T;
-    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>);
+    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>, String);
     fn decode_instruction(&mut self, op_code: T) -> (Opcode, Addressing);
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing);
     fn push_stack(&mut self, data: T);
@@ -193,7 +193,7 @@ struct RP2A03<T> {
     cpu_reg: [T; 4],
     cpu_p_reg: StatusRegister,
     cpu_pc: ProgramCounter,
-    nes_mem: NESMemory
+    nes_mem: NESMemory,
 }
 
 impl<T> CPU<T> for RP2A03<T>
@@ -430,7 +430,7 @@ where
     }
 
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing) {
-        let (operand,operand_second) = self.read_operand(addressing);
+        let (operand,operand_second,dbg_str) = self.read_operand(addressing);
 
         match opcode.opcode_type {
             OpcodeType::NOP => {
@@ -639,12 +639,11 @@ where
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
                     ret = val;
-                    println!("LDA {:#02X}", val);
 
                     if let Some(value2) = operand_second {
                         let val2: u8 = value2.try_into().unwrap();
-                        println!("LDA {:#02X} {:#02X}", val, val2);
                     }
+                    println!("{}",format!("LDA ${}",dbg_str));
                 }
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
             }
@@ -824,7 +823,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("JMP ${:04X}",jump_addr);
+                        println!("{}",format!("JMP ${}",dbg_str));
                     }
                 }
             }
@@ -840,7 +839,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("JSR ${:04X}",jump_addr);
+                        println!("{}",format!("JSR ${}",dbg_str));
                     }
                 }
             }
@@ -1030,85 +1029,98 @@ where
         self.read(address)
     }
 
-    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>)
+    fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>, String)
     {
         self.cpu_pc.pc += 1;
+        let oprand:u8 = self.read(self.cpu_pc.pc).try_into().unwrap();
+
         match *addressing.addr_mode {
             AddrMode::ACC => {
-                print!("OP-Code:(ACC) ");
-                (Some(self.get_register(CPUReg::A)), None)
+                let acc:u8 = self.get_register(CPUReg::A).try_into().unwrap();
+                (Some(self.get_register(CPUReg::A)),
+                None,
+                format!("{:#02X} (ACC)", acc))
             }
             AddrMode::IMM => {
-                print!("OP-Code:(IMM) ");
-                (Some(self.read(self.cpu_pc.pc)), None)
+                (Some(self.read(self.cpu_pc.pc)),
+                None,
+                format!("{:#02X} (IMM)",oprand))
             }
             AddrMode::ZPG => {
-                print!("OP-Code:(ZPG) ");
-                (Some(self.read(self.cpu_pc.pc)), None)
+                (Some(self.read(self.cpu_pc.pc)),
+                None,
+                format!("{:#02X} (ZPG)",oprand))
             }
             AddrMode::ZpgX => {
-                print!("OP-Code:(ZpgX) ");
-                let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
-                (Some(self.read(address.try_into().unwrap())),None)
+                let address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
+                (Some(self.read(address.try_into().unwrap())),
+                None,
+                format!("{:#02X} (ZpgX)",oprand))
             }
             AddrMode::ZpgY => {
-                print!("OP-Code:(ZpgY) ");
                 let address = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
-                (Some(self.read(address.try_into().unwrap())),None)
+                (Some(self.read(address.try_into().unwrap())),
+                None,
+                format!("{:#02X} (ZpgY)",oprand))
             }
             AddrMode::ABS => {
-                print!("OP-Code:(ABS) ");
                 let address_l:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 self.cpu_pc.pc += 1;
                 let address_u:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
+                (Some(address_l.try_into().unwrap()),
+                Some(address_u.try_into().unwrap()),
+                format!("{:#02X} {:#02X} (ABS)",address_l, address_u))
             }
             AddrMode::AbsX => {
-                print!("OP-Code:(AbsX) ");
                 let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::X)).unwrap();
                 self.cpu_pc.pc += 1;
                 let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 address_u |= address_l;
-                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
+                (Some(address_l.try_into().unwrap()),
+                Some(address_u.try_into().unwrap()),
+                format!("{:#02X} {:#02X} (AbsX)",address_l, address_u))
             }
             AddrMode::AbsY => {
-                print!("OP-Code:(AbsY) ");
                 let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::Y)).unwrap();
                 self.cpu_pc.pc += 1;
                 let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 address_u |= address_l;
-                (Some(address_l.try_into().unwrap()), Some(address_u.try_into().unwrap()))
+                (Some(address_l.try_into().unwrap()),
+                Some(address_u.try_into().unwrap()),
+                format!("{:#02X} {:#02X} (AbsY)",address_l, address_u))
             }
             AddrMode::IND => {
-                print!("OP-Code:(IND) ");
                 let address: T = self.read(self.cpu_pc.pc);
-                (Some(self.read(address.try_into().unwrap())),None)
+                (Some(self.read(address.try_into().unwrap())),
+                None,
+                format!("{:#02X} (IND)",oprand))
             }
             AddrMode::IndX => {
-                print!("OP-Code:(IndX) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::X).try_into().unwrap()));
                 let address: T = self.read(base_address.try_into().unwrap());
-                (Some(self.read(address.try_into().unwrap())),None)
+                (Some(self.read(address.try_into().unwrap())),
+                None,
+                format!("{:#02X} (IndX)",oprand))
             }
             AddrMode::IndY => {
-                print!("OP-Code:(IndY) ");
                 let base_address: T = self.read(self.cpu_pc.pc.wrapping_add(self.get_register(CPUReg::Y).try_into().unwrap()));
                 let address: T = self.read(base_address.try_into().unwrap());
-                (Some(self.read(address.try_into().unwrap())),None)
+                (Some(self.read(address.try_into().unwrap())),
+                None,
+                format!("{:#02X} (IndY)",oprand))
             }
             AddrMode::REL => { // Relative Addressing(相対アドレッシング)
                 let offset: i16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                print!("OP-Code:(REL (Offset:{}))", offset);
                 let addr: u16 = self.cpu_pc.pc.wrapping_add((offset & 0xff) as i16 as u16).wrapping_add(2).try_into().unwrap();
-                (Some(addr.try_into().unwrap()), Some((addr >> 8).try_into().unwrap()))
+                (Some(addr.try_into().unwrap()),
+                Some((addr >> 8).try_into().unwrap()),
+                format!("{:#02X} (REL)", offset))
             }
             AddrMode::IMPL => { // Implied Addressing
-                print!("OP-Code:(IMPL) ");
                 // Not, Have Operand
-                // self.cpu_pc.pc = self.cpu_pc.pc - 1;
-                (None, None)
+                (None, None,format!("(IMPL)"))
             }
         }
     }
