@@ -238,9 +238,13 @@ where
         // self.interrupt_proc(InterruptType::RST);
 
         // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
-        self.cpu_pc.pc = ADDR_PRG_ROM;
-        // (DEBUG) ダーミープログラム用に
-        self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
+        // self.cpu_pc.pc = ADDR_PRG_ROM;
+
+        // // (DEBUG) ダーミープログラム用に
+        // self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
+
+        // // (DEBUG) スネークゲーム用に
+        self.cpu_pc.pc = 0x600;
     }
 
     fn interrupt_proc(&mut self, int_type :InterruptType)
@@ -868,8 +872,7 @@ where
                 }
             }
             OpcodeType::JSR => {
-                self.cpu_pc.pc += 1;
-                let return_addr: u16 = self.cpu_pc.pc;
+                let return_addr: u16 = self.cpu_pc.pc + 1;
                 self.push_stack((return_addr & 0x00FF).try_into().unwrap());
                 self.push_stack(((return_addr & 0xFF00) >> 0x0008).try_into().unwrap());
 
@@ -879,7 +882,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
-                        println!("{}",format!("[DEBUG]: JSR ${}",dbg_str));
+                        println!("[DEBUG]: JSR ${:04X} ({})",jump_addr ,format!("{}",dbg_str));
                     }
                 }
             }

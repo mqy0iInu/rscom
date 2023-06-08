@@ -134,6 +134,12 @@ impl PPUReg {
     {
         self.oam[addr as usize] = data;
     }
+
+    pub fn ppu_v_blank(&self)
+    {
+        // TODO :V-Blank
+    }
+
 }
 
 pub fn ppu_reset()
