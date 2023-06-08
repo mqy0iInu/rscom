@@ -27,11 +27,7 @@ struct ProgramCounter {
 impl ProgramCounter {
     fn new() -> Self {
         ProgramCounter {
-            // TODO PCの初期位置
-            pc : ADDR_PRG_ROM,
-
-             // リセットベクタ
-            // pc : Self::ADDR_VEC_TBL_RST,
+            pc : ADDR_VEC_TBL_RST, // リセットベクタ
         }
     }
 }
@@ -92,6 +88,32 @@ trait CPU<T> {
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing);
     fn push_stack(&mut self, data: T);
     fn pop_stack(&mut self) -> T;
+    fn interrupt_proc(&mut self, int_type :InterruptType);
+}
+
+pub const ADDR_VEC_TBL_RST: u16 = 0xFFFC;  // RESET Vector Table
+pub const ADDR_VEC_TBL_NMI: u16 = 0xFFFA;  // NMI Vector Table
+pub const ADDR_VEC_TBL_IRQ: u16 = 0xFFFE;  // IRQ Vector Table
+enum InterruptType {
+    RST,
+    NMI,
+    IRQ,
+}
+
+struct Interrupt {
+    rst: bool,
+    nmi: bool,
+    irq: bool,
+}
+
+impl Interrupt {
+    fn new() -> Self {
+        Interrupt {
+            rst: true,
+            nmi: false,
+            irq: false
+        }
+    }
 }
 
 /// RP2A03のステータスレジスタ
@@ -194,6 +216,7 @@ struct RP2A03<T> {
     cpu_p_reg: StatusRegister,
     cpu_pc: ProgramCounter,
     nes_mem: NESMemory,
+    interrupt: Interrupt,
 }
 
 impl<T> CPU<T> for RP2A03<T>
@@ -205,11 +228,41 @@ where
         + std::ops::Shr<Output = T> + std::ops::Shl<Output = T> + std::ops::BitOrAssign,
     <T as std::convert::TryFrom<u16>>::Error: std::fmt::Debug,i32: From<T>,
 {
+
     fn reset(&mut self){
         self.set_register(CPUReg::A, T::from(0u8));
         self.set_register(CPUReg::X, T::from(0u8));
         self.set_register(CPUReg::Y, T::from(0u8));
         self.set_register(CPUReg::SP, T::from(0xFFu8));
+
+        // self.interrupt_proc(InterruptType::RST);
+
+        // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
+        self.cpu_pc.pc = ADDR_PRG_ROM;
+        // (DEBUG) ダーミープログラム用に
+        self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
+    }
+
+    fn interrupt_proc(&mut self, int_type :InterruptType)
+    {
+        match int_type {
+            InterruptType::RST => {
+                self.cpu_pc.pc = ADDR_VEC_TBL_RST;
+            },
+            InterruptType::NMI => {
+                // TODO: NMI
+                self.cpu_pc.pc = ADDR_VEC_TBL_NMI;
+            },
+            InterruptType::IRQ => {
+                // TODO: NMI
+                self.cpu_pc.pc = ADDR_VEC_TBL_IRQ;
+            },
+        }
+
+        let addr_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+        self.cpu_pc.pc += 1;
+        let addr_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+        self.cpu_pc.pc = (addr_u << 8) | addr_l;
     }
 
     fn read(&mut self, address: u16) -> T
@@ -1092,8 +1145,10 @@ where
             AddrMode::REL => { // Relative Addressing(相対アドレッシング)
                 let offset: i16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 let addr: u16 = self.cpu_pc.pc.wrapping_add((offset & 0xff) as i16 as u16).wrapping_add(2).try_into().unwrap();
-                (Some(addr.try_into().unwrap()),
-                Some((addr >> 8).try_into().unwrap()),
+                let addr_l: u8 = (self.cpu_pc.pc & 0x00FF) as u8;
+                let addr_u: u8 = ((self.cpu_pc.pc & 0xFF00) >> 8) as u8;
+                (Some(addr_l.try_into().unwrap()),
+                Some(addr_u.try_into().unwrap()),
                 format!("{:#02X} (REL)", offset))
             }
             AddrMode::IMPL => { // Implied Addressing
@@ -1145,6 +1200,7 @@ pub fn cpu_reset() {
             cpu_p_reg: StatusRegister::new(),
             cpu_pc: ProgramCounter::new(),
             nes_mem: NESMemory::new(),
+            interrupt: Interrupt::new(),
         });
     }
 
@@ -1152,9 +1208,6 @@ pub fn cpu_reset() {
         if let Some(ref mut cpu) = S_CPU {
             cpu.nes_mem.mem_reset();
             cpu.reset();
-
-        // (DEBUG)
-            cpu.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
         }
     }
 }
