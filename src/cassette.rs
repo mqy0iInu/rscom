@@ -3,8 +3,10 @@ use std::fs::File;
 use std::io::Read;
 
 // [Mapper 0]
-pub const ROM_MAPPER_0_ROM_TBL: [&str; 14] = [
+pub const ROM_MAPPER_0_ROM_TBL: [&str; 16] = [
     "test_rom/nes/mapper_0/1942.nes",
+    "test_rom/nes/mapper_0/Alter_Ego.nes",
+    "test_rom/nes/mapper_0/BombSweeper.nes",
     "test_rom/nes/mapper_0/donkeykong.nes",
     "test_rom/nes/mapper_0/elevatoraction.nes",
     "test_rom/nes/mapper_0/excitebike.nes",

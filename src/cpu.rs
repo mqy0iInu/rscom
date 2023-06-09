@@ -500,6 +500,7 @@ where
 
             // // Logical Operations / 論理演算命令
             OpcodeType::AND => {
+                println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
                 let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
                 let mut result: u16 = 0;
                 if let Some(value) = operand {
@@ -512,9 +513,9 @@ where
                     }
                 }
                 self.set_register(CPUReg::A, T::from(result as u8));
-                println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
             }
             OpcodeType::ORA => {
+                println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
                 let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
                 let mut result: u16 = 0;
                 if let Some(value) = operand {
@@ -527,9 +528,9 @@ where
                     }
                 }
                 self.set_register(CPUReg::A, T::from(result as u8));
-                println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
             }
             OpcodeType::EOR => {
+                println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
                 let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
                 let mut result: u16 = 0;
                 if let Some(value) = operand {
@@ -542,11 +543,11 @@ where
                     }
                 }
                 self.set_register(CPUReg::A, T::from(result as u8));
-                println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
             }
 
             // Arithmetic Operations / 算術倫理演算
             OpcodeType::ADC => {
+                println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: T = value.into();
                     let a: T = self.get_register(CPUReg::A);
@@ -559,9 +560,9 @@ where
                     self.set_register(CPUReg::A, ret.try_into().unwrap());
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
             }
             OpcodeType::SBC => {
+                println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: T = value.into();
                     let a = self.get_register(CPUReg::A);
@@ -579,46 +580,45 @@ where
                     self.set_register(CPUReg::A, ret);
                     self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
             }
             OpcodeType::CMP => {
+                println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
                 if let Some(operand_value) = operand {
                     let a = self.get_register(CPUReg::A);
                     let result: T = a - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
             }
             OpcodeType::CPX => {
+                println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
                 if let Some(operand_value) = operand {
                     let x: T = self.get_register(CPUReg::X);
                     let result: T = x - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
             }
             OpcodeType::CPY => {
+                println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
                 if let Some(operand_value) = operand {
                     let y: T = self.get_register(CPUReg::X);
                     let result: T = y - operand_value;
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
             }
             OpcodeType::INC => {
+                println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
                 if let Some(operand_value) = operand {
                     let ret: u8 = self.cpu_p_reg.c_flg_update_add(operand_value.try_into().unwrap(), 1);
                     self.set_register(CPUReg::A, ret.try_into().unwrap());
                     self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
             }
             OpcodeType::INX => {
+                println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
                 let x: T = self.get_register(CPUReg::X);
                 let ret: u8 = self.cpu_p_reg.c_flg_update_add(x.try_into().unwrap(), 1);
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
                 self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
             }
             OpcodeType::INY => {
                 let y: T = self.get_register(CPUReg::Y);
@@ -628,30 +628,31 @@ where
                 println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
             }
             OpcodeType::DEC => {
+                println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
                 if let Some(operand_value) = operand {
                     let result: T = operand_value - T::from(0x01);
                     self.set_register(CPUReg::A, result);
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
-                println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
             }
             OpcodeType::DEX => {
+                println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
                 let x: T = self.get_register(CPUReg::X);
                 let result: T = x - T::from(0x01);
                 self.set_register(CPUReg::X, result);
                 self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
             }
             OpcodeType::DEY => {
+                println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
                 let y: T = self.get_register(CPUReg::Y);
                 let result: T = y - T::from(0x01);
                 self.set_register(CPUReg::Y, result);
                 self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
             }
 
             // Shift and Rotate Operations
             OpcodeType::ASL => {
+                println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
                 match *_addressing.addr_mode {
                     AddrMode::ACC => {
                         let a: T = self.get_register(CPUReg::A);
@@ -678,9 +679,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
             }
             OpcodeType::LSR => {
+                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
                 match *_addressing.addr_mode {
                     AddrMode::ACC => {
                         let a: T = self.get_register(CPUReg::A);
@@ -707,11 +708,11 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
             }
             OpcodeType::ROL => {
                 match *_addressing.addr_mode {
                     AddrMode::ACC => {
+                        println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
                         let a: T = self.get_register(CPUReg::A);
                         let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(a.try_into().unwrap());
                         if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
@@ -745,9 +746,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
             }
             OpcodeType::ROR => {
+                println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
                 match *_addressing.addr_mode {
                     AddrMode::ACC => {
                         let a: T = self.get_register(CPUReg::A);
@@ -783,11 +784,11 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
             }
 
             // Load/Store Operations
             OpcodeType::LDA => {
+                println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
                     let val: u16 = value.try_into().unwrap();
@@ -799,9 +800,9 @@ where
                     }
                 }
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
             }
             OpcodeType::LDX => {
+                println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
                     let val: u16 = value.try_into().unwrap();
@@ -813,9 +814,9 @@ where
                     }
                 }
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
             }
             OpcodeType::LDY => {
+                println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
                     let val: u16 = value.try_into().unwrap();
@@ -827,9 +828,9 @@ where
                     }
                 }
                 self.set_register(CPUReg::Y, ret.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
             }
             OpcodeType::STA => {
+                println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
                 let a: T = self.get_register(CPUReg::A);
                 let mut addr: u16 = 0;
 
@@ -844,9 +845,9 @@ where
                     }
                 }
                 self.write(addr, a);
-                println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
             }
             OpcodeType::STX => {
+                println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
                 let x: T = self.get_register(CPUReg::X);
                 let mut addr: u16 = 0;
 
@@ -861,9 +862,9 @@ where
                     }
                 }
                 self.write(addr, x);
-                println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
             }
             OpcodeType::STY => {
+                println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
                 let y: T = self.get_register(CPUReg::Y);
                 let mut addr: u16 = 0;
 
@@ -878,66 +879,66 @@ where
                     }
                 }
                 self.write(addr, y);
-                println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
             }
 
             // Register Transfer Operations/レジスタ転送関連の命令
             OpcodeType::TAX => {
+                println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
                 let a = self.get_register(CPUReg::A);
                 self.set_register(CPUReg::X, a);
-                println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
             }
             OpcodeType::TAY => {
+                println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
                 let a = self.get_register(CPUReg::A);
                 self.set_register(CPUReg::Y, a);
-                println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
             }
             OpcodeType::TXA => {
+                println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
                 let x = self.get_register(CPUReg::X);
                 self.set_register(CPUReg::A, x);
-                println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
             }
             OpcodeType::TYA => {
+                println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
                 let y = self.get_register(CPUReg::Y);
                 self.set_register(CPUReg::A, y);
-                println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
             }
 
             // Stack Operations / スタック関連の命令
             OpcodeType::TSX => {
+                println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
                 let sp = self.get_register(CPUReg::SP);
                 self.set_register(CPUReg::X, sp);
-                println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
             }
             OpcodeType::TXS => {
+                println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
                 let x = self.get_register(CPUReg::X);
                 self.set_register(CPUReg::SP, x);
-                println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
             }
             OpcodeType::PHA => {
+                println!("{}",format!("[DEBUG]: PHA ${}",dbg_str));
                 let a = self.get_register(CPUReg::A);
                 self.push_stack(a);
-                println!("{}",format!("[DEBUG]: PHA ${}",dbg_str));
             }
             OpcodeType::PHP => {
+                println!("{}",format!("[DEBUG]: PHP ${}",dbg_str));
                 let p = self.cpu_p_reg.get_status_flg_all();
                 self.push_stack(p.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: PHP ${}",dbg_str));
             }
             OpcodeType::PLA => {
+                println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
                 let value = self.pop_stack();
                 self.set_register(CPUReg::A, value);
                 self.cpu_p_reg.nzv_flg_update(value.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
             }
             OpcodeType::PLP => {
+                println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
                 let value = self.pop_stack();
                 self.cpu_p_reg.set_status_flg_all(value.try_into().unwrap());
-                println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
             OpcodeType::BIT => {
+                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
                 let a: T = self.get_register(CPUReg::A);
                 if let Some(operand_value) = operand {
                     let result: T = a & operand_value;
@@ -957,7 +958,6 @@ where
                         self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
                     }
                 }
-                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
             }
             OpcodeType::CLC => {
                 self.cpu_p_reg.cls_status_flg(CARRY_FLG);
@@ -990,6 +990,7 @@ where
 
             // Branch Operations / 分岐命令
             OpcodeType::BCC => {
+                println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
                 if ret != true {
                     if let Some(value) = operand {
@@ -1002,9 +1003,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
             }
             OpcodeType::BCS => {
+                println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
                 if ret != false {
                     if let Some(value) = operand {
@@ -1017,9 +1018,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
             }
             OpcodeType::BEQ => {
+                println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
                 if ret != false {
                     if let Some(value) = operand {
@@ -1032,9 +1033,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
             }
             OpcodeType::BNE => {
+                println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
                 if ret != true {
                     if let Some(value) = operand {
@@ -1047,9 +1048,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
             }
             OpcodeType::BVC => {
+                println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
                 if ret != true {
                     if let Some(value) = operand {
@@ -1062,9 +1063,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
             }
             OpcodeType::BVS => {
+                println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
                 if ret != false {
                     if let Some(value) = operand {
@@ -1077,9 +1078,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
             }
             OpcodeType::BPL => {
+                println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
                 if ret != true {
                     if let Some(value) = operand {
@@ -1092,9 +1093,9 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
             }
             OpcodeType::BMI => {
+                println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
                 if ret != false {
                     if let Some(value) = operand {
@@ -1107,11 +1108,11 @@ where
                         }
                     }
                 }
-                println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
             }
 
             // Jump and Call Operations
             OpcodeType::JMP => {
+                println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
                 if let Some(value) = operand {
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
@@ -1121,9 +1122,9 @@ where
                         jmp_flg = true;
                     }
                 }
-                println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
             }
             OpcodeType::JSR => {
+                println!("{}",format!("[DEBUG]: JSR {}",dbg_str));
                 let mut jump_addr: u16 = 0x00;
                 let return_addr: u16 = self.cpu_pc.pc;
                 // let return_addr: u16 = self.cpu_pc.pc + 1;
@@ -1139,25 +1140,19 @@ where
                         jmp_flg = true;
                     }
                 }
-                println!("[DEBUG]: JSR ${:04X} ({})",jump_addr ,format!("{}",dbg_str));
             }
             OpcodeType::RTS => {
-                // TODO :なぜSPがバグって1少ないのかわからんから暫定でインクリメント
-                if self.get_register(CPUReg::SP) != T::from(0xFF)
-                {
-                    self.set_register(CPUReg::SP, self.get_register(CPUReg::SP) + T::from(1u8));
-                }
-
+                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
                 let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
                 let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
                 let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
                 self.cpu_pc.pc = return_addr + 1;
                 jmp_flg = true;
-                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
             }
 
             // Intrrupt Operations / 割込み関連
             OpcodeType::RTI => {
+                println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
                 let status = self.pop_stack();
                 self.cpu_p_reg.set_status_flg_all(status.into());
                 let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
@@ -1165,9 +1160,9 @@ where
                 let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
                 self.cpu_pc.pc = return_addr;
                 jmp_flg = true;
-                println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
             }
             OpcodeType::BRK => {
+                println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
                 if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
                     self.cpu_pc.pc += 1;
                     self.cpu_p_reg.set_status_flg(BREAK_COMMAND_FLG);
@@ -1181,7 +1176,6 @@ where
                     jmp_flg = true;
                     print!("BRK Jmp to: ${:04X}", self.cpu_pc.pc);
                 }
-                println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
             }
 
             // Other
@@ -1198,31 +1192,21 @@ where
         }
     }
 
-    fn push_stack(&mut self, data: T) {
-        println!("Push Stack");
-        let sp = self.get_register(CPUReg::SP);
-        let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
-        self.write(address, data);
-        if self.get_register(CPUReg::SP) > T::from(0)
-        {
-            self.set_register(CPUReg::SP, sp - T::from(1u8));
-        }else{
-            // panic!("[ERR]: Stack Under Flow !!!");
-        }
-    }
+fn push_stack(&mut self, data: T) {
+    println!("Push Stack");
+    let sp = self.get_register(CPUReg::SP);
+    let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
+    self.write(address, data);
+    self.set_register(CPUReg::SP, sp - T::from(1u8));
+}
 
-    fn pop_stack(&mut self) -> T {
-        println!("Pop Stack");
-        let sp = self.get_register(CPUReg::SP);
-        let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
-        if self.get_register(CPUReg::SP) < T::from(0xFF)
-        {
-            self.set_register(CPUReg::SP, sp + T::from(1u8));
-        }else{
-            // panic!("[ERR]: Stack Over Flow !!!");
-        }
-        self.read(address)
-    }
+fn pop_stack(&mut self) -> T {
+    println!("Pop Stack");
+    let sp = self.get_register(CPUReg::SP) + T::from(1u8);
+    self.set_register(CPUReg::SP, sp);
+    let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
+    self.read(address)
+}
 
     fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>, String)
     {

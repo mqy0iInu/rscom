@@ -72,7 +72,7 @@ impl NESMemory {
     pub fn mem_reset(&mut self)
     {
         // TODO :MEM Reset
-        // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/popeye.nes");
+        // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/BombSweeper.nes");
 
         // (DEBUG) :ダーミープログラムをPRG-ROMにセット
         // =================================
