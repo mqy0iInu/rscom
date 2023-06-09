@@ -694,8 +694,13 @@ where
             OpcodeType::LDA => {
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value.try_into().unwrap();
-                    ret = val;
+                    let val: u16 = value.try_into().unwrap();
+                    ret = val.try_into().unwrap();
+
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u8;
+                    }
                 }
                 self.set_register(CPUReg::A, ret.try_into().unwrap());
                 println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
@@ -703,8 +708,13 @@ where
             OpcodeType::LDX => {
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value.try_into().unwrap();
-                    ret = val;
+                    let val: u16 = value.try_into().unwrap();
+                    ret = val.try_into().unwrap();
+
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u8;
+                    }
                 }
                 self.set_register(CPUReg::X, ret.try_into().unwrap());
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
@@ -712,11 +722,12 @@ where
             OpcodeType::LDY => {
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value.try_into().unwrap();
-                    ret = val;
+                    let val: u16 = value.try_into().unwrap();
+                    ret = val.try_into().unwrap();
 
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2.try_into().unwrap();
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u8;
                     }
                 }
                 self.set_register(CPUReg::Y, ret.try_into().unwrap());

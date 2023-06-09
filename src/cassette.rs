@@ -12,10 +12,10 @@ pub const ROM_MAPPER_0_ROM_TBL: [&str; 14] = [
     "test_rom/nes/mapper_0/galaxian.nes",
     "test_rom/nes/mapper_0/ikki.nes",
     "test_rom/nes/mapper_0/karateka.nes",
+    "test_rom/nes/mapper_0/mario_bros.nes",
     "test_rom/nes/mapper_0/mappy.nes",
     "test_rom/nes/mapper_0/popeye.nes",
     "test_rom/nes/mapper_0/sky_destroyer.nes",
-    "test_rom/nes/mapper_0/super_mario_bros.nes",
     "test_rom/nes/mapper_0/tower_of_druaga.nes",
     "test_rom/nes/mapper_0/xevious.nes",
 ];
