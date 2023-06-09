@@ -549,36 +549,37 @@ where
             OpcodeType::ADC => {
                 println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
                 if let Some(value) = operand {
-                    let val: T = value.into();
-                    let a: T = self.get_register(CPUReg::A);
-                    let mut carry = T::from(0x00);
+                    let val: u16 = value.try_into().unwrap();
+                    let a: u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                    let mut carry: u16 = 0x00;
                     if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
-                        carry = T::from(0x01);
+                        carry = 0x01;
                     }
-                    let result: T = a + carry;
-                    let ret: u8 = self.cpu_p_reg.c_flg_update_add(result.try_into().unwrap(), val.try_into().unwrap());
-                    self.set_register(CPUReg::A, ret.try_into().unwrap());
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                    let mut ret: u8 = self.cpu_p_reg.c_flg_update_add(a as u8, carry as u8 + val as u8);
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = self.cpu_p_reg.c_flg_update_add(a as u8, carry as u8 + ((val2 << 8) | val) as u8);
+                    }
+                    self.set_register(CPUReg::A, T::from(ret as u8));
+                    self.cpu_p_reg.nzv_flg_update(ret);
                 }
             }
             OpcodeType::SBC => {
                 println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
                 if let Some(value) = operand {
-                    let val: T = value.into();
-                    let a = self.get_register(CPUReg::A);
-                    let mut carry: T = T::from(0x00);
-                    let mut ret = T::from(0x00);
+                    let val: u16 = value.try_into().unwrap();
+                    let a: u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                    let mut carry: u16 = 0x01;
                     if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
-                        carry = T::from(0x01);
-                        // A = A-M-(1-C)
-                        let result: T = a - val;
-                        ret = result;
-                    }else{
-                        let result: T = a - val - carry;
-                        ret = result;
+                        carry = 0x00;
                     }
-                    self.set_register(CPUReg::A, ret);
-                    self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                    let mut ret: u8 = a.wrapping_sub(val).wrapping_sub(carry) as u8;
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = a.wrapping_sub((val2 << 8) | val).wrapping_sub(carry) as u8;
+                    }
+                    self.set_register(CPUReg::A, T::from(ret as u8));
+                    self.cpu_p_reg.nzv_flg_update(ret);
                 }
             }
             OpcodeType::CMP => {
