@@ -28,7 +28,7 @@ fn main()
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(500));
         }
     });
 

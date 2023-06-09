@@ -739,7 +739,7 @@ where
 
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
-                    addr = self.cpu_pc.pc | val as u16;
+                    addr = val as u16;
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
@@ -756,7 +756,7 @@ where
 
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
-                    addr = self.cpu_pc.pc | val as u16;
+                    addr = val as u16;
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
@@ -773,7 +773,7 @@ where
 
                 if let Some(value) = operand {
                     let val: u8 = value.try_into().unwrap();
-                    addr = self.cpu_pc.pc | val as u16;
+                    addr = val as u16;
 
                     if let Some(value2) = operand_second {
                         let val: u8 = value.try_into().unwrap();
@@ -1270,8 +1270,8 @@ pub fn cpu_main()
         {
             // println!("[DEBUG] : CPU Main Loop");
                 if let Some(ref mut cpu) = S_CPU {
-                    cpu_proc(cpu);
                     cpu_reg_show(cpu);
+                    cpu_proc(cpu);
                 }
             }
     }
