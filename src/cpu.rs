@@ -583,32 +583,32 @@ where
             }
             OpcodeType::CMP => {
                 println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
-                if let Some(operand_value) = operand {
-                    let a = self.get_register(CPUReg::A);
-                    let result: T = a - operand_value;
+                if let Some(value) = operand {
+                    let a: u8 = self.get_register(CPUReg::A).try_into().unwrap();
+                    let result: u8 = a.wrapping_sub(value.into()).try_into().unwrap();
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
             }
             OpcodeType::CPX => {
                 println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
-                if let Some(operand_value) = operand {
-                    let x: T = self.get_register(CPUReg::X);
-                    let result: T = x - operand_value;
+                if let Some(value) = operand {
+                    let x: u8 = self.get_register(CPUReg::X).try_into().unwrap();
+                    let result: u8 = x.wrapping_sub(value.into()).try_into().unwrap();
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
             }
             OpcodeType::CPY => {
                 println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
-                if let Some(operand_value) = operand {
-                    let y: T = self.get_register(CPUReg::X);
-                    let result: T = y - operand_value;
+                if let Some(value) = operand {
+                    let y: u8 = self.get_register(CPUReg::Y).try_into().unwrap();
+                    let result: u8 = y.wrapping_sub(value.into()).try_into().unwrap();
                     self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
                 }
             }
             OpcodeType::INC => {
                 println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
-                if let Some(operand_value) = operand {
-                    let ret: u8 = self.cpu_p_reg.c_flg_update_add(operand_value.try_into().unwrap(), 1);
+                if let Some(value) = operand {
+                    let ret: u8 = self.cpu_p_reg.c_flg_update_add(value.try_into().unwrap(), 1);
                     self.set_register(CPUReg::A, ret.try_into().unwrap());
                     self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 }
