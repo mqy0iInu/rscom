@@ -1037,15 +1037,17 @@ where
             OpcodeType::RTI => {
                 let status = self.pop_stack();
                 self.cpu_p_reg.set_status_flg_all(status.into());
-                let mut return_addr = self.pop_stack();
-                return_addr |= self.pop_stack() << 8;
-                self.cpu_pc.pc = return_addr.try_into().unwrap();
+                let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
+                self.cpu_pc.pc = return_addr;
                 println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
             }
             OpcodeType::RTS => {
-                let mut return_addr = self.pop_stack();
-                return_addr |= self.pop_stack() << 8;
-                self.cpu_pc.pc = return_addr.try_into().unwrap();
+                let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
+                self.cpu_pc.pc = return_addr;
                 self.cpu_pc.pc += 1;
                 println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
             }
