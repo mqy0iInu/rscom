@@ -498,27 +498,39 @@ where
             // // Logical Operations / 論理演算命令
             OpcodeType::AND => {
                 let a: T = self.get_register(CPUReg::A);
-                if let Some(operand_value) = operand {
-                    let result: T = a & operand_value;
-                    self.set_register(CPUReg::A, result);
+                let mut result = T::from(0);
+                if let Some(value) = operand {
+                    result = a & value;
+                    if let Some(value2) = operand_second {
+                        result = a & ((value2 >> T::from(0x08)) | value);
+                    }
                 }
-                println!("{}",format!("[DEBUG]: AND ${}",dbg_str));
+                self.set_register(CPUReg::A, result);
+                println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
             }
             OpcodeType::ORA => {
                 let a: T = self.get_register(CPUReg::A);
-                if let Some(operand_value) = operand {
-                    let result: T = a | operand_value;
-                    self.set_register(CPUReg::A, result);
+                let mut result = T::from(0);
+                if let Some(value) = operand {
+                    result = a | value;
+                    if let Some(value2) = operand_second {
+                        result = a | ((value2 >> T::from(0x08)) | value);
+                    }
                 }
-                println!("{}",format!("[DEBUG]: ORA ${}",dbg_str));
+                self.set_register(CPUReg::A, result);
+                println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
             }
             OpcodeType::EOR => {
                 let a: T = self.get_register(CPUReg::A);
-                if let Some(operand_value) = operand {
-                    let result: T = a ^ operand_value;
-                    self.set_register(CPUReg::A, result);
+                let mut result = T::from(0);
+                if let Some(value) = operand {
+                    result = a ^ value;
+                    if let Some(value2) = operand_second {
+                        result = a ^ ((value2 >> T::from(0x08)) | value);
+                    }
                 }
-                println!("{}",format!("[DEBUG]: EOR ${}",dbg_str));
+                self.set_register(CPUReg::A, result);
+                println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
             }
             OpcodeType::BIT => {
                 let a: T = self.get_register(CPUReg::A);
