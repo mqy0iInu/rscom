@@ -608,46 +608,56 @@ where
             OpcodeType::INC => {
                 println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
                 if let Some(value) = operand {
-                    let ret: u8 = self.cpu_p_reg.c_flg_update_add(value.try_into().unwrap(), 1);
-                    self.set_register(CPUReg::A, ret.try_into().unwrap());
-                    self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                    let val1: u16 = value.try_into().unwrap();
+                    let mut ret: u16 = self.cpu_p_reg.c_flg_update_add(val1 as u8,1) as u16;
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = self.cpu_p_reg.c_flg_update_add(((val2 << 8) | val1) as u8, 1) as u16;
+                    }
+                    self.write(self.cpu_pc.pc, T::from(ret as u8));
+                    self.cpu_p_reg.nzv_flg_update(ret as u8);
                 }
             }
             OpcodeType::INX => {
                 println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
-                let x: T = self.get_register(CPUReg::X);
-                let ret: u8 = self.cpu_p_reg.c_flg_update_add(x.try_into().unwrap(), 1);
-                self.set_register(CPUReg::X, ret.try_into().unwrap());
-                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                let x: u8 = self.get_register(CPUReg::X).try_into().unwrap();
+                let ret: u8 = self.cpu_p_reg.c_flg_update_add(x, 1);
+                self.set_register(CPUReg::X, T::from(ret as u8));
+                self.cpu_p_reg.nzv_flg_update(ret);
             }
             OpcodeType::INY => {
-                let y: T = self.get_register(CPUReg::Y);
-                let ret: u8 = self.cpu_p_reg.c_flg_update_add(y.try_into().unwrap(), 1);
-                self.set_register(CPUReg::X, ret.try_into().unwrap());
-                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
                 println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
+                let y: u8 = self.get_register(CPUReg::Y).try_into().unwrap();
+                let ret: u8 = self.cpu_p_reg.c_flg_update_add(y, 1);
+                self.set_register(CPUReg::Y, T::from(ret as u8));
+                self.cpu_p_reg.nzv_flg_update(ret);
             }
             OpcodeType::DEC => {
                 println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
-                if let Some(operand_value) = operand {
-                    let result: T = operand_value - T::from(0x01);
-                    self.set_register(CPUReg::A, result);
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                if let Some(value) = operand {
+                    let val1: u16 = value.try_into().unwrap();
+                    let mut ret: u16 = val1.wrapping_sub(0x01);
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val1).wrapping_sub(0x01);
+                    }
+                    self.write(self.cpu_pc.pc, T::from(ret as u8));
+                    self.cpu_p_reg.nzv_flg_update(ret as u8);
                 }
             }
             OpcodeType::DEX => {
                 println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
-                let x: T = self.get_register(CPUReg::X);
-                let result: T = x - T::from(0x01);
-                self.set_register(CPUReg::X, result);
-                self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                let x: u8 = self.get_register(CPUReg::X).try_into().unwrap();
+                let ret: u8 = x.wrapping_sub(0x01);
+                self.set_register(CPUReg::X, ret.try_into().unwrap());
+                self.cpu_p_reg.nzv_flg_update(ret);
             }
             OpcodeType::DEY => {
                 println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
-                let y: T = self.get_register(CPUReg::Y);
-                let result: T = y - T::from(0x01);
-                self.set_register(CPUReg::Y, result);
-                self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                let y: u8 = self.get_register(CPUReg::Y).try_into().unwrap();
+                let ret: u8 = y.wrapping_sub(0x01);
+                self.set_register(CPUReg::Y, ret.try_into().unwrap());
+                self.cpu_p_reg.nzv_flg_update(ret);
             }
 
             // Shift and Rotate Operations
@@ -1193,7 +1203,6 @@ where
     }
 
 fn push_stack(&mut self, data: T) {
-    println!("Push Stack");
     let sp = self.get_register(CPUReg::SP);
     let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
     self.write(address, data);
@@ -1201,7 +1210,6 @@ fn push_stack(&mut self, data: T) {
 }
 
 fn pop_stack(&mut self) -> T {
-    println!("Pop Stack");
     let sp = self.get_register(CPUReg::SP) + T::from(1u8);
     self.set_register(CPUReg::SP, sp);
     let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
@@ -1320,11 +1328,8 @@ fn cpu_reg_show(cpu :&RP2A03<u8>)
 
 fn cpu_proc(cpu :&mut RP2A03<u8>)
 {
-    // println!("[DEBUG] : Fetch!");
     let op_code = cpu.fetch_instruction();
-    // println!("[DEBUG] : Decode!");
     let (opcode, addressing) = cpu.decode_instruction(op_code);
-    // println!("[DEBUG] : Execute!");
     cpu.execute_instruction(opcode, addressing);
 }
 
