@@ -661,24 +661,23 @@ where
                         self.set_register(CPUReg::A, ret.try_into().unwrap());
                     },
                     _ => {
-                            if let Some(value) = operand {
-                                let addr: u8 = value.try_into().unwrap();
-                                let mut val: u8 = 0;
-                                val =  self.read(addr as u16).try_into().unwrap();
-                                if let Some(value2) = operand_second {
-                                    let addr_l: u8 = value.try_into().unwrap();
-                                    let addr_u: u8 = value2.try_into().unwrap();
-                                    let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                    val = self.read(addr as u16).try_into().unwrap();
-                                }
-
-                                let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(val as u8);
-                                ret = ret & 0xFE; // bit0, clear
-                                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                                self.write(self.cpu_pc.pc, T::from(ret as u8));
+                        if let Some(value) = operand {
+                            let addr: u8 = value.try_into().unwrap();
+                            let mut val: u8 = 0;
+                            val =  self.read(addr as u16).try_into().unwrap();
+                            if let Some(value2) = operand_second {
+                                let addr_l: u8 = value.try_into().unwrap();
+                                let addr_u: u8 = value2.try_into().unwrap();
+                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
+                                val = self.read(addr as u16).try_into().unwrap();
                             }
+                            let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(val as u8);
+                            ret = ret & 0xFE; // bit0, clear
+                            self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                            self.write(self.cpu_pc.pc, T::from(ret as u8));
                         }
                     }
+                }
                 println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
             }
             OpcodeType::LSR => {
@@ -691,48 +690,99 @@ where
                         self.set_register(CPUReg::A, ret.try_into().unwrap());
                     },
                     _ => {
-                            if let Some(value) = operand {
-                                let addr: u8 = value.try_into().unwrap();
-                                let mut val: u8 = 0;
-                                val =  self.read(addr as u16).try_into().unwrap();
-                                if let Some(value2) = operand_second {
-                                    let addr_l: u8 = value.try_into().unwrap();
-                                    let addr_u: u8 = value2.try_into().unwrap();
-                                    let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                    val = self.read(addr as u16).try_into().unwrap();
-                                }
-
-                                let mut ret: u8 = self.cpu_p_reg.c_flg_update_r_shit(val as u8);
-                                ret = ret & 0x7F; // bit7, clear
-                                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                                self.write(self.cpu_pc.pc, T::from(ret as u8));
+                        if let Some(value) = operand {
+                            let addr: u8 = value.try_into().unwrap();
+                            let mut val: u8 = 0;
+                            val =  self.read(addr as u16).try_into().unwrap();
+                            if let Some(value2) = operand_second {
+                                let addr_l: u8 = value.try_into().unwrap();
+                                let addr_u: u8 = value2.try_into().unwrap();
+                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
+                                val = self.read(addr as u16).try_into().unwrap();
                             }
+                            let mut ret: u8 = self.cpu_p_reg.c_flg_update_r_shit(val as u8);
+                            ret = ret & 0x7F; // bit7, clear
+                            self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                            self.write(self.cpu_pc.pc, T::from(ret as u8));
                         }
                     }
+                }
                 println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
             }
             OpcodeType::ROL => {
-                let a: T = self.get_register(CPUReg::A);
-                let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(a.try_into().unwrap());
-                let mut carry: u8 = 0;
-                if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
-                    carry = BIN_BIT_0;
+                match *_addressing.addr_mode {
+                    AddrMode::ACC => {
+                        let a: T = self.get_register(CPUReg::A);
+                        let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(a.try_into().unwrap());
+                        if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
+                            ret = ret | BIN_BIT_0; // bit0 = C Flag Set
+                        }else{
+                            ret = ret & 0xFE; // bit0 = C Flag Clear
+                        }
+                        self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                        self.set_register(CPUReg::A, ret.try_into().unwrap());
+                    },
+                    _ => {
+                        if let Some(value) = operand {
+                            let addr: u8 = value.try_into().unwrap();
+                            let mut val: u8 = 0;
+                            val =  self.read(addr as u16).try_into().unwrap();
+                            if let Some(value2) = operand_second {
+                                let addr_l: u8 = value.try_into().unwrap();
+                                let addr_u: u8 = value2.try_into().unwrap();
+                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
+                                val = self.read(addr as u16).try_into().unwrap();
+                            }
+
+                            let mut ret: u8 = self.cpu_p_reg.c_flg_update_l_shit(val as u8);
+                            if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
+                                ret = ret | BIN_BIT_0; // bit0 = C Flag Set
+                            }else{
+                                ret = ret & 0xFE; // bit0 = C Flag Clear
+                            }
+                            self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                            self.write(self.cpu_pc.pc, T::from(ret as u8));
+                        }
+                    }
                 }
-                ret = ret | carry; // bit0 = C Flag Set
-                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                self.set_register(CPUReg::A, ret.try_into().unwrap());
                 println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
             }
             OpcodeType::ROR => {
-                let a: T = self.get_register(CPUReg::A);
-                let mut ret: u8 = self.cpu_p_reg.c_flg_update_r_shit(a.try_into().unwrap());
-                let mut carry: u8 = 0;
-                if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
-                    carry = BIN_BIT_7;
+                match *_addressing.addr_mode {
+                    AddrMode::ACC => {
+                        let a: T = self.get_register(CPUReg::A);
+                        let mut ret: u8 = self.cpu_p_reg.c_flg_update_r_shit(a.try_into().unwrap());
+                        if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
+                            ret = ret | BIN_BIT_7; // bit7 = C Flag Set
+                        }else{
+                            ret = ret & 0x7F;      // bit7 = C Flag Clear
+                        }
+                        self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                        self.set_register(CPUReg::A, ret.try_into().unwrap());
+                    },
+                    _ => {
+                        if let Some(value) = operand {
+                            let addr: u8 = value.try_into().unwrap();
+                            let mut val: u8 = 0;
+                            val =  self.read(addr as u16).try_into().unwrap();
+                            if let Some(value2) = operand_second {
+                                let addr_l: u8 = value.try_into().unwrap();
+                                let addr_u: u8 = value2.try_into().unwrap();
+                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
+                                val = self.read(addr as u16).try_into().unwrap();
+                            }
+
+                            let mut ret: u8 = self.cpu_p_reg.c_flg_update_r_shit(val as u8);
+                            if self.cpu_p_reg.get_status_flg(CARRY_FLG) {
+                                ret = ret | BIN_BIT_7; // bit7 = C Flag Set
+                            }else{
+                                ret = ret & 0x7F;      // bit7 = C Flag Clear
+                            }
+                            self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
+                            self.write(self.cpu_pc.pc, T::from(ret as u8));
+                        }
+                    }
                 }
-                ret = ret | carry; // bit7 = C Flag Set
-                self.cpu_p_reg.nzv_flg_update(ret.try_into().unwrap());
-                self.set_register(CPUReg::A, ret.try_into().unwrap());
                 println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
             }
 
