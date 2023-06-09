@@ -488,6 +488,7 @@ where
 
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing) {
         let (operand,operand_second,dbg_str) = self.read_operand(addressing);
+        let mut jmp_flg: bool = false;
 
         match opcode.opcode_type {
             OpcodeType::NOP => {
@@ -899,6 +900,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
+                        jmp_flg = true;
                         println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
                     }
                 }
@@ -914,6 +916,7 @@ where
                         let val2: u8 = value2.try_into().unwrap();
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.cpu_pc.pc = jump_addr;
+                        jmp_flg = true;
                         println!("[DEBUG]: JSR ${:04X} ({})",jump_addr ,format!("{}",dbg_str));
                     }
                 }
@@ -929,6 +932,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
                         }
                     }
@@ -943,6 +947,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
                         }
                     }
@@ -957,6 +962,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
                         }
                     }
@@ -971,6 +977,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
                         }
                     }
@@ -985,6 +992,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
                         }
                     }
@@ -999,6 +1007,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
                         }
                     }
@@ -1013,6 +1022,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
                         }
                     }
@@ -1027,6 +1037,7 @@ where
                             let val2: u8 = value2.try_into().unwrap();
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
+                            jmp_flg = true;
                             println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
                         }
                     }
@@ -1041,6 +1052,7 @@ where
                 let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
                 let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
                 self.cpu_pc.pc = return_addr;
+                jmp_flg = true;
                 println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
             }
             OpcodeType::RTS => {
@@ -1049,6 +1061,7 @@ where
                 let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
                 self.cpu_pc.pc = return_addr;
                 self.cpu_pc.pc += 1;
+                jmp_flg = true;
                 println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
             }
             OpcodeType::BRK => {
@@ -1062,6 +1075,7 @@ where
                     let mut _jmp_addr: T = self.read(ADDR_VEC_TBL_IRQ);
                     _jmp_addr = self.read(ADDR_VEC_TBL_IRQ + 1) << 0x0008;
                     self.cpu_pc.pc = _jmp_addr.try_into().unwrap();
+                    jmp_flg = true;
                     println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
                     print!("Jmp to: ${:04X}", self.cpu_pc.pc);
                 }
@@ -1070,19 +1084,19 @@ where
             // Other
             OpcodeType::STP | _ => {
                 // TODO STPと未定義命令をどうするか
-                println!("Undefined Instruction!");
+                println!("[DEBUG]: Undefined Instruction!");
             }
         }
 
         // pc ++
-        if operand != None
+        if (operand != None) & (jmp_flg != true)
         {
             self.cpu_pc.pc += 1;
         }
     }
 
     fn push_stack(&mut self, data: T) {
-        println!("Push Stack");
+        // println!("Push Stack");
         let sp = self.get_register(CPUReg::SP);
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
         self.write(address, data);
@@ -1090,7 +1104,7 @@ where
     }
 
     fn pop_stack(&mut self) -> T {
-        println!("POP Stack");
+        // println!("POP Stack");
         let sp = self.get_register(CPUReg::SP);
         self.set_register(CPUReg::SP, sp + T::from(1u8));
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
