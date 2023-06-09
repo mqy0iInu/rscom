@@ -40,7 +40,7 @@ enum OpcodeType {
     // Stack Operations
     TSX, TXS, PHA, PHP, PLA, PLP,
     // Logical Operations
-    AND, ORA, EOR, BIT,
+    AND, ORA, EOR,
     // Arithmetic Operations
     ADC, SBC, CMP, CPX, CPY, INC, INX, INY, DEC, DEX, DEY,
     // Shift and Rotate Operations
@@ -50,7 +50,7 @@ enum OpcodeType {
     // Branch Operations
     BCC, BCS, BNE, BEQ, BPL, BMI, BVC, BVS,
     // Status Flag Operations
-    CLC, CLD, CLI, CLV, SEC, SED, SEI,
+    BIT, CLC, CLD, CLI, CLV, SEC, SED, SEI,
     // Interrupt Operations
     RTS, RTI, BRK,
     // Other
@@ -497,62 +497,49 @@ where
 
             // // Logical Operations / 論理演算命令
             OpcodeType::AND => {
-                let a: T = self.get_register(CPUReg::A);
-                let mut result = T::from(0);
+                let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                let mut result: u16 = 0;
                 if let Some(value) = operand {
-                    result = a & value;
+                    let val: u16 = value.try_into().unwrap();
+                    result = (a & val).try_into().unwrap();
                     if let Some(value2) = operand_second {
-                        result = a & ((value2 >> T::from(0x08)) | value);
+                        let val: u16 = value.try_into().unwrap();
+                        let val2: u16 = value2.try_into().unwrap();
+                        result = (a & ((val2 << 0x08) | val)).try_into().unwrap();
                     }
                 }
-                self.set_register(CPUReg::A, result);
+                self.set_register(CPUReg::A, T::from(result as u8));
                 println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
             }
             OpcodeType::ORA => {
-                let a: T = self.get_register(CPUReg::A);
-                let mut result = T::from(0);
+                let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                let mut result: u16 = 0;
                 if let Some(value) = operand {
-                    result = a | value;
+                    let val: u16 = value.try_into().unwrap();
+                    result = (a | val).try_into().unwrap();
                     if let Some(value2) = operand_second {
-                        result = a | ((value2 >> T::from(0x08)) | value);
+                        let val: u16 = value.try_into().unwrap();
+                        let val2: u16 = value2.try_into().unwrap();
+                        result = (a | ((val2 << 0x08) | val)).try_into().unwrap();
                     }
                 }
-                self.set_register(CPUReg::A, result);
+                self.set_register(CPUReg::A, T::from(result as u8));
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
             }
             OpcodeType::EOR => {
-                let a: T = self.get_register(CPUReg::A);
-                let mut result = T::from(0);
+                let a:u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                let mut result: u16 = 0;
                 if let Some(value) = operand {
-                    result = a ^ value;
+                    let val: u16 = value.try_into().unwrap();
+                    result = (a ^ val).try_into().unwrap();
                     if let Some(value2) = operand_second {
-                        result = a ^ ((value2 >> T::from(0x08)) | value);
+                        let val: u16 = value.try_into().unwrap();
+                        let val2: u16 = value2.try_into().unwrap();
+                        result = (a ^ ((val2 << 0x08) | val)).try_into().unwrap();
                     }
                 }
-                self.set_register(CPUReg::A, result);
+                self.set_register(CPUReg::A, T::from(result as u8));
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
-            }
-            OpcodeType::BIT => {
-                let a: T = self.get_register(CPUReg::A);
-                if let Some(operand_value) = operand {
-                    let result: T = a & operand_value;
-                    if result == T::from(0) {
-                        self.cpu_p_reg.set_status_flg(ZERO_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(ZERO_FLG);
-                    }
-                    if (operand_value & T::from(BIN_BIT_7)) != T::from(0) {
-                        self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(NEGATIVE_FLG);
-                    }
-                    if (operand_value & T::from(BIN_BIT_6)) != T::from(0) {
-                        self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
-                    }
-                }
-                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
             }
 
             // Arithmetic Operations / 算術倫理演算
@@ -853,6 +840,28 @@ where
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
+            OpcodeType::BIT => {
+                let a: T = self.get_register(CPUReg::A);
+                if let Some(operand_value) = operand {
+                    let result: T = a & operand_value;
+                    if result == T::from(0) {
+                        self.cpu_p_reg.set_status_flg(ZERO_FLG);
+                    } else {
+                        self.cpu_p_reg.cls_status_flg(ZERO_FLG);
+                    }
+                    if (operand_value & T::from(BIN_BIT_7)) != T::from(0) {
+                        self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
+                    } else {
+                        self.cpu_p_reg.cls_status_flg(NEGATIVE_FLG);
+                    }
+                    if (operand_value & T::from(BIN_BIT_6)) != T::from(0) {
+                        self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
+                    } else {
+                        self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
+                    }
+                }
+                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
+            }
             OpcodeType::CLC => {
                 self.cpu_p_reg.cls_status_flg(CARRY_FLG);
                 println!("{}",format!("[DEBUG]: CLC ${}",dbg_str));
