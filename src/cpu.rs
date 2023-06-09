@@ -46,13 +46,13 @@ enum OpcodeType {
     // Shift and Rotate Operations
     ASL, LSR, ROL, ROR,
     // Jump and Call Operations
-    JMP, JSR,
+    JMP, JSR, RTS,
     // Branch Operations
     BCC, BCS, BNE, BEQ, BPL, BMI, BVC, BVS,
     // Status Flag Operations
     BIT, CLC, CLD, CLI, CLV, SEC, SED, SEI,
     // Interrupt Operations
-    RTS, RTI, BRK,
+    RTI, BRK,
     // Other
     NOP, STP,
     // Undefined OP
@@ -988,36 +988,6 @@ where
                 println!("{}",format!("[DEBUG]: SEI ${}",dbg_str));
             }
 
-            // Jump and Call Operations
-            OpcodeType::JMP => {
-                if let Some(value) = operand {
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value.try_into().unwrap();
-                        let val2: u8 = value2.try_into().unwrap();
-                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
-                        self.cpu_pc.pc = jump_addr;
-                        jmp_flg = true;
-                        println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
-                    }
-                }
-            }
-            OpcodeType::JSR => {
-                let return_addr: u16 = self.cpu_pc.pc + 1;
-                self.push_stack((return_addr & 0x00FF).try_into().unwrap());
-                self.push_stack(((return_addr & 0xFF00) >> 0x0008).try_into().unwrap());
-
-                if let Some(value) = operand {
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value.try_into().unwrap();
-                        let val2: u8 = value2.try_into().unwrap();
-                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
-                        self.cpu_pc.pc = jump_addr;
-                        jmp_flg = true;
-                        println!("[DEBUG]: JSR ${:04X} ({})",jump_addr ,format!("{}",dbg_str));
-                    }
-                }
-            }
-
             // Branch Operations / 分岐命令
             OpcodeType::BCC => {
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
@@ -1029,10 +999,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
             }
             OpcodeType::BCS => {
                 let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
@@ -1044,10 +1014,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
             }
             OpcodeType::BEQ => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
@@ -1059,10 +1029,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
             }
             OpcodeType::BNE => {
                 let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
@@ -1074,10 +1044,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
             }
             OpcodeType::BVC => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
@@ -1089,10 +1059,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
             }
             OpcodeType::BVS => {
                 let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
@@ -1104,10 +1074,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
             }
             OpcodeType::BPL => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
@@ -1119,10 +1089,10 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
             }
             OpcodeType::BMI => {
                 let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
@@ -1134,10 +1104,56 @@ where
                             let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
-                            println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
                         }
                     }
                 }
+                println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
+            }
+
+            // Jump and Call Operations
+            OpcodeType::JMP => {
+                if let Some(value) = operand {
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
+                        self.cpu_pc.pc = jump_addr;
+                        jmp_flg = true;
+                    }
+                }
+                println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
+            }
+            OpcodeType::JSR => {
+                let mut jump_addr: u16 = 0x00;
+                let return_addr: u16 = self.cpu_pc.pc;
+                // let return_addr: u16 = self.cpu_pc.pc + 1;
+                self.push_stack((return_addr & 0x00FF).try_into().unwrap());
+                self.push_stack(((return_addr & 0xFF00) >> 0x0008).try_into().unwrap());
+
+                if let Some(value) = operand {
+                    if let Some(value2) = operand_second {
+                        let val: u8 = value.try_into().unwrap();
+                        let val2: u8 = value2.try_into().unwrap();
+                        jump_addr = (val2 as u16) << 8 | val as u16;
+                        self.cpu_pc.pc = jump_addr;
+                        jmp_flg = true;
+                    }
+                }
+                println!("[DEBUG]: JSR ${:04X} ({})",jump_addr ,format!("{}",dbg_str));
+            }
+            OpcodeType::RTS => {
+                // TODO :なぜSPがバグって1少ないのかわからんから暫定でインクリメント
+                if self.get_register(CPUReg::SP) != T::from(0xFF)
+                {
+                    self.set_register(CPUReg::SP, self.get_register(CPUReg::SP) + T::from(1u8));
+                }
+
+                let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
+                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
+                self.cpu_pc.pc = return_addr + 1;
+                jmp_flg = true;
+                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
             }
 
             // Intrrupt Operations / 割込み関連
@@ -1151,15 +1167,6 @@ where
                 jmp_flg = true;
                 println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
             }
-            OpcodeType::RTS => {
-                let return_addr_l: u16 = self.pop_stack().try_into().unwrap();
-                let return_addr_u: u16 = self.pop_stack().try_into().unwrap();
-                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
-                self.cpu_pc.pc = return_addr;
-                self.cpu_pc.pc += 1;
-                jmp_flg = true;
-                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
-            }
             OpcodeType::BRK => {
                 if self.cpu_p_reg.get_status_flg(BREAK_COMMAND_FLG) != true {
                     self.cpu_pc.pc += 1;
@@ -1172,9 +1179,9 @@ where
                     _jmp_addr = self.read(ADDR_VEC_TBL_IRQ + 1) << 0x0008;
                     self.cpu_pc.pc = _jmp_addr.try_into().unwrap();
                     jmp_flg = true;
-                    println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
-                    print!("Jmp to: ${:04X}", self.cpu_pc.pc);
+                    print!("BRK Jmp to: ${:04X}", self.cpu_pc.pc);
                 }
+                println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
             }
 
             // Other
@@ -1192,18 +1199,28 @@ where
     }
 
     fn push_stack(&mut self, data: T) {
-        // println!("Push Stack");
+        println!("Push Stack");
         let sp = self.get_register(CPUReg::SP);
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
         self.write(address, data);
-        self.set_register(CPUReg::SP, sp - T::from(1u8));
+        if self.get_register(CPUReg::SP) > T::from(0)
+        {
+            self.set_register(CPUReg::SP, sp - T::from(1u8));
+        }else{
+            // panic!("[ERR]: Stack Under Flow !!!");
+        }
     }
 
     fn pop_stack(&mut self) -> T {
-        // println!("POP Stack");
+        println!("Pop Stack");
         let sp = self.get_register(CPUReg::SP);
-        self.set_register(CPUReg::SP, sp + T::from(1u8));
         let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
+        if self.get_register(CPUReg::SP) < T::from(0xFF)
+        {
+            self.set_register(CPUReg::SP, sp + T::from(1u8));
+        }else{
+            // panic!("[ERR]: Stack Over Flow !!!");
+        }
         self.read(address)
     }
 

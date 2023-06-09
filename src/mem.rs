@@ -86,7 +86,7 @@ impl NESMemory {
         // ];
         // self.cassette.prg_rom.clear();
         // self.cassette.prg_rom.extend_from_slice(&dummy_program);
-
+        // =================================
         // (DEBUG) :Snake Game(Only 6502 OP-Code)
         let start_address = 0x600; // アセンブラを読んでるとWRAMで実行するみたい
         let end_address = start_address + SNAKE_GAME_TBL.len();
