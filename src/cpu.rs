@@ -584,25 +584,76 @@ where
             OpcodeType::CMP => {
                 println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
                 if let Some(value) = operand {
-                    let a: u8 = self.get_register(CPUReg::A).try_into().unwrap();
-                    let result: u8 = a.wrapping_sub(value.into()).try_into().unwrap();
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                    let val: u16 = value.try_into().unwrap();
+                    let a: u16 = self.get_register(CPUReg::A).try_into().unwrap();
+                    let mut ret: u16 = val;
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u16;
+                    }
+
+                    if a > ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                    }
+                    if a == ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                        self.cpu_p_reg.set_status_flg(ZERO_FLG);
+                    }
+                    if a < ret {
+                    }
+                    if (ret & BIN_BIT_7 as u16) != 0 {
+                        self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
+                    }
                 }
             }
             OpcodeType::CPX => {
                 println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
                 if let Some(value) = operand {
-                    let x: u8 = self.get_register(CPUReg::X).try_into().unwrap();
-                    let result: u8 = x.wrapping_sub(value.into()).try_into().unwrap();
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                    let val: u16 = value.try_into().unwrap();
+                    let x: u16 = self.get_register(CPUReg::X).try_into().unwrap();
+                    let mut ret: u16 = val;
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u16;
+                    }
+
+                    if x > ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                    }
+                    if x == ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                        self.cpu_p_reg.set_status_flg(ZERO_FLG);
+                    }
+                    if x < ret {
+                    }
+                    if (ret & BIN_BIT_7 as u16) != 0 {
+                        self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
+                    }
                 }
             }
             OpcodeType::CPY => {
                 println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
                 if let Some(value) = operand {
-                    let y: u8 = self.get_register(CPUReg::Y).try_into().unwrap();
-                    let result: u8 = y.wrapping_sub(value.into()).try_into().unwrap();
-                    self.cpu_p_reg.nzv_flg_update(result.try_into().unwrap());
+                    let val: u16 = value.try_into().unwrap();
+                    let y: u16 = self.get_register(CPUReg::Y).try_into().unwrap();
+                    let mut ret: u16 = val;
+                    if let Some(value2) = operand_second {
+                        let val2: u16 = value2.try_into().unwrap();
+                        ret = ((val2 << 8) | val) as u16;
+                    }
+
+                    if y > ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                    }
+                    if y == ret {
+                        self.cpu_p_reg.set_status_flg(CARRY_FLG);
+                        self.cpu_p_reg.set_status_flg(ZERO_FLG);
+                    }
+                    if y < ret {
+                    }
+                    if (ret & BIN_BIT_7 as u16) != 0 {
+                        self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
+                    }
                 }
             }
             OpcodeType::INC => {
