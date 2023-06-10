@@ -1343,13 +1343,14 @@ fn pop_stack(&mut self) -> T {
                 format!("{:#02X} (IndY)",oprand))
             }
             AddrMode::REL => { // Relative Addressing(相対アドレッシング)
-                let offset: u8 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                let addr: i32 = ((offset as i8) as i32).wrapping_add(self.cpu_pc.pc as i32);
+                let offset: u8 = self.read(self.cpu_pc.pc + 2).try_into().unwrap();
+                let s_offset: i8 = offset as i8;
+                let addr: u16 = (self.cpu_pc.pc as i16).wrapping_add(s_offset as i16) as u16;
                 let addr_l: u8 = addr as u8;
                 let addr_u: u8 = (addr >> 8) as u8;
                 (Some(T::from(addr_l as u8)),
                 Some(T::from(addr_u as u8)),
-                format!("{:#02X} (REL)", offset))
+                format!("${:04X} (REL)(Offset: 0x{:02X}({}))", addr, s_offset, s_offset))
             }
             AddrMode::IMPL => { // Implied Addressing
                 // Not, Have Operand
@@ -1428,9 +1429,8 @@ pub fn cpu_main()
 mod cpu_test {
 
     #[test]
-    fn cpu_test()
-    {
-        // TODO CPU Test
+    fn cpu_test() {
+        // TODO :CPU Test
     }
 }
 // ==================================================================================
