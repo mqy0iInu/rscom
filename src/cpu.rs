@@ -168,7 +168,7 @@ impl StatusRegister {
 
     fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
         let mut ret: u16 = val_a as u16;
-        ret += val_b as u16;
+        ret = ret.wrapping_add(val_b as u16);
         if ret >  0x00FF {
             self.set_status_flg(CARRY_FLG);
             0x00
@@ -1053,13 +1053,12 @@ where
             // Branch Operations / 分岐命令
             OpcodeType::BCC => {
                 println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
-                if ret != true {
+                if self.cpu_p_reg.get_status_flg(CARRY_FLG) != true {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1068,13 +1067,12 @@ where
             }
             OpcodeType::BCS => {
                 println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(CARRY_FLG);
-                if ret != false {
+                if self.cpu_p_reg.get_status_flg(CARRY_FLG) != false {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1083,13 +1081,12 @@ where
             }
             OpcodeType::BEQ => {
                 println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
-                if ret != false {
+                if self.cpu_p_reg.get_status_flg(ZERO_FLG) != false {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1098,13 +1095,12 @@ where
             }
             OpcodeType::BNE => {
                 println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(ZERO_FLG);
-                if ret != true {
+                if self.cpu_p_reg.get_status_flg(ZERO_FLG) != true {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1113,13 +1109,12 @@ where
             }
             OpcodeType::BVC => {
                 println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
-                if ret != true {
+                if self.cpu_p_reg.get_status_flg(OVERFLOW_FLG) != true {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1128,13 +1123,12 @@ where
             }
             OpcodeType::BVS => {
                 println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(OVERFLOW_FLG);
-                if ret != false {
+                if self.cpu_p_reg.get_status_flg(OVERFLOW_FLG) != false {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1143,13 +1137,12 @@ where
             }
             OpcodeType::BPL => {
                 println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
-                if ret != true {
+                if self.cpu_p_reg.get_status_flg(NEGATIVE_FLG) != true {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1158,13 +1151,12 @@ where
             }
             OpcodeType::BMI => {
                 println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
-                let ret = self.cpu_p_reg.get_status_flg(NEGATIVE_FLG);
-                if ret != false {
+                if self.cpu_p_reg.get_status_flg(NEGATIVE_FLG) != false {
                     if let Some(value) = operand {
                         if let Some(value2) = operand_second {
-                            let val: u8 = value.try_into().unwrap();
-                            let val2: u8 = value2.try_into().unwrap();
-                            let branch_addr: u16 = (val2 as u16) << 8 | val as u16;
+                            let val: u16 = value.try_into().unwrap();
+                            let val2:u16 = value2.try_into().unwrap();
+                            let branch_addr: u16 = (val2 << 8) | val;
                             self.cpu_pc.pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1303,32 +1295,32 @@ fn pop_stack(&mut self) -> T {
                 format!("{:#02X} (ZpgY)",oprand))
             }
             AddrMode::ABS => {
-                let address_l:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                let addr_l:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 self.cpu_pc.pc += 1;
-                let address_u:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                (Some(address_l.try_into().unwrap()),
-                Some(address_u.try_into().unwrap()),
-                format!("{:#02X} {:#02X} (ABS)",address_l, address_u))
+                let addr_u:u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                (Some(T::from(addr_l as u8)),
+                Some(T::from(addr_u as u8)),
+                format!("{:#02X} {:#02X} (ABS)",addr_l, addr_u))
             }
             AddrMode::AbsX => {
-                let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::X)).unwrap();
+                let mut addr_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                addr_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::X)).unwrap();
                 self.cpu_pc.pc += 1;
-                let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                address_u |= address_l;
-                (Some(address_l.try_into().unwrap()),
-                Some(address_u.try_into().unwrap()),
-                format!("{:#02X} {:#02X} (AbsX)",address_l, address_u))
+                let mut addr_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                addr_u |= addr_l;
+                (Some(T::from(addr_l as u8)),
+                Some(T::from(addr_u as u8)),
+                format!("{:#02X} {:#02X} (AbsX)",addr_l, addr_u))
             }
             AddrMode::AbsY => {
-                let mut address_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                address_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::Y)).unwrap();
+                let mut addr_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                addr_l |= TryInto::<u16>::try_into(self.get_register(CPUReg::Y)).unwrap();
                 self.cpu_pc.pc += 1;
-                let mut address_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                address_u |= address_l;
-                (Some(address_l.try_into().unwrap()),
-                Some(address_u.try_into().unwrap()),
-                format!("{:#02X} {:#02X} (AbsY)",address_l, address_u))
+                let mut addr_u: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                addr_u |= addr_l;
+                (Some(T::from(addr_l as u8)),
+                Some(T::from(addr_u as u8)),
+                format!("{:#02X} {:#02X} (AbsY)",addr_l, addr_u))
             }
             AddrMode::IND => {
                 let address: T = self.read(self.cpu_pc.pc);
@@ -1351,12 +1343,12 @@ fn pop_stack(&mut self) -> T {
                 format!("{:#02X} (IndY)",oprand))
             }
             AddrMode::REL => { // Relative Addressing(相対アドレッシング)
-                let offset: i16 = self.read(self.cpu_pc.pc).try_into().unwrap();
-                let addr: u16 = self.cpu_pc.pc.wrapping_add((offset & 0xff) as i16 as u16).wrapping_add(2).try_into().unwrap();
-                let addr_l: u8 = (self.cpu_pc.pc & 0x00FF) as u8;
-                let addr_u: u8 = ((self.cpu_pc.pc & 0xFF00) >> 8) as u8;
-                (Some(addr_l.try_into().unwrap()),
-                Some(addr_u.try_into().unwrap()),
+                let offset: u8 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                let addr: i32 = ((offset as i8) as i32).wrapping_add(self.cpu_pc.pc as i32);
+                let addr_l: u8 = addr as u8;
+                let addr_u: u8 = (addr >> 8) as u8;
+                (Some(T::from(addr_l as u8)),
+                Some(T::from(addr_u as u8)),
                 format!("{:#02X} (REL)", offset))
             }
             AddrMode::IMPL => { // Implied Addressing
