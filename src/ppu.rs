@@ -58,6 +58,7 @@ const PPU_PPU_MEM_DATA_REG_ADDR: u16 = 0x2007;
 pub const PPU_REG_READ: u8 = 0x00;
 pub const PPU_REG_WRITE: u8 = 0x01;
 
+#[derive(Clone)]
 pub struct PPUReg {
     ctrl_1_reg: u8,          // ($2000) (RW) Control Register 1
     ctrl_2_reg: u8,          // ($2001) (RW) Control Register 2

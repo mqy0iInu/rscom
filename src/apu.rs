@@ -24,6 +24,7 @@ const APU_SOUND_FRAME_REG_ADDR: u16 = 0x4017;
 pub const APU_REG_READ: u8 = 0x00;
 pub const APU_REG_WRITE: u8 = 0x01;
 
+#[derive(Clone)]
 pub struct APUReg {
     square_wave_1_ctrl_1_reg: u8,      // ($4000) Square Wave 1 Control 1
     square_wave_1_ctrl_2_reg: u8,      // ($4001) Square Wave 1 Control 2

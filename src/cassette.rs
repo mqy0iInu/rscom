@@ -22,7 +22,8 @@ pub const ROM_MAPPER_0_ROM_TBL: [&str; 16] = [
     "test_rom/nes/mapper_0/xevious.nes",
 ];
 
-#[derive(Debug, PartialEq)]
+
+#[derive(Debug, PartialEq, Clone)]
 #[allow(non_camel_case_types)]
 pub enum Mirroring {
     VERTICAL,
@@ -35,6 +36,7 @@ pub const PRG_ROM_MIN_SIZE: usize = 16 * 1024;           // 16KB
 pub const CHR_RAM_MIN_SIZE: usize = 16 * 1024;           // 16KB(TBD)
 pub const CHR_ROM_MIN_SIZE: usize = 8 * 1024;            // 8KB
 
+#[derive(Clone)]
 pub struct Cassette {
     pub chr_rom: Vec<u8>,                                // CHR ROM ... 8KB or 16KB
     // pub chr_ram: Vec<u8>,                                // CHR-RAM (Ext RAM)

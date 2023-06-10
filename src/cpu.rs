@@ -2,7 +2,16 @@ use crate::mem::*;
 use std::convert::TryInto;
 use std::convert::From;
 use std::rc::Rc;
-// use std::num::Wrapping;
+// use core::cell::OnceCell;
+use std::cell::OnceCell;
+use std::sync::{Once, Mutex};
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref S_CPU_DATA: Mutex<Option<RP2A03<u8>>> = Mutex::new(None);
+    static ref S_CPU: Once = Once::new();
+    static ref S_CPU_STOP: bool = false;
+}
 
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
 pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
@@ -20,7 +29,8 @@ enum CPUReg {
     SP,  // スタックポインタ              ... スタックのトップアドレスを示す。
 }
 
-struct ProgramCounter {
+#[derive(Clone)]
+pub struct ProgramCounter {
     pc: u16,
 }
 
@@ -100,7 +110,8 @@ enum InterruptType {
     IRQ,
 }
 
-struct Interrupt {
+#[derive(Clone)]
+pub struct Interrupt {
     rst: bool,
     nmi: bool,
     irq: bool,
@@ -116,8 +127,9 @@ impl Interrupt {
     }
 }
 
+#[derive(Clone)]
 /// RP2A03のステータスレジスタ
-struct StatusRegister {
+pub struct StatusRegister {
     p_reg: u8,
 }
 
@@ -212,12 +224,13 @@ impl StatusRegister {
     }
 }
 
-struct RP2A03<T> {
-    cpu_reg: [T; 4],
-    cpu_p_reg: StatusRegister,
-    cpu_pc: ProgramCounter,
-    nes_mem: NESMemory,
-    interrupt: Interrupt,
+#[derive(Clone)]
+pub struct RP2A03<T> {
+    pub cpu_reg: [T; 4],
+    pub cpu_p_reg: StatusRegister,
+    pub cpu_pc: ProgramCounter,
+    pub nes_mem: NESMemory,
+    pub interrupt: Interrupt,
 }
 
 impl<T> CPU<T> for RP2A03<T>
@@ -1378,49 +1391,42 @@ fn cpu_proc(cpu :&mut RP2A03<u8>)
     cpu.execute_instruction(opcode, addressing);
 }
 
-static mut S_CPU: Option<RP2A03<u8>> = None;
-static mut S_CPU_STOP: bool = false;
-
-pub fn cpu_stop(flg: bool)
-{
-    unsafe {
-        if S_CPU_STOP != false
-        {
-            println!("[DEBUG]: CPU Stop");
-        }
+pub fn cpu_stop(flg: bool) {
+    if *S_CPU_STOP {
+        println!("[DEBUG]: CPU Stop");
     }
 }
 
-pub fn cpu_reset() {
-    unsafe {
-        S_CPU = Some(RP2A03 {
+pub fn cpu_reset() -> Option<RP2A03<u8>> {
+    S_CPU.call_once(|| {
+        let mut cpu_data = S_CPU_DATA.lock().unwrap();
+        *cpu_data = Some(RP2A03 {
             cpu_reg: [0u8; 4],
             cpu_p_reg: StatusRegister::new(),
             cpu_pc: ProgramCounter::new(),
             nes_mem: NESMemory::new(),
             interrupt: Interrupt::new(),
         });
+    });
+
+    if let Some(cpu) = S_CPU_DATA.lock().unwrap().as_mut() {
+        cpu.nes_mem.mem_reset();
+        cpu.reset();
     }
 
-    unsafe {
-        if let Some(ref mut cpu) = S_CPU {
-            cpu.nes_mem.mem_reset();
-            cpu.reset();
-        }
-    }
+    S_CPU_DATA.lock().unwrap().clone()
 }
 
-pub fn cpu_main()
-{
+pub fn cpu_main() {
+    if *S_CPU_STOP {
+        return;
+    }
+
     unsafe {
-        if S_CPU_STOP != true
-        {
-            // println!("[DEBUG] : CPU Main Loop");
-                if let Some(ref mut cpu) = S_CPU {
-                    cpu_reg_show(cpu);
-                    cpu_proc(cpu);
-                }
-            }
+        S_CPU_DATA.lock().unwrap().as_mut().map(|cpu| {
+            cpu_reg_show(cpu);
+            cpu_proc(cpu);
+        });
     }
 }
 
