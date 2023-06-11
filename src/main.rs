@@ -35,53 +35,49 @@ fn color(byte: u8) -> Color {
         _ => sdl2::pixels::Color::CYAN,
     }
 }
-
-fn read_screen_state(cpu_rp2a03: &mut Option<RP2A03<u8>>, frame: &mut [u8; 32 * 3 * 32]) -> bool {
+fn read_screen_state(cpu_rp2a03: &mut RP2A03, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     let mut frame_idx = 0;
     let mut update = false;
-    if let Some(cpu) = cpu_rp2a03 {
-        let mut rng = rand::thread_rng();
-        cpu.nes_mem.mem_write(0xfe, rng.gen_range(1..16) as u8);
+    let mut rng = rand::thread_rng();
+    cpu_rp2a03.nes_mem.mem_write(0xfe, rng.gen_range(1..16) as u8);
 
-        for i in 0x0200..0x600 {
-            let color_idx = cpu.nes_mem.mem_read(i as u16);
-            let (b1, b2, b3) = color(color_idx).rgb();
-            if frame[frame_idx] != b1 || frame[frame_idx + 1] != b2 || frame[frame_idx + 2] != b3 {
-                frame[frame_idx] = b1;
-                frame[frame_idx + 1] = b2;
-                frame[frame_idx + 2] = b3;
-                update = true;
-            }
-            frame_idx += 3;
+    for i in 0x0200..0x600 {
+        let color_idx = cpu_rp2a03.nes_mem.mem_read(i as u16);
+        let (b1, b2, b3) = color(color_idx).rgb();
+        if frame[frame_idx] != b1 || frame[frame_idx + 1] != b2 || frame[frame_idx + 2] != b3 {
+            frame[frame_idx] = b1;
+            frame[frame_idx + 1] = b2;
+            frame[frame_idx + 2] = b3;
+            update = true;
         }
+        frame_idx += 3;
     }
     update
 }
 
-fn handle_user_input(cpu_rp2a03: &mut Option<RP2A03<u8>>, event_pump: &mut EventPump) {
+fn handle_user_input(cpu_rp2a03: &mut RP2A03, event_pump: &mut EventPump) {
     for event in event_pump.poll_iter() {
-        if let Some(cpu) = cpu_rp2a03.as_mut() {
-            match event {
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    std::process::exit(0)
-                },
-                Event::KeyDown { keycode: Some(Keycode::W), .. } => {
-                    cpu.nes_mem.mem_write(0xff, 0x77);
-                },
-                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
-                    cpu.nes_mem.mem_write(0xff, 0x73);
-                },
-                Event::KeyDown { keycode: Some(Keycode::A), .. } => {
-                    cpu.nes_mem.mem_write(0xff, 0x61);
-                },
-                Event::KeyDown { keycode: Some(Keycode::D), .. } => {
-                    cpu.nes_mem.mem_write(0xff, 0x64);
-                }
-                _ => {/* do nothing */}
-            }
+        match event {
+            Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                std::process::exit(0)
+            },
+            Event::KeyDown { keycode: Some(Keycode::W), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0xff, 0x77);
+            },
+            Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0xff, 0x73);
+            },
+            Event::KeyDown { keycode: Some(Keycode::A), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0xff, 0x61);
+            },
+            Event::KeyDown { keycode: Some(Keycode::D), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0xff, 0x64);
+            },
+            _ => {/* do nothing */}
         }
     }
 }
+
 
 fn app_init()
 {
