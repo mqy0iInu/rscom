@@ -248,6 +248,7 @@ where
         self.set_register(CPUReg::X, T::from(0u8));
         self.set_register(CPUReg::Y, T::from(0u8));
         self.set_register(CPUReg::SP, T::from(0xFFu8));
+        self.cpu_p_reg.set_status_flg(INTERRUPT_DISABLE_FLG);
 
         // self.interrupt_proc(InterruptType::RST);
 
@@ -1356,9 +1357,9 @@ fn pop_stack(&mut self) -> T {
                 format!("{:#02X} (IndY)",oprand))
             }
             AddrMode::REL => { // Relative Addressing(相対アドレッシング)
-                let offset: u8 = self.read(self.cpu_pc.pc + 2).try_into().unwrap();
+                let offset: u8 = self.read(self.cpu_pc.pc).try_into().unwrap();
                 let s_offset: i8 = offset as i8;
-                let addr: u16 = (self.cpu_pc.pc as i16).wrapping_add(s_offset as i16) as u16;
+                let addr: u16 = (self.cpu_pc.pc as i16 + 1).wrapping_add(s_offset as i16) as u16;
                 let addr_l: u8 = addr as u8;
                 let addr_u: u8 = (addr >> 8) as u8;
                 (Some(T::from(addr_l as u8)),
