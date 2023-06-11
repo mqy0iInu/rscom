@@ -114,26 +114,29 @@ fn main()
     app_init();
     // ==================================================================================
     // [Thred Main Loop]
+
+    // CPU Thred @1.79 MHz(558.6 nsec)
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_nanos(559));
         }
     });
 
-    let _ppu_thread = thread::spawn(|| {
-        loop {
-            ppu_main();
-            thread::sleep(Duration::from_millis(500));
-        }
-    });
+    // PPU Thred @5.37 MHz(186.4 nsec)
+    // let _ppu_thread = thread::spawn(|| {
+    //     loop {
+    //         ppu_main();
+    //         thread::sleep(Duration::from_nanos(187));
+    //     }
+    // });
 
-    let _apu_thread = thread::spawn(|| {
-        loop {
-            apu_main();
-            thread::sleep(Duration::from_millis(500));
-        }
-    });
+    // let _apu_thread = thread::spawn(|| {
+    //     loop {
+    //         apu_main();
+    //         thread::sleep(Duration::from_millis(500));
+    //     }
+    // });
 
 // ==================================================================================
 // [Main Loop]
@@ -145,7 +148,7 @@ fn main()
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_nanos(559));
     }
 // ==================================================================================
 }

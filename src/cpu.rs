@@ -94,6 +94,7 @@ trait CPU<T> {
     fn set_register(&mut self, register: CPUReg, value: T);
     fn fetch_instruction(&mut self) -> T;
     fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>, String);
+    fn read_operand_mem(&mut self, addressing: Addressing, addr: u16) -> u8;
     fn decode_instruction(&mut self, op_code: T) -> (Opcode, Addressing);
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing);
     fn push_stack(&mut self, data: T);
@@ -502,7 +503,7 @@ where
     }
 
     fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing) {
-        let _addressing = addressing.clone();
+        let _addressing: Addressing = addressing.clone();
         let (operand,operand_second,dbg_str) = self.read_operand(addressing);
         let mut jmp_flg: bool = false;
 
@@ -1015,23 +1016,24 @@ where
             // Status Flag Operations / ステータスフラグ関連の命令
             OpcodeType::BIT => {
                 println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
-                let a: T = self.get_register(CPUReg::A);
-                if let Some(operand_value) = operand {
-                    let result: T = a & operand_value;
-                    if result == T::from(0) {
+                let a: u8 = self.get_register(CPUReg::A).try_into().unwrap();
+                let mut addr: u16 = 0;
+                if let Some(value) = operand {
+                    addr = value.try_into().unwrap();
+                    if let Some(value2) = operand_second {
+                        let addr_u: u16 = value.try_into().unwrap();
+                        addr = addr_u << 8 | addr;
+                    }
+                    let ret: u8 = self.read_operand_mem(_addressing ,addr);
+                    let result = a & ret;
+                    if result == 0 {
                         self.cpu_p_reg.set_status_flg(ZERO_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(ZERO_FLG);
                     }
-                    if (operand_value & T::from(BIN_BIT_7)) != T::from(0) {
+                    if (ret & BIN_BIT_7) != 0 {
                         self.cpu_p_reg.set_status_flg(NEGATIVE_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(NEGATIVE_FLG);
                     }
-                    if (operand_value & T::from(BIN_BIT_6)) != T::from(0) {
+                    if (ret & BIN_BIT_6) != 0 {
                         self.cpu_p_reg.set_status_flg(OVERFLOW_FLG);
-                    } else {
-                        self.cpu_p_reg.cls_status_flg(OVERFLOW_FLG);
                     }
                 }
             }
@@ -1260,19 +1262,19 @@ where
         }
     }
 
-fn push_stack(&mut self, data: T) {
-    let sp = self.get_register(CPUReg::SP);
-    let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
-    self.write(address, data);
-    self.set_register(CPUReg::SP, sp - T::from(1u8));
-}
+    fn push_stack(&mut self, data: T) {
+        let sp = self.get_register(CPUReg::SP);
+        let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
+        self.write(address, data);
+        self.set_register(CPUReg::SP, sp - T::from(1u8));
+    }
 
-fn pop_stack(&mut self) -> T {
-    let sp = self.get_register(CPUReg::SP) + T::from(1u8);
-    self.set_register(CPUReg::SP, sp);
-    let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
-    self.read(address)
-}
+    fn pop_stack(&mut self) -> T {
+        let sp = self.get_register(CPUReg::SP) + T::from(1u8);
+        self.set_register(CPUReg::SP, sp);
+        let address: u16 = 0x0100u16.wrapping_add(sp.try_into().unwrap());
+        self.read(address)
+    }
 
     fn read_operand(&mut self, addressing: Addressing) -> (Option<T>, Option<T>, String)
     {
@@ -1337,9 +1339,10 @@ fn pop_stack(&mut self) -> T {
                 format!("{:#02X} {:#02X} (AbsY)",addr_l, addr_u))
             }
             AddrMode::IND => {
-                let address: T = self.read(self.cpu_pc.pc);
-                (Some(self.read(address.try_into().unwrap())),
-                None,
+                let addr_l: u16 = self.read(self.cpu_pc.pc).try_into().unwrap();
+                let addr_u: u16 = (addr_l & 0xff00) | (addr_l as u8).wrapping_add(1) as u16;
+                (Some(T::from(addr_l as u8)),
+                Some(T::from(addr_u as u8)),
                 format!("{:#02X} (IND)",oprand))
             }
             AddrMode::IndX => {
@@ -1369,6 +1372,26 @@ fn pop_stack(&mut self) -> T {
             AddrMode::IMPL => { // Implied Addressing
                 // Not, Have Operand
                 (None, None,format!("(IMPL)"))
+            }
+        }
+    }
+
+    fn read_operand_mem(&mut self, addressing: Addressing, addr: u16) -> u8
+    {
+        self.cpu_pc.pc += 1;
+        let oprand:u8 = self.read(self.cpu_pc.pc).try_into().unwrap();
+
+        match *addressing.addr_mode {
+            AddrMode::ACC | AddrMode::IMM => {
+                addr as u8
+            },
+            AddrMode::ZPG | AddrMode::ZpgX | AddrMode::ZpgY |
+            AddrMode::ABS | AddrMode::AbsX | AddrMode::AbsY |
+            AddrMode::IND | AddrMode::IndX | AddrMode::IndY  => {
+                self.read(addr).try_into().unwrap()
+            },
+            _ => {
+                0
             }
         }
     }
