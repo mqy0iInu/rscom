@@ -1,13 +1,8 @@
 use crate::mem::*;
 use std::pin::Pin;
-use std::sync::{Once, Mutex};
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref S_CPU_DATA: Mutex<RP2A03> = Mutex::new(RP2A03::new());
-    static ref S_CPU: Once = Once::new();
-    static ref S_CPU_STOP: bool = false;
-}
+// use std::sync::{Once, Mutex};
+// use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
 pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
@@ -85,25 +80,29 @@ pub struct RP2A03
     pub nmi: bool,
     pub irq: bool,
 
+    pub cpu_run: bool,
     pub nes_mem: NESMemory,
 }
 
 
 impl RP2A03{
-    fn new() -> Self {
+    pub fn new() -> Self {
         RP2A03 {
             reg_a: 0,
             reg_x: 0,
             reg_y: 0,
             reg_p: R_FLG, // ビット5: Reaerved.予約済 (常に1固定)
             reg_sp: 0xFF,
-            reg_pc: 0x0000u16,
+            reg_pc: 0x0600,
+            // reg_pc: ADDR_PRG_ROM,
+            // reg_pc: ADDR_VEC_TBL_RST,
 
             op_code: Opcode::NOP,
             op_rand: [0; 2],
             cycle: 0,
             adressing: Addressing::IMPL,
 
+            cpu_run: false,
             rst: false,
             nmi: false,
             irq: false,
@@ -141,7 +140,6 @@ impl RP2A03{
         }else{
             self.cls_status_flg(ZERO_FLG);
         }
-
         if (val & BIN_BIT_7) != 0 {
             self.set_status_flg(NEGATIVE_FLG);
         }else{
@@ -168,7 +166,6 @@ impl RP2A03{
         if ret >  0x00FF {
             ret = ret & 0x00FF;
         }
-
         if (ret & (BIN_BIT_7 as u16)) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
@@ -179,18 +176,15 @@ impl RP2A03{
 
     fn c_flg_update_r_shit(&mut self, val: u8) -> u8{
         let mut ret: u16 = val as u16;
-
         ret = ret >> 1;
         if ret <= 0x00 {
             ret = 0;
         }
-
         if (ret & (BIN_BIT_0 as u16)) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
             self.cls_status_flg(CARRY_FLG);
         }
-
         ret as u8
     }
 
@@ -200,10 +194,10 @@ impl RP2A03{
         self.reg_y = 0;
         self.reg_p = 0;
         self.reg_sp = 0xFF;
-        self.reg_pc = ADDR_PRG_ROM;
-        self.reg_pc = ADDR_VEC_TBL_RST;
+        // self.reg_pc = ADDR_PRG_ROM;
+        // self.reg_pc = ADDR_VEC_TBL_RST;
         self.set_status_flg(INTERRUPT_DISABLE_FLG);
-
+        self.cpu_run = true;
         // self.interrupt_proc(InterruptType::RST);
 
         // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
@@ -1289,55 +1283,57 @@ impl RP2A03{
     }
 }
 
-fn cpu_reg_show(cpu :&RP2A03)
+fn cpu_reg_show()
 {
-    println!("[DEBUG]: A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",
-    cpu.reg_a,
-    cpu.reg_x,
-    cpu.reg_y,
-    cpu.reg_sp,
-    cpu.reg_p,
-    cpu.reg_pc);
-}
-
-fn cpu_proc(cpu :&mut RP2A03)
-{
-    let op_code = cpu.fetch_instruction();
-    let (opcode, addressing) = cpu.decode_instruction(op_code);
-    cpu.execute_instruction(opcode, addressing);
-}
-
-pub fn cpu_stop(flg: bool) {
-    if *S_CPU_STOP {
-        println!("[DEBUG]: CPU Stop");
+    unsafe {
+        let mut cpu = Pin::into_inner_unchecked(Pin::clone(&*S_CPU));
+        println!("[DEBUG]: A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",
+        cpu.reg_a,
+        cpu.reg_x,
+        cpu.reg_y,
+        cpu.reg_sp,
+        cpu.reg_p,
+        cpu.reg_pc);
     }
 }
 
-pub fn cpu_reset() -> RP2A03 {
-    S_CPU.call_once(|| {
-        let mut cpu_data = S_CPU_DATA.lock().unwrap();
-        *cpu_data = RP2A03::new();
-    });
+static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
+    let cpu = Box::pin(RP2A03::new());
+    cpu
+});
 
-    if let Ok(mut cpu) = S_CPU_DATA.lock() {
-        cpu.nes_mem.mem_reset();
-        cpu.reset();
+fn cpu_proc() {
+    unsafe {
+        let op_code = S_CPU.fetch_instruction();
+        let (opcode, addressing) = S_CPU.decode_instruction(op_code);
+        S_CPU.execute_instruction(opcode, addressing);
     }
+}
 
-    S_CPU_DATA.lock().unwrap().clone()
+pub fn cpu_run(flg: bool) {
+    unsafe {
+        if flg {
+            S_CPU.as_mut().cpu_run = true;
+        } else {
+            println!("[DEBUG]: CPU Stop");
+            S_CPU.as_mut().cpu_run = false;
+        }
+    }
+}
+
+pub fn cpu_reset() -> Box<RP2A03> {
+    unsafe {
+        S_CPU.nes_mem.mem_reset();
+        S_CPU.reset();
+        cpu_run(true);
+        let cpu_box: Box<RP2A03> = Box::from_raw(Pin::as_mut(&mut *S_CPU).get_mut());
+        cpu_box
+    }
 }
 
 pub fn cpu_main() {
-    if *S_CPU_STOP {
-        return;
-    }
-
-    unsafe {
-        if let Ok(mut cpu) = S_CPU_DATA.lock() {
-            cpu_reg_show(&mut cpu);
-            cpu_proc(&mut cpu);
-        }
-    }
+    cpu_reg_show();
+    cpu_proc();
 }
 
 // ====================================== TEST ======================================

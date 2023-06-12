@@ -87,21 +87,21 @@ fn app_init()
 fn main()
 {
     // init sdl2
-    let mut screen_state = [0 as u8; 32 * 3 * 32];
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    let window = video_subsystem
-        .window("Snake game", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
-        .position_centered()
-        .build().unwrap();
+    // let mut screen_state = [0 as u8; 32 * 3 * 32];
+    // let sdl_context = sdl2::init().unwrap();
+    // let video_subsystem = sdl_context.video().unwrap();
+    // let window = video_subsystem
+    //     .window("Snake game", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
+    //     .position_centered()
+    //     .build().unwrap();
 
-    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
-    let mut event_pump = sdl_context.event_pump().unwrap();
-    canvas.set_scale(10.0, 10.0).unwrap();
+    // let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+    // let mut event_pump = sdl_context.event_pump().unwrap();
+    // canvas.set_scale(10.0, 10.0).unwrap();
 
-    let creator = canvas.texture_creator();
-    let mut texture = creator
-        .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
+    // let creator = canvas.texture_creator();
+    // let mut texture = creator
+    //     .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
 // ==================================================================================
     // [H/W Reset & App Init]
     let mut cpu_handler = cpu_reset();
@@ -115,7 +115,8 @@ fn main()
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            thread::sleep(Duration::from_nanos(559));
+            // thread::sleep(Duration::from_nanos(559));
+            thread::sleep(Duration::from_millis(100));
         }
     });
 
@@ -137,14 +138,15 @@ fn main()
 // ==================================================================================
 // [Main Loop]
     loop {
-        handle_user_input(&mut cpu_handler, &mut event_pump);
+        // handle_user_input(&mut cpu_handler, &mut event_pump);
 
-        if read_screen_state(&mut cpu_handler, &mut screen_state) {
-            texture.update(None, &screen_state, 32 * 3).unwrap();
-            canvas.copy(&texture, None, None).unwrap();
-            canvas.present();
-        }
-        thread::sleep(Duration::from_nanos(559));
+        // if read_screen_state(&mut cpu_handler, &mut screen_state) {
+        //     texture.update(None, &screen_state, 32 * 3).unwrap();
+        //     canvas.copy(&texture, None, None).unwrap();
+        //     canvas.present();
+        // }
+        // thread::sleep(Duration::from_nanos(559));
+        thread::sleep(Duration::from_millis(100));
     }
 // ==================================================================================
 }

@@ -137,14 +137,14 @@ impl NESMemory {
         start_addr =  (start_addr << 0x08u8) as u16;
         println!("[DEBUG] : DMA Start");
 
-        cpu_stop(true);
+        cpu_run(false);
         // WRAM to OAM (256Byte)
         for i in 0..=255 {
             let mut data = self.mem_read(start_addr);
             self.ppu_reg.ppu_oam_write(i, data);
             start_addr = start_addr + 1;
         }
-        cpu_stop(false);
+        cpu_run(true);
     }
 }
 
