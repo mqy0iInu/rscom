@@ -431,7 +431,6 @@ impl RP2A03{
             // // Logical Operations / 論理演算命令
             OpCode::AND => {
                 println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
-                let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -439,13 +438,12 @@ impl RP2A03{
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                result = self.reg_a & val;
-                self.reg_a = result as u8;
+                let result = self.reg_a & val;
+                self.reg_a = result;
                 self.nzv_flg_update(result);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
-                let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -453,13 +451,12 @@ impl RP2A03{
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                result = self.reg_a | val;
+                let result = self.reg_a | val;
                 self.reg_a = result as u8;
                 self.nzv_flg_update(result);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
-                let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -467,7 +464,7 @@ impl RP2A03{
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                result = self.reg_a ^ val;
+                let result = self.reg_a ^ val;
                 self.reg_a = result as u8;
                 self.nzv_flg_update(result);
             }
@@ -509,72 +506,69 @@ impl RP2A03{
             }
             OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
-                if let Some(value) = operand {
-                    let val: u8 = value;
-                    let mut ret: u8 = val;
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                let mut _ret: u8 = 0;
+                if let Some(val) = operand {
+                    _ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
 
-                    if self.reg_a > ret {
+                    if self.reg_a > _ret {
                         self.set_status_flg(CARRY_FLG);
                     }
-                    if self.reg_a == ret {
+                    if self.reg_a == _ret {
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_a < ret {
+                    if self.reg_a < _ret {
                     }
-                    if (ret & BIN_BIT_7) != 0 {
+                    if (_ret & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
             }
             OpCode::CPX => {
                 println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
-                if let Some(value) = operand {
-                    let val: u8 = value;
-                    let mut ret: u8 = val;
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                let mut _ret: u8 = 0;
+                if let Some(val) = operand {
+                    _ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
 
-                    if self.reg_x > ret {
+                    if self.reg_x > _ret {
                         self.set_status_flg(CARRY_FLG);
                     }
-                    if self.reg_x == ret {
+                    if self.reg_x == _ret {
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_x < ret {
+                    if self.reg_x < _ret {
                     }
-                    if (ret & BIN_BIT_7) != 0 {
+                    if (_ret & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
             }
             OpCode::CPY => {
                 println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
-                if let Some(value) = operand {
-                    let val: u8 = value;
-                    let mut ret: u8 = val;
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                let mut _ret: u8 = 0;
+                if let Some(val) = operand {
+                    _ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
 
-                    if self.reg_y > ret {
+                    if self.reg_y > _ret {
                         self.set_status_flg(CARRY_FLG);
                     }
-                    if self.reg_y == ret {
+                    if self.reg_y == _ret {
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_y < ret {
+                    if self.reg_y < _ret {
                     }
-                    if (ret & BIN_BIT_7) != 0 {
+                    if (_ret & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
