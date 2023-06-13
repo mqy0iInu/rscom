@@ -122,25 +122,20 @@ impl RP2A03{
         (self.reg_p & flg) != 0
     }
 
-    fn get_status_flg_all(&self) -> u8 {
-        self.reg_p
-    }
-
     fn nz_flg_update(&mut self, val: u8) {
         if val == 0{
             self.set_status_flg(ZERO_FLG);
-        }else{
-            self.cls_status_flg(ZERO_FLG);
+            self.cls_status_flg(NEGATIVE_FLG);
         }
+
         if (val & BIN_BIT_7) != 0 {
             self.set_status_flg(NEGATIVE_FLG);
-        }else{
-            self.cls_status_flg(NEGATIVE_FLG);
+            self.cls_status_flg(ZERO_FLG);
         }
     }
 
     fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: u16 = val_a.wrapping_add(val_b) as u16;
+        let ret: u16 = (val_a as u16).wrapping_add(val_b as u16) as u16;
         if ret >= 0x00FF {
             self.set_status_flg(CARRY_FLG);
             0x00
@@ -150,12 +145,16 @@ impl RP2A03{
         }
     }
 
-    fn cv_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: i16 = val_a.wrapping_sub(val_b) as i16;
-        if ret <= 0 {
-            self.set_status_flg(OVERFLOW_FLG);
-            self.cls_status_flg(CARRY_FLG);
-            0x00
+    fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
+        let ret: i8 = (val_a as i8).wrapping_sub(val_b as i8) as i8;
+        if val_a == val_b {
+            self.set_status_flg(ZERO_FLG);
+            self.cls_status_flg(NEGATIVE_FLG);
+            0
+        } else if ret < 0 {
+            self.set_status_flg(NEGATIVE_FLG);
+            self.cls_status_flg(ZERO_FLG);
+            0
         }else{
             val_a.wrapping_sub(val_b)
         }
@@ -189,7 +188,7 @@ impl RP2A03{
         self.reg_a = 0;
         self.reg_x = 0;
         self.reg_y = 0;
-        self.reg_p = 0;
+        self.reg_p = R_FLG;
         self.reg_sp = 0xFF;
         self.set_status_flg(INTERRUPT_DISABLE_FLG);
         self.cpu_run = true;
@@ -493,7 +492,7 @@ impl RP2A03{
                     if let Some(value2) = operand_second {
                         _val = self.read((value2 as u16) << 8 | value as u16);
                     }
-                    _ret = self.cv_flg_update_sub(self.reg_a, _val.wrapping_sub(carry));
+                    _ret = self.nz_flg_update_sub(self.reg_a, _val.wrapping_sub(carry));
                     self.reg_a = _ret;
                     self.nz_flg_update(_ret);
                 }
@@ -603,19 +602,20 @@ impl RP2A03{
                     if let Some(val2) = operand_second {
                         _addr = ((val2 as u16) << 8) | val as u16;
                     }
-                    _ret = self.read(_addr).wrapping_sub(0x01);
+                    let mem = self.read(_addr);
+                    _ret = self.nz_flg_update_sub(mem, 0x01);
                     self.write(self.reg_pc, _ret);
                     self.nz_flg_update(_ret as u8);
                 }
             }
             OpCode::DEX => {
                 println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
-                self.reg_x = self.reg_x.wrapping_sub(0x01);
+                self.reg_x = self.nz_flg_update_sub(self.reg_x, 1);
                 self.nz_flg_update(self.reg_x);
             }
             OpCode::DEY => {
                 println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
-                self.reg_y = self.reg_y.wrapping_sub(0x01);
+                self.reg_y = self.nz_flg_update_sub(self.reg_y, 1);
                 self.nz_flg_update(self.reg_y);
             }
 
@@ -727,7 +727,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_a = ret;
-                self.nz_flg_update(ret);
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::LDX => {
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
@@ -739,7 +739,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_x = ret;
-                self.nz_flg_update(ret);
+                self.nz_flg_update(self.reg_x);
             }
             OpCode::LDY => {
                 println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
@@ -751,7 +751,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_y = ret;
-                self.nz_flg_update(ret);
+                self.nz_flg_update(self.reg_y);
             }
             OpCode::STA => {
                 println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
@@ -1030,19 +1030,21 @@ impl RP2A03{
             }
             OpCode::BRK => {
                 println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
-                if self.get_status_flg(BREAK_COMMAND_FLG) != true {
-                    self.reg_pc += 1;
-                    self.set_status_flg(BREAK_COMMAND_FLG);
-                    self.push_stack((self.reg_pc & 0x00FF) as u8);
-                    self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
-                    self.push_stack(self.get_status_flg_all());
-                    self.set_status_flg(BREAK_COMMAND_FLG);
-                    let mut _jmp_addr: u16 = self.read(ADDR_VEC_TBL_IRQ) as u16;
-                    _jmp_addr |= (self.read(ADDR_VEC_TBL_IRQ + 1) as u16) << 0x0008;
-                    self.reg_pc = _jmp_addr;
-                    jmp_flg = true;
-                    print!("BRK Jmp to: ${:04X}", self.reg_pc);
-                }
+                // if self.get_status_flg(BREAK_COMMAND_FLG) != true {
+                //     self.reg_pc += 1;
+                //     self.set_status_flg(BREAK_COMMAND_FLG);
+                //     self.push_stack((self.reg_pc & 0x00FF) as u8);
+                //     self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
+                //     self.push_stack(self.get_status_flg_all());
+                //     self.set_status_flg(BREAK_COMMAND_FLG);
+                //     let mut _jmp_addr: u16 = self.read(ADDR_VEC_TBL_IRQ) as u16;
+                //     _jmp_addr |= (self.read(ADDR_VEC_TBL_IRQ + 1) as u16) << 0x0008;
+                //     self.reg_pc = _jmp_addr;
+                //     jmp_flg = true;
+                //     print!("BRK Jmp to: ${:04X}", self.reg_pc);
+                // }
+
+                panic!("[ERR]: BRK Call!")
             }
 
             // Other
@@ -1090,68 +1092,73 @@ impl RP2A03{
             }
             Addressing::ZPG => {
                 (Some(self.read(self.reg_pc)),
-                None,
+                Some(0),
                 format!("{:#02X} (ZPG)",oprand))
             }
             Addressing::ZpgX => {
-                let address: u16 = self.read(self.reg_pc.wrapping_add(self.reg_x as u16)) as u16;
-                (Some(self.read(address)),
-                None,
+                let address: u8 = self.read(self.reg_pc) + self.reg_x;
+                (Some(address),
+                Some(0),
                 format!("{:#02X} (ZpgX)",oprand))
             }
             Addressing::ZpgY => {
-                let address = self.read(self.reg_pc.wrapping_add(self.reg_y as u16)) as u16;
-                (Some(self.read(address)),
-                None,
+                let address: u8 = self.read(self.reg_pc) + self.reg_y;
+                (Some(address),
+                Some(0),
                 format!("{:#02X} (ZpgY)",oprand))
             }
             Addressing::ABS => {
-                let addr_l:u16 = self.read(self.reg_pc) as u16;
+                let addr_l:u8 = self.read(self.reg_pc);
                 self.reg_pc += 1;
-                let addr_u:u16 = self.read(self.reg_pc) as u16;
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
+                let addr_u:u8 = self.read(self.reg_pc);
+                (Some(addr_l),
+                Some(addr_u),
                 format!("{:#02X} {:#02X} (ABS)",addr_l, addr_u))
             }
             Addressing::AbsX => {
-                let mut addr_l: u16 = self.read(self.reg_pc) as u16;
-                addr_l |= self.reg_x as u16;
+                let mut addr_l: u8 = self.read(self.reg_pc);
+                addr_l += self.reg_x;
                 self.reg_pc += 1;
-                let mut addr_u: u16 = self.read(self.reg_pc) as u16;
+                let mut addr_u: u8 = self.read(self.reg_pc);
                 addr_u |= addr_l;
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
+                (Some(addr_l),
+                Some(addr_u),
                 format!("{:#02X} {:#02X} (AbsX)",addr_l, addr_u))
             }
             Addressing::AbsY => {
-                let mut addr_l: u16 = self.read(self.reg_pc) as u16;
-                addr_l |= self.reg_y as u16;
+                let mut addr_l: u8 = self.read(self.reg_pc);
+                addr_l += self.reg_y;
                 self.reg_pc += 1;
-                let mut addr_u: u16 = self.read(self.reg_pc) as u16;
+                let mut addr_u: u8 = self.read(self.reg_pc);
                 addr_u |= addr_l;
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
+                (Some(addr_l),
+                Some(addr_u),
                 format!("{:#02X} {:#02X} (AbsY)",addr_l, addr_u))
             }
-            Addressing::IND => {
-                let addr_l: u16 = self.read(self.reg_pc) as u16;
-                let addr_u: u16 = (addr_l & 0xff00) | (addr_l as u8).wrapping_add(1) as u16;
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
+            Addressing::IND => { // Indirect Indexed
+                let val1: u16 = self.read(self.reg_pc) as u16;
+                self.reg_pc += 1;
+                let val2: u16 = self.read(self.reg_pc) as u16;
+                let addr: u16 = ((val2 << 8) | val1).wrapping_add(1);
+                (Some((addr & 0x00FF) as u8),
+                Some(((addr & 0xFF00) >> 8) as u8),
                 format!("{:#02X} (IND)",oprand))
             }
-            Addressing::IndX => {
-                let base_address: u16 = self.read(self.reg_pc.wrapping_add(self.reg_x as u16)) as u16;
-                let address: u16 = self.read(base_address) as u16;
-                (Some(self.read(address)),
-                None,
+            Addressing::IndX => { // Indexed Indirect
+                let b1:u8 = self.read(self.reg_pc);
+                let m: u8 = b1.wrapping_add(self.reg_x);
+                let addr_l: u8 = self.read(m as u16);
+                let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
+                (Some(addr_l as u8),
+                Some(addr_u as u8),
                 format!("{:#02X} (IndX)",oprand))
             }
-            Addressing::IndY => {
-                let base_address: u16 = self.read(self.reg_pc.wrapping_add(self.reg_y as u16)) as u16;
-                let address: u8 = self.read(base_address);
-                (Some(self.read(address as u16)),
-                None,
+            Addressing::IndY => { // Indirect Indexed
+                let b1:u8 = self.read(self.reg_pc);
+                let addr_l: u8 = self.read(b1 as u16);
+                let addr_u: u8 = self.read(b1.wrapping_add(1) as u16);
+                (Some(addr_l as u8),
+                Some(addr_u as u8),
                 format!("{:#02X} (IndY)",oprand))
             }
             Addressing::REL => { // Relative Addressing(相対アドレッシング)
@@ -1178,10 +1185,14 @@ impl RP2A03{
                 addr as u8
             },
             Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
-            Addressing::ABS | Addressing::AbsX | Addressing::AbsY |
+            Addressing::ABS | Addressing::AbsX |
             Addressing::IND | Addressing::IndX | Addressing::IndY  => {
                 self.read(addr)
             },
+            Addressing::AbsY => {
+                let _addr: u16 = addr.wrapping_add(self.reg_y as u16) as u16;
+                self.read(_addr)
+            }
             _ => {
                 0
             }
