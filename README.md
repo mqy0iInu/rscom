@@ -8,8 +8,10 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 I purchased a `🤑$4 NES🤑` and`🤑$2 NES Soft🤑`.  
 I am developing an emulator based on them! (I even took it apart and analyzed it)  
 
-<img src="dev/IMG_20230612_214934.jpg" alt="book" width="45%">
-<img src="dev/IMG_20230612_215026.jpg" alt="book" width="45%">
+<div align="center">
+<img src="dev/IMG_20230612_214934.jpg" alt="4dnes"  width="45%">
+<img src="dev/IMG_20230612_215026.jpg" alt="2dness" width="45%">
+</div>
 
 # 📍Emulator Structure (Design)
 `Self Promotion` ... `Multi Threaded NES Emulator!!!`  

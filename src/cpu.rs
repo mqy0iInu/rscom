@@ -126,7 +126,7 @@ impl RP2A03{
         self.reg_p
     }
 
-    fn nzv_flg_update(&mut self, val: u8) {
+    fn nz_flg_update(&mut self, val: u8) {
         if val == 0{
             self.set_status_flg(ZERO_FLG);
         }else{
@@ -140,13 +140,24 @@ impl RP2A03{
     }
 
     fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: u8 = val_a.wrapping_add(val_b);
-        if ret >  0x00FF {
+        let ret: u16 = val_a.wrapping_add(val_b) as u16;
+        if ret >= 0x00FF {
             self.set_status_flg(CARRY_FLG);
             0x00
         }else{
             self.cls_status_flg(CARRY_FLG);
-            ret as u8
+            val_a.wrapping_add(val_b)
+        }
+    }
+
+    fn cv_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
+        let ret: i16 = val_a.wrapping_sub(val_b) as i16;
+        if ret <= 0 {
+            self.set_status_flg(OVERFLOW_FLG);
+            self.cls_status_flg(CARRY_FLG);
+            0x00
+        }else{
+            val_a.wrapping_sub(val_b)
         }
     }
 
@@ -427,7 +438,7 @@ impl RP2A03{
                 }
                 let result = self.reg_a & val;
                 self.reg_a = result;
-                self.nzv_flg_update(result);
+                self.nz_flg_update(result);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
@@ -440,7 +451,7 @@ impl RP2A03{
                 }
                 let result = self.reg_a | val;
                 self.reg_a = result as u8;
-                self.nzv_flg_update(result);
+                self.nz_flg_update(result);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
@@ -453,42 +464,38 @@ impl RP2A03{
                 }
                 let result = self.reg_a ^ val;
                 self.reg_a = result as u8;
-                self.nzv_flg_update(result);
+                self.nz_flg_update(result);
             }
 
             // Arithmetic Operations / 算術倫理演算
             OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
+                let mut _ret: u8 = 0;
+                let mut _val: u8 = 0;
+                let carry: u8 = self.reg_p & CARRY_FLG;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    let mut carry: u8 = 0x00;
-                    if self.get_status_flg(CARRY_FLG) {
-                        carry = 0x01;
-                    }
-                    let mut ret: u8 = self.c_flg_update_add(self.reg_a, carry as u8 + val as u8);
+                    _val = self.read(value as u16);
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = self.c_flg_update_add(self.reg_a, carry as u8 + (((val2 as u16) << 8) | val as u16) as u8);
+                        _val = self.read((value2 as u16) << 8 | value as u16);
                     }
-                    self.reg_a = ret;
-                    self.nzv_flg_update(ret);
+                    _ret = self.c_flg_update_add(self.reg_a, _val.wrapping_add(carry));
+                    self.reg_a = _ret;
+                    self.nz_flg_update(_ret);
                 }
             }
             OpCode::SBC => {
                 println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
+                let mut _ret: u8 = 0;
+                let mut _val: u8 = 0;
+                let carry: u8 = !(self.reg_p & CARRY_FLG);
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    let mut carry: u8 = 0x01;
-                    if self.get_status_flg(CARRY_FLG) {
-                        carry = 0x00;
-                    }
-                    let mut ret: u8 = self.reg_a.wrapping_sub(val).wrapping_sub(carry) as u8;
+                    _val = self.read(value as u16);
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (self.reg_a.wrapping_sub((((val2 as u16) << 8) | val as u16) as u8).wrapping_sub(carry)) as u8;
+                        _val = self.read((value2 as u16) << 8 | value as u16);
                     }
-                    self.reg_a = ret;
-                    self.nzv_flg_update(ret);
+                    _ret = self.cv_flg_update_sub(self.reg_a, _val.wrapping_sub(carry));
+                    self.reg_a = _ret;
+                    self.nz_flg_update(_ret);
                 }
             }
             OpCode::CMP => {
@@ -572,20 +579,20 @@ impl RP2A03{
                     _ret = self.read(_addr);
                     _ret = self.c_flg_update_add(_ret, 0x01);
                     self.write(self.reg_pc, _ret);
-                    self.nzv_flg_update(_ret as u8);
+                    self.nz_flg_update(_ret as u8);
                 }
             }
             OpCode::INX => {
                 println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_x, 1);
                 self.reg_x = ret;
-                self.nzv_flg_update(ret);
+                self.nz_flg_update(ret);
             }
             OpCode::INY => {
                 println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_y, 1);
                 self.reg_y = ret;
-                self.nzv_flg_update(ret);
+                self.nz_flg_update(ret);
             }
             OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
@@ -598,18 +605,18 @@ impl RP2A03{
                     }
                     _ret = self.read(_addr).wrapping_sub(0x01);
                     self.write(self.reg_pc, _ret);
-                    self.nzv_flg_update(_ret as u8);
+                    self.nz_flg_update(_ret as u8);
                 }
             }
             OpCode::DEX => {
                 println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
                 self.reg_x = self.reg_x.wrapping_sub(0x01);
-                self.nzv_flg_update(self.reg_x);
+                self.nz_flg_update(self.reg_x);
             }
             OpCode::DEY => {
                 println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
                 self.reg_y = self.reg_y.wrapping_sub(0x01);
-                self.nzv_flg_update(self.reg_y);
+                self.nz_flg_update(self.reg_y);
             }
 
             // Shift and Rotate Operations
@@ -620,7 +627,7 @@ impl RP2A03{
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_l_shit(self.reg_a);
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
@@ -632,7 +639,7 @@ impl RP2A03{
                             let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
                         _ret = _ret & 0xFE; // bit0, clear
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
                     }
                 }
@@ -644,7 +651,7 @@ impl RP2A03{
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_r_shit(self.reg_a);
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
@@ -656,7 +663,7 @@ impl RP2A03{
                             let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
                         _ret = _ret & 0x7F; // bit7, clear
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
                     }
                 }
@@ -667,7 +674,7 @@ impl RP2A03{
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_l_shit(self.reg_a);
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
@@ -679,7 +686,7 @@ impl RP2A03{
                             let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
                         _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
                     }
                 }
@@ -691,7 +698,7 @@ impl RP2A03{
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_r_shit(self.reg_a);
-                        self.nzv_flg_update(_ret);
+                        self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
@@ -702,8 +709,8 @@ impl RP2A03{
                             }
                             let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
-                        _ret = _ret | ((self.reg_p & CARRY_FLG) << BIN_BIT_7); // bit7, Set C
-                        self.nzv_flg_update(_ret);
+                        _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
+                        self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
                     }
                 }
@@ -720,7 +727,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_a = ret;
-                self.nzv_flg_update(ret);
+                self.nz_flg_update(ret);
             }
             OpCode::LDX => {
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
@@ -732,7 +739,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_x = ret;
-                self.nzv_flg_update(ret);
+                self.nz_flg_update(ret);
             }
             OpCode::LDY => {
                 println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
@@ -744,7 +751,7 @@ impl RP2A03{
                     }
                 }
                 self.reg_y = ret;
-                self.nzv_flg_update(ret);
+                self.nz_flg_update(ret);
             }
             OpCode::STA => {
                 println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
@@ -819,7 +826,7 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
                 let value = self.pop_stack();
                 self.reg_a = value;
-                self.nzv_flg_update(value);
+                self.nz_flg_update(value);
             }
             OpCode::PLP => {
                 println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
