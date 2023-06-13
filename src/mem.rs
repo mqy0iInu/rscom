@@ -26,7 +26,7 @@ pub const ADDR_PRG_ROM: u16 = 0x8000;   // PRG-ROM TOP
 // (DEBUG) :Snake Game(Only 6502 OP-Code)
 // https://bugzmanov.github.io/nes_ebook/chapter_3_4.html
 // アセンブラ ... https://gist.github.com/wkjagt/9043907
-pub const SNAKE_GAME_TBL: [u8; 309] = [
+pub const SNAKE_GAME_TBL: [u8; 310] = [
     0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
     0x02, 0xa9, 0x04, 0x85, 0x03, 0xa9, 0x11, 0x85, 0x10, 0xa9, 0x10, 0x85, 0x12, 0xa9, 0x0f, 0x85,
     0x14, 0xa9, 0x04, 0x85, 0x11, 0x85, 0x13, 0x85, 0x15, 0x60, 0xa5, 0xfe, 0x85, 0x00, 0xa5, 0xfe,
@@ -46,7 +46,7 @@ pub const SNAKE_GAME_TBL: [u8; 309] = [
     0x01, 0x60, 0xe6, 0x11, 0xa9, 0x06, 0xc5, 0x11, 0xf0, 0x0c, 0x60, 0xc6, 0x10, 0xa5, 0x10, 0x29,
     0x1f, 0xc9, 0x1f, 0xf0, 0x01, 0x60, 0x4c, 0x35, 0x07, 0xa0, 0x00, 0xa5, 0xfe, 0x91, 0x00, 0x60,
     0xa6, 0x03, 0xa9, 0x00, 0x81, 0x10, 0xa2, 0x00, 0xa9, 0x01, 0x81, 0x10, 0x60, 0xa2, 0x00, 0xea,
-    0xea, 0xca, 0xd0, 0xfb, 0x60
+    0xea, 0xca, 0xd0, 0xfb, 0x60, 0x60
 ];
 
 #[derive(Clone)]
@@ -76,23 +76,12 @@ impl NESMemory {
         // TODO :MEM Reset
         // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/BombSweeper.nes");
 
-        // (DEBUG) :ダーミープログラムをPRG-ROMにセット
-        // =================================
-        // ダーミープログラム ... $8000~$8015を、ロード、ストア、演算命令で無限ループ
-        // let dummy_program: [u8; 24] = [
-        //     0x38, 0xF8, 0x78, 0x18, 0xD8,
-        //     0x58, 0xB8, 0xA9, 0x0A, 0xAA,
-        //     0x8A, 0xA9, 0x0B, 0xA8, 0x98,
-        //     0x09, 0xA0, 0x49, 0xBA, 0x29,
-        //     0x44, 0x4C, 0x00, 0x80
-        // ];
-        // self.cassette.prg_rom.clear();
-        // self.cassette.prg_rom.extend_from_slice(&dummy_program);
-        // =================================
         // (DEBUG) :Snake Game(Only 6502 OP-Code)
-        let start_address = 0x600; // アセンブラを読んでるとWRAMで実行するみたい
+        let start_address = 0x600; // WRAMで実行する
         let end_address = start_address + SNAKE_GAME_TBL.len();
         self.wram[start_address..end_address].copy_from_slice(&SNAKE_GAME_TBL);
+        self.mem_write(ADDR_VEC_TBL_RST, 0x00);
+        self.mem_write(ADDR_VEC_TBL_RST + 1, 0x06);
         // =================================
     }
 
@@ -104,6 +93,7 @@ impl NESMemory {
             0x2008..=0x3FFF => self.vram[(addr - 0x2000) as usize],
             0x4000..=0x4017 => self.apu_reg.apu_reg_ctrl(addr, APU_REG_READ, 0),
             0x4020..=0x5FFF => self.cassette.chr_rom[(addr - 0x4020) as usize],
+            // TODO :(DEBUG) PRG-RAM
             // 0x6000..=0x7FFF => self.cassette.chr_ram[(addr - 0x6000) as usize],
             // TODO :(DEBUG)一旦、PRG-ROMをミラーしとく
             0x8000..=0xBFFF => self.cassette.prg_rom[(addr - 0x8000) as usize],
@@ -131,6 +121,7 @@ impl NESMemory {
             _ => panic!("Invalid Mem Addr: {:#06x}", addr),
         }
     }
+
     pub fn dma_start(&mut self)
     {
         let mut start_addr:u16 = self.dma_start_addr as u16;

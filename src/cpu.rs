@@ -93,9 +93,7 @@ impl RP2A03{
             reg_y: 0,
             reg_p: R_FLG, // ビット5: Reaerved.予約済 (常に1固定)
             reg_sp: 0xFF,
-            reg_pc: 0x0600,
-            // reg_pc: ADDR_PRG_ROM,
-            // reg_pc: ADDR_VEC_TBL_RST,
+            reg_pc: ADDR_VEC_TBL_RST,
 
             op_code: OpCode::NOP,
             op_rand: [0; 2],
@@ -147,16 +145,16 @@ impl RP2A03{
 
     fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
         let ret: i8 = (val_a as i8).wrapping_sub(val_b as i8) as i8;
-        if val_a == val_b {
+        if (val_a == val_b) || (ret == 0x00) {
             self.set_status_flg(ZERO_FLG);
             self.cls_status_flg(NEGATIVE_FLG);
             0
-        } else if ret < 0 {
+        } else if (val_a < val_b) || (ret < 0) {
             self.set_status_flg(NEGATIVE_FLG);
             self.cls_status_flg(ZERO_FLG);
-            0
-        }else{
-            val_a.wrapping_sub(val_b)
+            ret as u8
+        } else{
+            ret as u8
         }
     }
 
@@ -196,33 +194,25 @@ impl RP2A03{
         // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
         // self.reg_pc = ADDR_PRG_ROM;
         self.interrupt_proc(InterruptType::RST);
-
-        // // (DEBUG) ダーミープログラム用に
-        // self.set_status_flg(OVERFLOW_FLG);
-
-        // // (DEBUG) スネークゲーム用に
-        self.reg_pc = 0x600;
     }
 
     fn interrupt_proc(&mut self, int_type :InterruptType)
     {
+        let mut _vet_tbl_addr: u16 = 0x0000;
         match int_type {
             InterruptType::RST => {
-                self.reg_pc = ADDR_VEC_TBL_RST;
+                _vet_tbl_addr = ADDR_VEC_TBL_RST;
             },
             InterruptType::NMI => {
-                // TODO: NMI
-                self.reg_pc = ADDR_VEC_TBL_NMI;
+                _vet_tbl_addr = ADDR_VEC_TBL_NMI;
             },
             InterruptType::IRQ => {
-                // TODO: NMI
-                self.reg_pc = ADDR_VEC_TBL_IRQ;
+                _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
             },
         }
 
-        let addr_l: u16 = self.read(self.reg_pc) as u16;
-        self.reg_pc += 1;
-        let addr_u: u16 = self.read(self.reg_pc) as u16;
+        let addr_l: u16 = self.read(_vet_tbl_addr) as u16;
+        let addr_u: u16 = self.read(_vet_tbl_addr + 1) as u16;
         self.reg_pc = (addr_u << 8) | addr_l;
     }
 
@@ -605,18 +595,15 @@ impl RP2A03{
                     let mem = self.read(_addr);
                     _ret = self.nz_flg_update_sub(mem, 0x01);
                     self.write(self.reg_pc, _ret);
-                    self.nz_flg_update(_ret as u8);
                 }
             }
             OpCode::DEX => {
                 println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
                 self.reg_x = self.nz_flg_update_sub(self.reg_x, 1);
-                self.nz_flg_update(self.reg_x);
             }
             OpCode::DEY => {
                 println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
                 self.reg_y = self.nz_flg_update_sub(self.reg_y, 1);
-                self.nz_flg_update(self.reg_y);
             }
 
             // Shift and Rotate Operations
@@ -1164,7 +1151,7 @@ impl RP2A03{
             Addressing::REL => { // Relative Addressing(相対アドレッシング)
                 let offset: u8 = self.read(self.reg_pc);
                 let s_offset: i8 = offset as i8;
-                let addr: u16 = (self.reg_pc as i16 + 1).wrapping_add(s_offset as i16) as u16;
+                let addr: u16 = (1 + self.reg_pc as i16).wrapping_add(s_offset as i16) as u16;
                 let addr_l: u8 = addr as u8;
                 let addr_u: u8 = (addr >> 8) as u8;
                 (Some(addr_l as u8),
