@@ -74,7 +74,7 @@ pub struct RP2A03
     pub op_code: Opcode,
     pub op_rand: [u8; 2],
     pub cycle: u8,
-    pub adressing: Addressing,
+    pub addr_mode: Addressing,
 
     pub rst: bool,
     pub nmi: bool,
@@ -100,7 +100,7 @@ impl RP2A03{
             op_code: Opcode::NOP,
             op_rand: [0; 2],
             cycle: 0,
-            adressing: Addressing::IMPL,
+            addr_mode: Addressing::IMPL,
 
             cpu_run: false,
             rst: false,
@@ -130,9 +130,9 @@ impl RP2A03{
         self.reg_p = val;
     }
 
-    // fn cls_status_flg_all(&mut self) {
-    //     self.reg_p = R_FLG;
-    // }
+    fn cls_status_flg_all(&mut self) {
+        self.reg_p = R_FLG;
+    }
 
     fn nzv_flg_update(&mut self, val: u8) {
         if val == 0{
@@ -148,8 +148,7 @@ impl RP2A03{
     }
 
     fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let mut ret: u16 = val_a as u16;
-        ret = ret.wrapping_add(val_b as u16);
+        let ret: u8 = val_a.wrapping_add(val_b);
         if ret >  0x00FF {
             self.set_status_flg(CARRY_FLG);
             0x00
@@ -192,16 +191,14 @@ impl RP2A03{
         self.reg_a = 0;
         self.reg_x = 0;
         self.reg_y = 0;
-        self.reg_p = 0;
+        self.cls_status_flg_all();
         self.reg_sp = 0xFF;
-        // self.reg_pc = ADDR_PRG_ROM;
-        // self.reg_pc = ADDR_VEC_TBL_RST;
         self.set_status_flg(INTERRUPT_DISABLE_FLG);
         self.cpu_run = true;
-        // self.interrupt_proc(InterruptType::RST);
 
         // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
         // self.reg_pc = ADDR_PRG_ROM;
+        self.interrupt_proc(InterruptType::RST);
 
         // // (DEBUG) ダーミープログラム用に
         // self.set_status_flg(OVERFLOW_FLG);
@@ -247,191 +244,185 @@ impl RP2A03{
         op_code
     }
 
-    fn decode_instruction(&mut self, op_code: u8) -> (Opcode, Addressing) {
-        let mut opcode_type: Opcode = Opcode::NOP;
-        let mut addr_mode: Addressing = Addressing::IMPL;
-
+    fn decode_instruction(&mut self, op_code: u8) {
         match op_code.into() {
-            0x00 => { opcode_type = Opcode::BRK; addr_mode = Addressing::IMPL },
-            0x01 => { opcode_type = Opcode::ORA; addr_mode = Addressing::IndX },
-            0x05 => { opcode_type = Opcode::ORA; addr_mode = Addressing::ZPG },
-            0x06 => { opcode_type = Opcode::ASL; addr_mode = Addressing::ZPG },
-            0x08 => { opcode_type = Opcode::PHP; addr_mode = Addressing::IMPL },
-            0x09 => { opcode_type = Opcode::ORA; addr_mode = Addressing::IMM },
-            0x0A => { opcode_type = Opcode::ASL; addr_mode = Addressing::ACC },
-            0x0D => { opcode_type = Opcode::ORA; addr_mode = Addressing::ABS },
-            0x0E => { opcode_type = Opcode::ASL; addr_mode = Addressing::ABS },
-            0x10 => { opcode_type = Opcode::BPL; addr_mode = Addressing::REL },
-            0x11 => { opcode_type = Opcode::ORA; addr_mode = Addressing::IndY },
-            0x15 => { opcode_type = Opcode::ORA; addr_mode = Addressing::ZpgX },
-            0x16 => { opcode_type = Opcode::ASL; addr_mode = Addressing::ZpgX },
-            0x18 => { opcode_type = Opcode::CLC; addr_mode = Addressing::IMPL },
-            0x19 => { opcode_type = Opcode::ORA; addr_mode = Addressing::AbsY },
-            0x1D => { opcode_type = Opcode::ORA; addr_mode = Addressing::AbsX },
-            0x1E => { opcode_type = Opcode::ASL; addr_mode = Addressing::AbsX },
-            0x20 => { opcode_type = Opcode::JSR; addr_mode = Addressing::ABS },
-            0x21 => { opcode_type = Opcode::AND; addr_mode = Addressing::IndX },
-            0x24 => { opcode_type = Opcode::BIT; addr_mode = Addressing::ZPG },
-            0x25 => { opcode_type = Opcode::AND; addr_mode = Addressing::ZPG },
-            0x26 => { opcode_type = Opcode::ROL; addr_mode = Addressing::ZPG },
-            0x28 => { opcode_type = Opcode::PLP; addr_mode = Addressing::IMPL },
-            0x29 => { opcode_type = Opcode::AND; addr_mode = Addressing::IMM },
-            0x2A => { opcode_type = Opcode::ROL; addr_mode = Addressing::ACC },
-            0x2C => { opcode_type = Opcode::BIT; addr_mode = Addressing::ABS },
-            0x2D => { opcode_type = Opcode::AND; addr_mode = Addressing::ABS },
-            0x2E => { opcode_type = Opcode::ROL; addr_mode = Addressing::ABS },
-            0x30 => { opcode_type = Opcode::BMI; addr_mode = Addressing::REL },
-            0x31 => { opcode_type = Opcode::AND; addr_mode = Addressing::IndY },
-            0x35 => { opcode_type = Opcode::AND; addr_mode = Addressing::ZpgX },
-            0x36 => { opcode_type = Opcode::ROL; addr_mode = Addressing::ZpgX },
-            0x38 => { opcode_type = Opcode::SEC; addr_mode = Addressing::IMPL },
-            0x39 => { opcode_type = Opcode::AND; addr_mode = Addressing::AbsY },
-            0x3D => { opcode_type = Opcode::AND; addr_mode = Addressing::AbsX },
-            0x3E => { opcode_type = Opcode::ROL; addr_mode = Addressing::AbsX },
-            0x40 => { opcode_type = Opcode::RTI; addr_mode = Addressing::IMPL },
-            0x41 => { opcode_type = Opcode::EOR; addr_mode = Addressing::IndX },
-            0x45 => { opcode_type = Opcode::EOR; addr_mode = Addressing::ZPG },
-            0x46 => { opcode_type = Opcode::LSR; addr_mode = Addressing::ZPG },
-            0x48 => { opcode_type = Opcode::PHA; addr_mode = Addressing::IMPL },
-            0x49 => { opcode_type = Opcode::EOR; addr_mode = Addressing::IMM },
-            0x4A => { opcode_type = Opcode::LSR; addr_mode = Addressing::ACC },
-            0x4C => { opcode_type = Opcode::JMP; addr_mode = Addressing::ABS },
-            0x4D => { opcode_type = Opcode::EOR; addr_mode = Addressing::ABS },
-            0x4E => { opcode_type = Opcode::LSR; addr_mode = Addressing::ABS },
-            0x50 => { opcode_type = Opcode::BVC; addr_mode = Addressing::REL },
-            0x51 => { opcode_type = Opcode::EOR; addr_mode = Addressing::IndY },
-            0x55 => { opcode_type = Opcode::EOR; addr_mode = Addressing::ZpgX },
-            0x56 => { opcode_type = Opcode::LSR; addr_mode = Addressing::ZpgX },
-            0x58 => { opcode_type = Opcode::CLI; addr_mode = Addressing::IMPL },
-            0x59 => { opcode_type = Opcode::EOR; addr_mode = Addressing::AbsY },
-            0x5D => { opcode_type = Opcode::EOR; addr_mode = Addressing::AbsX },
-            0x5E => { opcode_type = Opcode::LSR; addr_mode = Addressing::AbsX },
-            0x60 => { opcode_type = Opcode::RTS; addr_mode = Addressing::IMPL },
-            0x61 => { opcode_type = Opcode::ADC; addr_mode = Addressing::IndX },
-            0x65 => { opcode_type = Opcode::ADC; addr_mode = Addressing::ZPG },
-            0x66 => { opcode_type = Opcode::ROR; addr_mode = Addressing::ZPG },
-            0x68 => { opcode_type = Opcode::PLA; addr_mode = Addressing::IMPL },
-            0x69 => { opcode_type = Opcode::ADC; addr_mode = Addressing::IMM },
-            0x6A => { opcode_type = Opcode::ROR; addr_mode = Addressing::ACC },
-            0x6C => { opcode_type = Opcode::JMP; addr_mode = Addressing::IND },
-            0x6D => { opcode_type = Opcode::ADC; addr_mode = Addressing::ABS },
-            0x6E => { opcode_type = Opcode::ROR; addr_mode = Addressing::ABS },
-            0x70 => { opcode_type = Opcode::BVS; addr_mode = Addressing::REL },
-            0x71 => { opcode_type = Opcode::ADC; addr_mode = Addressing::IndY },
-            0x75 => { opcode_type = Opcode::ADC; addr_mode = Addressing::ZpgX },
-            0x76 => { opcode_type = Opcode::ROR; addr_mode = Addressing::ZpgX },
-            0x78 => { opcode_type = Opcode::SEI; addr_mode = Addressing::IMPL },
-            0x79 => { opcode_type = Opcode::ADC; addr_mode = Addressing::AbsY },
-            0x7D => { opcode_type = Opcode::ADC; addr_mode = Addressing::AbsX },
-            0x7E => { opcode_type = Opcode::ROR; addr_mode = Addressing::AbsX },
-            0x81 => { opcode_type = Opcode::STA; addr_mode = Addressing::IndX },
-            0x84 => { opcode_type = Opcode::STY; addr_mode = Addressing::ZPG },
-            0x85 => { opcode_type = Opcode::STA; addr_mode = Addressing::ZPG },
-            0x86 => { opcode_type = Opcode::STX; addr_mode = Addressing::ZPG },
-            0x88 => { opcode_type = Opcode::DEY; addr_mode = Addressing::IMPL },
-            0x8A => { opcode_type = Opcode::TXA; addr_mode = Addressing::IMPL },
-            0x8C => { opcode_type = Opcode::STY; addr_mode = Addressing::ABS },
-            0x8D => { opcode_type = Opcode::STA; addr_mode = Addressing::ABS },
-            0x8E => { opcode_type = Opcode::STX; addr_mode = Addressing::ABS },
-            0x90 => { opcode_type = Opcode::BCC; addr_mode = Addressing::REL },
-            0x91 => { opcode_type = Opcode::STA; addr_mode = Addressing::IndY },
-            0x94 => { opcode_type = Opcode::STY; addr_mode = Addressing::ZpgX },
-            0x95 => { opcode_type = Opcode::STA; addr_mode = Addressing::ZpgX },
-            0x96 => { opcode_type = Opcode::STX; addr_mode = Addressing::ZpgY },
-            0x98 => { opcode_type = Opcode::TYA; addr_mode = Addressing::IMPL },
-            0x99 => { opcode_type = Opcode::STA; addr_mode = Addressing::AbsY },
-            0x9A => { opcode_type = Opcode::TXS; addr_mode = Addressing::IMPL },
-            0x9D => { opcode_type = Opcode::STA; addr_mode = Addressing::AbsX },
-            0xA0 => { opcode_type = Opcode::LDY; addr_mode = Addressing::IMM },
-            0xA1 => { opcode_type = Opcode::LDA; addr_mode = Addressing::IndX },
-            0xA2 => { opcode_type = Opcode::LDX; addr_mode = Addressing::IMM },
-            0xA4 => { opcode_type = Opcode::LDY; addr_mode = Addressing::ZPG },
-            0xA5 => { opcode_type = Opcode::LDA; addr_mode = Addressing::ZPG },
-            0xA6 => { opcode_type = Opcode::LDX; addr_mode = Addressing::ZPG },
-            0xA8 => { opcode_type = Opcode::TAY; addr_mode = Addressing::IMPL },
-            0xA9 => { opcode_type = Opcode::LDA; addr_mode = Addressing::IMM },
-            0xAA => { opcode_type = Opcode::TAX; addr_mode = Addressing::IMPL },
-            0xAC => { opcode_type = Opcode::LDY; addr_mode = Addressing::ABS },
-            0xAD => { opcode_type = Opcode::LDA; addr_mode = Addressing::ABS },
-            0xAE => { opcode_type = Opcode::LDX; addr_mode = Addressing::ABS },
-            0xB0 => { opcode_type = Opcode::BCS; addr_mode = Addressing::REL },
-            0xB1 => { opcode_type = Opcode::LDA; addr_mode = Addressing::IndY },
-            0xB4 => { opcode_type = Opcode::LDY; addr_mode = Addressing::ZpgX },
-            0xB5 => { opcode_type = Opcode::LDA; addr_mode = Addressing::ZpgX },
-            0xB6 => { opcode_type = Opcode::LDX; addr_mode = Addressing::ZpgY },
-            0xB8 => { opcode_type = Opcode::CLV; addr_mode = Addressing::IMPL },
-            0xB9 => { opcode_type = Opcode::LDA; addr_mode = Addressing::AbsY },
-            0xBA => { opcode_type = Opcode::TSX; addr_mode = Addressing::IMPL },
-            0xBC => { opcode_type = Opcode::LDY; addr_mode = Addressing::AbsX },
-            0xBD => { opcode_type = Opcode::LDA; addr_mode = Addressing::AbsX },
-            0xBE => { opcode_type = Opcode::LDX; addr_mode = Addressing::AbsY },
-            0xC0 => { opcode_type = Opcode::CPY; addr_mode = Addressing::IMM },
-            0xC1 => { opcode_type = Opcode::CMP; addr_mode = Addressing::IndX },
-            0xC4 => { opcode_type = Opcode::CPY; addr_mode = Addressing::ZPG },
-            0xC5 => { opcode_type = Opcode::CMP; addr_mode = Addressing::ZPG },
-            0xC6 => { opcode_type = Opcode::DEC; addr_mode = Addressing::ZPG },
-            0xC8 => { opcode_type = Opcode::INY; addr_mode = Addressing::IMPL },
-            0xC9 => { opcode_type = Opcode::CMP; addr_mode = Addressing::IMM },
-            0xCA => { opcode_type = Opcode::DEX; addr_mode = Addressing::IMPL },
-            0xCC => { opcode_type = Opcode::CPY; addr_mode = Addressing::ABS },
-            0xCD => { opcode_type = Opcode::CMP; addr_mode = Addressing::ABS },
-            0xCE => { opcode_type = Opcode::DEC; addr_mode = Addressing::ABS },
-            0xD0 => { opcode_type = Opcode::BNE; addr_mode = Addressing::REL },
-            0xD1 => { opcode_type = Opcode::CMP; addr_mode = Addressing::IndY },
-            0xD5 => { opcode_type = Opcode::CMP; addr_mode = Addressing::ZpgX },
-            0xD6 => { opcode_type = Opcode::DEC; addr_mode = Addressing::ZpgX },
-            0xD8 => { opcode_type = Opcode::CLD; addr_mode = Addressing::IMPL },
-            0xD9 => { opcode_type = Opcode::CMP; addr_mode = Addressing::AbsY },
-            0xDD => { opcode_type = Opcode::CMP; addr_mode = Addressing::AbsX },
-            0xDE => { opcode_type = Opcode::DEC; addr_mode = Addressing::AbsX },
-            0xE0 => { opcode_type = Opcode::CPX; addr_mode = Addressing::IMM },
-            0xE1 => { opcode_type = Opcode::SBC; addr_mode = Addressing::IndX },
-            0xE4 => { opcode_type = Opcode::CPX; addr_mode = Addressing::ZPG },
-            0xE5 => { opcode_type = Opcode::SBC; addr_mode = Addressing::ZPG },
-            0xE6 => { opcode_type = Opcode::INC; addr_mode = Addressing::ZPG },
-            0xE8 => { opcode_type = Opcode::INX; addr_mode = Addressing::IMPL },
-            0xE9 => { opcode_type = Opcode::SBC; addr_mode = Addressing::IMM },
-            0xEC => { opcode_type = Opcode::CPX; addr_mode = Addressing::ABS },
-            0xED => { opcode_type = Opcode::SBC; addr_mode = Addressing::ABS },
-            0xEE => { opcode_type = Opcode::INC; addr_mode = Addressing::ABS },
-            0xF0 => { opcode_type = Opcode::BEQ; addr_mode = Addressing::REL },
-            0xF1 => { opcode_type = Opcode::SBC; addr_mode = Addressing::IndY },
-            0xF5 => { opcode_type = Opcode::SBC; addr_mode = Addressing::ZpgX },
-            0xF6 => { opcode_type = Opcode::INC; addr_mode = Addressing::ZpgX },
-            0xF8 => { opcode_type = Opcode::SED; addr_mode = Addressing::IMPL },
-            0xF9 => { opcode_type = Opcode::SBC; addr_mode = Addressing::AbsY },
-            0xFD => { opcode_type = Opcode::SBC; addr_mode = Addressing::AbsX },
-            0xFE => { opcode_type = Opcode::INC; addr_mode = Addressing::AbsX },
+            0x00 => { self.op_code = Opcode::BRK; self.addr_mode = Addressing::IMPL },
+            0x01 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IndX },
+            0x05 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ZPG },
+            0x06 => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ZPG },
+            0x08 => { self.op_code = Opcode::PHP; self.addr_mode = Addressing::IMPL },
+            0x09 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IMM },
+            0x0A => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ACC },
+            0x0D => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ABS },
+            0x0E => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ABS },
+            0x10 => { self.op_code = Opcode::BPL; self.addr_mode = Addressing::REL },
+            0x11 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IndY },
+            0x15 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ZpgX },
+            0x16 => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ZpgX },
+            0x18 => { self.op_code = Opcode::CLC; self.addr_mode = Addressing::IMPL },
+            0x19 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::AbsY },
+            0x1D => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::AbsX },
+            0x1E => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::AbsX },
+            0x20 => { self.op_code = Opcode::JSR; self.addr_mode = Addressing::ABS },
+            0x21 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IndX },
+            0x24 => { self.op_code = Opcode::BIT; self.addr_mode = Addressing::ZPG },
+            0x25 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ZPG },
+            0x26 => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ZPG },
+            0x28 => { self.op_code = Opcode::PLP; self.addr_mode = Addressing::IMPL },
+            0x29 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IMM },
+            0x2A => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ACC },
+            0x2C => { self.op_code = Opcode::BIT; self.addr_mode = Addressing::ABS },
+            0x2D => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ABS },
+            0x2E => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ABS },
+            0x30 => { self.op_code = Opcode::BMI; self.addr_mode = Addressing::REL },
+            0x31 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IndY },
+            0x35 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ZpgX },
+            0x36 => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ZpgX },
+            0x38 => { self.op_code = Opcode::SEC; self.addr_mode = Addressing::IMPL },
+            0x39 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::AbsY },
+            0x3D => { self.op_code = Opcode::AND; self.addr_mode = Addressing::AbsX },
+            0x3E => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::AbsX },
+            0x40 => { self.op_code = Opcode::RTI; self.addr_mode = Addressing::IMPL },
+            0x41 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IndX },
+            0x45 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ZPG },
+            0x46 => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ZPG },
+            0x48 => { self.op_code = Opcode::PHA; self.addr_mode = Addressing::IMPL },
+            0x49 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IMM },
+            0x4A => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ACC },
+            0x4C => { self.op_code = Opcode::JMP; self.addr_mode = Addressing::ABS },
+            0x4D => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ABS },
+            0x4E => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ABS },
+            0x50 => { self.op_code = Opcode::BVC; self.addr_mode = Addressing::REL },
+            0x51 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IndY },
+            0x55 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ZpgX },
+            0x56 => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ZpgX },
+            0x58 => { self.op_code = Opcode::CLI; self.addr_mode = Addressing::IMPL },
+            0x59 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::AbsY },
+            0x5D => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::AbsX },
+            0x5E => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::AbsX },
+            0x60 => { self.op_code = Opcode::RTS; self.addr_mode = Addressing::IMPL },
+            0x61 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IndX },
+            0x65 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ZPG },
+            0x66 => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ZPG },
+            0x68 => { self.op_code = Opcode::PLA; self.addr_mode = Addressing::IMPL },
+            0x69 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IMM },
+            0x6A => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ACC },
+            0x6C => { self.op_code = Opcode::JMP; self.addr_mode = Addressing::IND },
+            0x6D => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ABS },
+            0x6E => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ABS },
+            0x70 => { self.op_code = Opcode::BVS; self.addr_mode = Addressing::REL },
+            0x71 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IndY },
+            0x75 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ZpgX },
+            0x76 => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ZpgX },
+            0x78 => { self.op_code = Opcode::SEI; self.addr_mode = Addressing::IMPL },
+            0x79 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::AbsY },
+            0x7D => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::AbsX },
+            0x7E => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::AbsX },
+            0x81 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::IndX },
+            0x84 => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ZPG },
+            0x85 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ZPG },
+            0x86 => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ZPG },
+            0x88 => { self.op_code = Opcode::DEY; self.addr_mode = Addressing::IMPL },
+            0x8A => { self.op_code = Opcode::TXA; self.addr_mode = Addressing::IMPL },
+            0x8C => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ABS },
+            0x8D => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ABS },
+            0x8E => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ABS },
+            0x90 => { self.op_code = Opcode::BCC; self.addr_mode = Addressing::REL },
+            0x91 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::IndY },
+            0x94 => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ZpgX },
+            0x95 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ZpgX },
+            0x96 => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ZpgY },
+            0x98 => { self.op_code = Opcode::TYA; self.addr_mode = Addressing::IMPL },
+            0x99 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::AbsY },
+            0x9A => { self.op_code = Opcode::TXS; self.addr_mode = Addressing::IMPL },
+            0x9D => { self.op_code = Opcode::STA; self.addr_mode = Addressing::AbsX },
+            0xA0 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::IMM },
+            0xA1 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IndX },
+            0xA2 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::IMM },
+            0xA4 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ZPG },
+            0xA5 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ZPG },
+            0xA6 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ZPG },
+            0xA8 => { self.op_code = Opcode::TAY; self.addr_mode = Addressing::IMPL },
+            0xA9 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IMM },
+            0xAA => { self.op_code = Opcode::TAX; self.addr_mode = Addressing::IMPL },
+            0xAC => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ABS },
+            0xAD => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ABS },
+            0xAE => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ABS },
+            0xB0 => { self.op_code = Opcode::BCS; self.addr_mode = Addressing::REL },
+            0xB1 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IndY },
+            0xB4 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ZpgX },
+            0xB5 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ZpgX },
+            0xB6 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ZpgY },
+            0xB8 => { self.op_code = Opcode::CLV; self.addr_mode = Addressing::IMPL },
+            0xB9 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::AbsY },
+            0xBA => { self.op_code = Opcode::TSX; self.addr_mode = Addressing::IMPL },
+            0xBC => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::AbsX },
+            0xBD => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::AbsX },
+            0xBE => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::AbsY },
+            0xC0 => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::IMM },
+            0xC1 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IndX },
+            0xC4 => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::ZPG },
+            0xC5 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ZPG },
+            0xC6 => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ZPG },
+            0xC8 => { self.op_code = Opcode::INY; self.addr_mode = Addressing::IMPL },
+            0xC9 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IMM },
+            0xCA => { self.op_code = Opcode::DEX; self.addr_mode = Addressing::IMPL },
+            0xCC => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::ABS },
+            0xCD => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ABS },
+            0xCE => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ABS },
+            0xD0 => { self.op_code = Opcode::BNE; self.addr_mode = Addressing::REL },
+            0xD1 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IndY },
+            0xD5 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ZpgX },
+            0xD6 => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ZpgX },
+            0xD8 => { self.op_code = Opcode::CLD; self.addr_mode = Addressing::IMPL },
+            0xD9 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::AbsY },
+            0xDD => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::AbsX },
+            0xDE => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::AbsX },
+            0xE0 => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::IMM },
+            0xE1 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IndX },
+            0xE4 => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::ZPG },
+            0xE5 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ZPG },
+            0xE6 => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ZPG },
+            0xE8 => { self.op_code = Opcode::INX; self.addr_mode = Addressing::IMPL },
+            0xE9 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IMM },
+            0xEC => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::ABS },
+            0xED => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ABS },
+            0xEE => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ABS },
+            0xF0 => { self.op_code = Opcode::BEQ; self.addr_mode = Addressing::REL },
+            0xF1 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IndY },
+            0xF5 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ZpgX },
+            0xF6 => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ZpgX },
+            0xF8 => { self.op_code = Opcode::SED; self.addr_mode = Addressing::IMPL },
+            0xF9 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::AbsY },
+            0xFD => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::AbsX },
+            0xFE => { self.op_code = Opcode::INC; self.addr_mode = Addressing::AbsX },
 
             // NOP
             0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xEA | 0xFA => {
-                opcode_type = Opcode::NOP; addr_mode = Addressing::IMPL },
+                self.op_code = Opcode::NOP; self.addr_mode = Addressing::IMPL },
             0x80 | 0x82 | 0x89 | 0xC2 | 0xE2 => {
-                opcode_type = Opcode::NOP; addr_mode = Addressing::IMM },
+                self.op_code = Opcode::NOP; self.addr_mode = Addressing::IMM },
             0x04 | 0x44 | 0x64 => {
-                opcode_type = Opcode::NOP; addr_mode = Addressing::ZPG },
+                self.op_code = Opcode::NOP; self.addr_mode = Addressing::ZPG },
             0x14 | 0x34 | 0x54 | 0x74| 0xD4| 0xF4 => {
-                opcode_type = Opcode::NOP; addr_mode = Addressing::ZpgX },
-            0x0C => { opcode_type = Opcode::NOP; addr_mode = Addressing::ABS },
+                self.op_code = Opcode::NOP; self.addr_mode = Addressing::ZpgX },
+            0x0C => { self.op_code = Opcode::NOP; self.addr_mode = Addressing::ABS },
             0x1C | 0x3C | 0x5C | 0x7C| 0xDC| 0xFC => {
-                opcode_type = Opcode::NOP; addr_mode = Addressing::AbsX },
+                self.op_code = Opcode::NOP; self.addr_mode = Addressing::AbsX },
 
             // STP
             0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xB2 | 0xD2 | 0xF2  => {
-                opcode_type = Opcode::STP; addr_mode = Addressing::IMPL },
+                self.op_code = Opcode::STP; self.addr_mode = Addressing::IMPL },
 
-            _ => { opcode_type = Opcode::UNK; addr_mode = Addressing::IMPL }
+            _ => { self.op_code = Opcode::UNK; self.addr_mode = Addressing::IMPL }
         };
-
-        (opcode_type, addr_mode)
     }
 
-    fn execute_instruction(&mut self, opcode: Opcode, addressing: Addressing) {
-        let _addressing: Addressing = addressing.clone();
-        let (operand,operand_second,dbg_str) = self.read_operand(addressing);
+    fn execute_instruction(&mut self) {
+        let (operand,operand_second,dbg_str) = self.read_operand();
         let mut jmp_flg: bool = false;
 
-        match opcode {
+        match self.op_code {
             Opcode::NOP => {
                 // No operation, do nothing
                 println!("{}",format!("[DEBUG]: NOP ${}",dbg_str));
@@ -443,39 +434,42 @@ impl RP2A03{
                 let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
-                    val = self.read_operand_mem(&_addressing, value as u16);
+                    val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 result = self.reg_a & val;
                 self.reg_a = result as u8;
+                self.nzv_flg_update(result);
             }
             Opcode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
                 let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
-                    val = self.read_operand_mem(&_addressing, value as u16);
+                    val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 result = self.reg_a | val;
                 self.reg_a = result as u8;
+                self.nzv_flg_update(result);
             }
             Opcode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
                 let mut result: u8 = 0;
                 let mut val = 0;
                 if let Some(value) = operand {
-                    val = self.read_operand_mem(&_addressing, value as u16);
+                    val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 result = self.reg_a ^ val;
                 self.reg_a = result as u8;
+                self.nzv_flg_update(result);
             }
 
             // Arithmetic Operations / 算術倫理演算
@@ -637,7 +631,7 @@ impl RP2A03{
             // Shift and Rotate Operations
             Opcode::ASL => {
                 println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
-                match _addressing {
+                match self.addr_mode {
                     Addressing::ACC => {
                         let mut ret: u8 = self.c_flg_update_l_shit(self.reg_a);
                         ret = ret & 0xFE; // bit0, clear
@@ -665,7 +659,7 @@ impl RP2A03{
             }
             Opcode::LSR => {
                 println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
-                match _addressing {
+                match self.addr_mode {
                     Addressing::ACC => {
                         let mut ret: u8 = self.c_flg_update_r_shit(self.reg_a);
                         ret = ret & 0x7F; // bit7, clear
@@ -692,7 +686,7 @@ impl RP2A03{
                 }
             }
             Opcode::ROL => {
-                match _addressing {
+                match self.addr_mode {
                     Addressing::ACC => {
                         println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
                         let mut ret: u8 = self.c_flg_update_l_shit(self.reg_a);
@@ -730,7 +724,7 @@ impl RP2A03{
             }
             Opcode::ROR => {
                 println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
-                match _addressing {
+                match self.addr_mode {
                     Addressing::ACC => {
                         let mut ret: u8 = self.c_flg_update_r_shit(self.reg_a);
                         if self.get_status_flg(CARRY_FLG) {
@@ -771,34 +765,37 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    ret = self.read_operand_mem(&_addressing, value as u16);
+                    ret = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_a = ret;
+                self.nzv_flg_update(ret);
             }
             Opcode::LDX => {
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    ret = self.read_operand_mem(&_addressing, value as u16);
+                    ret = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_x = ret;
+                self.nzv_flg_update(ret);
             }
             Opcode::LDY => {
                 println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    ret = self.read_operand_mem(&_addressing, value as u16);
+                    ret = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
+                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_y = ret;
+                self.nzv_flg_update(ret);
             }
             Opcode::STA => {
                 println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
@@ -891,7 +888,7 @@ impl RP2A03{
                         let addr_u: u16 = value2 as u16;
                         addr = addr_u << 8 | addr;
                     }
-                    let ret: u8 = self.read_operand_mem(&_addressing ,addr);
+                    let ret: u8 = self.read_operand_mem(addr);
                     let result = self.reg_a & ret;
                     if result == 0 {
                         self.set_status_flg(ZERO_FLG);
@@ -1141,12 +1138,12 @@ impl RP2A03{
         self.read(address)
     }
 
-    fn read_operand(&mut self, addressing: Addressing) -> (Option<u8>, Option<u8>, String)
+    fn read_operand(&mut self) -> (Option<u8>, Option<u8>, String)
     {
         self.reg_pc += 1;
         let oprand:u8 = self.read(self.reg_pc);
 
-        match addressing {
+        match self.addr_mode {
             Addressing::ACC => {
                 let acc:u8 = self.reg_a;
                 (Some(self.reg_a),
@@ -1241,9 +1238,9 @@ impl RP2A03{
         }
     }
 
-    fn read_operand_mem(&mut self, addressing: &Addressing, addr: u16) -> u8
+    fn read_operand_mem(&mut self, addr: u16) -> u8
     {
-        match addressing {
+        match self.addr_mode {
             Addressing::ACC | Addressing::IMM => {
                 addr as u8
             },
@@ -1280,9 +1277,9 @@ static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
 
 fn cpu_proc() {
     unsafe {
-        let op_code = S_CPU.fetch_instruction();
-        let (opcode, addressing) = S_CPU.decode_instruction(op_code);
-        S_CPU.execute_instruction(opcode, addressing);
+        let val = S_CPU.fetch_instruction();
+        S_CPU.decode_instruction(val);
+        S_CPU.execute_instruction();
     }
 }
 
