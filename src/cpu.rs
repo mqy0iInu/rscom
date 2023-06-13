@@ -440,44 +440,41 @@ impl RP2A03{
             // // Logical Operations / 論理演算命令
             Opcode::AND => {
                 println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
-                let mut result: u16 = 0;
+                let mut result: u8 = 0;
+                let mut val = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    result = (self.reg_a & val) as u16;
+                    val = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val: u16 = value as u16;
-                        let val2: u16 = value2 as u16;
-                        result = self.reg_a as u16 & ((val2 << 0x08) | val);
+                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
+                result = self.reg_a & val;
                 self.reg_a = result as u8;
             }
             Opcode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
-                let mut result: u16 = 0;
+                let mut result: u8 = 0;
+                let mut val = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    result = (self.reg_a | val) as u16;
+                    val = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val: u16 = value as u16;
-                        let val2: u16 = value2 as u16;
-                        result = self.reg_a as u16 | ((val2 << 0x08) | val);
+                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
+                result = self.reg_a | val;
                 self.reg_a = result as u8;
             }
             Opcode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
-                let mut result: u16 = 0;
+                let mut result: u8 = 0;
+                let mut val = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    result = (self.reg_a ^ val) as u16;
+                    val = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val: u16 = value as u16;
-                        let val2: u16 = value2 as u16;
-                        result = self.reg_a as u16 ^ ((val2 << 0x08) | val);
+                        val = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
+                result = self.reg_a ^ val;
                 self.reg_a = result as u8;
             }
 
@@ -909,10 +906,10 @@ impl RP2A03{
                 if let Some(value) = operand {
                     addr = value as u16;
                     if let Some(value2) = operand_second {
-                        let addr_u: u16 = value as u16;
+                        let addr_u: u16 = value2 as u16;
                         addr = addr_u << 8 | addr;
                     }
-                    let ret: u8 = self.read_operand_mem(_addressing ,addr);
+                    let ret: u8 = self.read_operand_mem(&_addressing ,addr);
                     let result = self.reg_a & ret;
                     if result == 0 {
                         self.set_status_flg(ZERO_FLG);
@@ -1262,7 +1259,7 @@ impl RP2A03{
         }
     }
 
-    fn read_operand_mem(&mut self, addressing: Addressing, addr: u16) -> u8
+    fn read_operand_mem(&mut self, addressing: &Addressing, addr: u16) -> u8
     {
         self.reg_pc += 1;
         let oprand:u8 = self.read(self.reg_pc);
