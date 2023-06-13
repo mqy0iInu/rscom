@@ -116,7 +116,7 @@ fn main()
         loop {
             cpu_main();
             // thread::sleep(Duration::from_nanos(559));
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(300));
         }
     });
 
@@ -146,7 +146,7 @@ fn main()
         //     canvas.present();
         // }
         // thread::sleep(Duration::from_nanos(559));
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(500));
     }
 // ==================================================================================
 }

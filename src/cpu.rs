@@ -771,12 +771,9 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    ret = val;
-
+                    ret = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_a = ret;
@@ -785,12 +782,9 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    ret = val;
-
+                    ret = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_x = ret;
@@ -799,12 +793,9 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(value) = operand {
-                    let val: u8 = value;
-                    ret = val;
-
+                    ret = self.read_operand_mem(&_addressing, value as u16);
                     if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val as u16) as u8;
+                        ret = self.read_operand_mem(&_addressing, ((value2 as u16) << 8) | value as u16);
                     }
                 }
                 self.reg_y = ret;
@@ -812,12 +803,9 @@ impl RP2A03{
             Opcode::STA => {
                 println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
                 let mut addr: u16 = 0;
-                if let Some(value) = operand {
-                    let val: u8 = value;
+                if let Some(val) = operand {
                     addr = val as u16;
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value;
-                        let val2: u8 = value2;
+                    if let Some(val2) = operand_second {
                         addr = (val2 as u16) << 8 | val as u16;
                     }
                 }
@@ -826,12 +814,9 @@ impl RP2A03{
             Opcode::STX => {
                 println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
                 let mut addr: u16 = 0;
-                if let Some(value) = operand {
-                    let val: u8 = value;
+                if let Some(val) = operand {
                     addr = val as u16;
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value;
-                        let val2: u8 = value2;
+                    if let Some(val2) = operand_second {
                         addr = (val2 as u16) << 8 | val as u16;
                     }
                 }
@@ -840,12 +825,9 @@ impl RP2A03{
             Opcode::STY => {
                 println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
                 let mut addr: u16 = 0;
-                if let Some(value) = operand {
-                    let val: u8 = value;
+                if let Some(val) = operand {
                     addr = val as u16;
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value;
-                        let val2: u8 = value2;
+                    if let Some(val2) = operand_second {
                         addr = (val2 as u16) << 8 | val as u16;
                     }
                 }
@@ -1261,9 +1243,6 @@ impl RP2A03{
 
     fn read_operand_mem(&mut self, addressing: &Addressing, addr: u16) -> u8
     {
-        self.reg_pc += 1;
-        let oprand:u8 = self.read(self.reg_pc);
-
         match addressing {
             Addressing::ACC | Addressing::IMM => {
                 addr as u8
