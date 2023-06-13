@@ -10,7 +10,6 @@ I am developing an emulator based on them! (I even took it apart and analyzed it
 
 <img src="dev/IMG_20230612_214934.jpg" alt="book" width="35%">
 <img src="dev/IMG_20230612_215026.jpg" alt="book" width="35%">
-
 <img src="dev/IMG_20230612_223018.jpg" alt="book" width="35%">
 <img src="dev/IMG_20230612_222947.jpg" alt="book" width="35%">
 
