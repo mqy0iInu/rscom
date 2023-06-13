@@ -25,7 +25,7 @@ enum InterruptType {
 }
 
 #[derive(Clone)]
-pub enum Opcode {
+pub enum OpCode {
     // Load/Store Operations
     LDA, LDX, LDY, STA, STX, STY,
     // Register Transfer Operations
@@ -71,7 +71,7 @@ pub struct RP2A03
     pub reg_sp: u8,
     pub reg_pc: u16,
 
-    pub op_code: Opcode,
+    pub op_code: OpCode,
     pub op_rand: [u8; 2],
     pub cycle: u8,
     pub addr_mode: Addressing,
@@ -97,7 +97,7 @@ impl RP2A03{
             // reg_pc: ADDR_PRG_ROM,
             // reg_pc: ADDR_VEC_TBL_RST,
 
-            op_code: Opcode::NOP,
+            op_code: OpCode::NOP,
             op_rand: [0; 2],
             cycle: 0,
             addr_mode: Addressing::IMPL,
@@ -246,175 +246,175 @@ impl RP2A03{
 
     fn decode_instruction(&mut self, op_code: u8) {
         match op_code.into() {
-            0x00 => { self.op_code = Opcode::BRK; self.addr_mode = Addressing::IMPL },
-            0x01 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IndX },
-            0x05 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ZPG },
-            0x06 => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ZPG },
-            0x08 => { self.op_code = Opcode::PHP; self.addr_mode = Addressing::IMPL },
-            0x09 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IMM },
-            0x0A => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ACC },
-            0x0D => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ABS },
-            0x0E => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ABS },
-            0x10 => { self.op_code = Opcode::BPL; self.addr_mode = Addressing::REL },
-            0x11 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::IndY },
-            0x15 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::ZpgX },
-            0x16 => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::ZpgX },
-            0x18 => { self.op_code = Opcode::CLC; self.addr_mode = Addressing::IMPL },
-            0x19 => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::AbsY },
-            0x1D => { self.op_code = Opcode::ORA; self.addr_mode = Addressing::AbsX },
-            0x1E => { self.op_code = Opcode::ASL; self.addr_mode = Addressing::AbsX },
-            0x20 => { self.op_code = Opcode::JSR; self.addr_mode = Addressing::ABS },
-            0x21 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IndX },
-            0x24 => { self.op_code = Opcode::BIT; self.addr_mode = Addressing::ZPG },
-            0x25 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ZPG },
-            0x26 => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ZPG },
-            0x28 => { self.op_code = Opcode::PLP; self.addr_mode = Addressing::IMPL },
-            0x29 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IMM },
-            0x2A => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ACC },
-            0x2C => { self.op_code = Opcode::BIT; self.addr_mode = Addressing::ABS },
-            0x2D => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ABS },
-            0x2E => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ABS },
-            0x30 => { self.op_code = Opcode::BMI; self.addr_mode = Addressing::REL },
-            0x31 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::IndY },
-            0x35 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::ZpgX },
-            0x36 => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::ZpgX },
-            0x38 => { self.op_code = Opcode::SEC; self.addr_mode = Addressing::IMPL },
-            0x39 => { self.op_code = Opcode::AND; self.addr_mode = Addressing::AbsY },
-            0x3D => { self.op_code = Opcode::AND; self.addr_mode = Addressing::AbsX },
-            0x3E => { self.op_code = Opcode::ROL; self.addr_mode = Addressing::AbsX },
-            0x40 => { self.op_code = Opcode::RTI; self.addr_mode = Addressing::IMPL },
-            0x41 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IndX },
-            0x45 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ZPG },
-            0x46 => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ZPG },
-            0x48 => { self.op_code = Opcode::PHA; self.addr_mode = Addressing::IMPL },
-            0x49 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IMM },
-            0x4A => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ACC },
-            0x4C => { self.op_code = Opcode::JMP; self.addr_mode = Addressing::ABS },
-            0x4D => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ABS },
-            0x4E => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ABS },
-            0x50 => { self.op_code = Opcode::BVC; self.addr_mode = Addressing::REL },
-            0x51 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::IndY },
-            0x55 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::ZpgX },
-            0x56 => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::ZpgX },
-            0x58 => { self.op_code = Opcode::CLI; self.addr_mode = Addressing::IMPL },
-            0x59 => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::AbsY },
-            0x5D => { self.op_code = Opcode::EOR; self.addr_mode = Addressing::AbsX },
-            0x5E => { self.op_code = Opcode::LSR; self.addr_mode = Addressing::AbsX },
-            0x60 => { self.op_code = Opcode::RTS; self.addr_mode = Addressing::IMPL },
-            0x61 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IndX },
-            0x65 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ZPG },
-            0x66 => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ZPG },
-            0x68 => { self.op_code = Opcode::PLA; self.addr_mode = Addressing::IMPL },
-            0x69 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IMM },
-            0x6A => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ACC },
-            0x6C => { self.op_code = Opcode::JMP; self.addr_mode = Addressing::IND },
-            0x6D => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ABS },
-            0x6E => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ABS },
-            0x70 => { self.op_code = Opcode::BVS; self.addr_mode = Addressing::REL },
-            0x71 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::IndY },
-            0x75 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::ZpgX },
-            0x76 => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::ZpgX },
-            0x78 => { self.op_code = Opcode::SEI; self.addr_mode = Addressing::IMPL },
-            0x79 => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::AbsY },
-            0x7D => { self.op_code = Opcode::ADC; self.addr_mode = Addressing::AbsX },
-            0x7E => { self.op_code = Opcode::ROR; self.addr_mode = Addressing::AbsX },
-            0x81 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::IndX },
-            0x84 => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ZPG },
-            0x85 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ZPG },
-            0x86 => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ZPG },
-            0x88 => { self.op_code = Opcode::DEY; self.addr_mode = Addressing::IMPL },
-            0x8A => { self.op_code = Opcode::TXA; self.addr_mode = Addressing::IMPL },
-            0x8C => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ABS },
-            0x8D => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ABS },
-            0x8E => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ABS },
-            0x90 => { self.op_code = Opcode::BCC; self.addr_mode = Addressing::REL },
-            0x91 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::IndY },
-            0x94 => { self.op_code = Opcode::STY; self.addr_mode = Addressing::ZpgX },
-            0x95 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::ZpgX },
-            0x96 => { self.op_code = Opcode::STX; self.addr_mode = Addressing::ZpgY },
-            0x98 => { self.op_code = Opcode::TYA; self.addr_mode = Addressing::IMPL },
-            0x99 => { self.op_code = Opcode::STA; self.addr_mode = Addressing::AbsY },
-            0x9A => { self.op_code = Opcode::TXS; self.addr_mode = Addressing::IMPL },
-            0x9D => { self.op_code = Opcode::STA; self.addr_mode = Addressing::AbsX },
-            0xA0 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::IMM },
-            0xA1 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IndX },
-            0xA2 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::IMM },
-            0xA4 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ZPG },
-            0xA5 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ZPG },
-            0xA6 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ZPG },
-            0xA8 => { self.op_code = Opcode::TAY; self.addr_mode = Addressing::IMPL },
-            0xA9 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IMM },
-            0xAA => { self.op_code = Opcode::TAX; self.addr_mode = Addressing::IMPL },
-            0xAC => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ABS },
-            0xAD => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ABS },
-            0xAE => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ABS },
-            0xB0 => { self.op_code = Opcode::BCS; self.addr_mode = Addressing::REL },
-            0xB1 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::IndY },
-            0xB4 => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::ZpgX },
-            0xB5 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::ZpgX },
-            0xB6 => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::ZpgY },
-            0xB8 => { self.op_code = Opcode::CLV; self.addr_mode = Addressing::IMPL },
-            0xB9 => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::AbsY },
-            0xBA => { self.op_code = Opcode::TSX; self.addr_mode = Addressing::IMPL },
-            0xBC => { self.op_code = Opcode::LDY; self.addr_mode = Addressing::AbsX },
-            0xBD => { self.op_code = Opcode::LDA; self.addr_mode = Addressing::AbsX },
-            0xBE => { self.op_code = Opcode::LDX; self.addr_mode = Addressing::AbsY },
-            0xC0 => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::IMM },
-            0xC1 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IndX },
-            0xC4 => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::ZPG },
-            0xC5 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ZPG },
-            0xC6 => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ZPG },
-            0xC8 => { self.op_code = Opcode::INY; self.addr_mode = Addressing::IMPL },
-            0xC9 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IMM },
-            0xCA => { self.op_code = Opcode::DEX; self.addr_mode = Addressing::IMPL },
-            0xCC => { self.op_code = Opcode::CPY; self.addr_mode = Addressing::ABS },
-            0xCD => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ABS },
-            0xCE => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ABS },
-            0xD0 => { self.op_code = Opcode::BNE; self.addr_mode = Addressing::REL },
-            0xD1 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::IndY },
-            0xD5 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::ZpgX },
-            0xD6 => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::ZpgX },
-            0xD8 => { self.op_code = Opcode::CLD; self.addr_mode = Addressing::IMPL },
-            0xD9 => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::AbsY },
-            0xDD => { self.op_code = Opcode::CMP; self.addr_mode = Addressing::AbsX },
-            0xDE => { self.op_code = Opcode::DEC; self.addr_mode = Addressing::AbsX },
-            0xE0 => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::IMM },
-            0xE1 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IndX },
-            0xE4 => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::ZPG },
-            0xE5 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ZPG },
-            0xE6 => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ZPG },
-            0xE8 => { self.op_code = Opcode::INX; self.addr_mode = Addressing::IMPL },
-            0xE9 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IMM },
-            0xEC => { self.op_code = Opcode::CPX; self.addr_mode = Addressing::ABS },
-            0xED => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ABS },
-            0xEE => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ABS },
-            0xF0 => { self.op_code = Opcode::BEQ; self.addr_mode = Addressing::REL },
-            0xF1 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::IndY },
-            0xF5 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::ZpgX },
-            0xF6 => { self.op_code = Opcode::INC; self.addr_mode = Addressing::ZpgX },
-            0xF8 => { self.op_code = Opcode::SED; self.addr_mode = Addressing::IMPL },
-            0xF9 => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::AbsY },
-            0xFD => { self.op_code = Opcode::SBC; self.addr_mode = Addressing::AbsX },
-            0xFE => { self.op_code = Opcode::INC; self.addr_mode = Addressing::AbsX },
+            0x00 => { self.op_code = OpCode::BRK; self.addr_mode = Addressing::IMPL },
+            0x01 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IndX },
+            0x05 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ZPG },
+            0x06 => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ZPG },
+            0x08 => { self.op_code = OpCode::PHP; self.addr_mode = Addressing::IMPL },
+            0x09 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IMM },
+            0x0A => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ACC },
+            0x0D => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ABS },
+            0x0E => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ABS },
+            0x10 => { self.op_code = OpCode::BPL; self.addr_mode = Addressing::REL },
+            0x11 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IndY },
+            0x15 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ZpgX },
+            0x16 => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ZpgX },
+            0x18 => { self.op_code = OpCode::CLC; self.addr_mode = Addressing::IMPL },
+            0x19 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::AbsY },
+            0x1D => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::AbsX },
+            0x1E => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::AbsX },
+            0x20 => { self.op_code = OpCode::JSR; self.addr_mode = Addressing::ABS },
+            0x21 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IndX },
+            0x24 => { self.op_code = OpCode::BIT; self.addr_mode = Addressing::ZPG },
+            0x25 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ZPG },
+            0x26 => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ZPG },
+            0x28 => { self.op_code = OpCode::PLP; self.addr_mode = Addressing::IMPL },
+            0x29 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IMM },
+            0x2A => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ACC },
+            0x2C => { self.op_code = OpCode::BIT; self.addr_mode = Addressing::ABS },
+            0x2D => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ABS },
+            0x2E => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ABS },
+            0x30 => { self.op_code = OpCode::BMI; self.addr_mode = Addressing::REL },
+            0x31 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IndY },
+            0x35 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ZpgX },
+            0x36 => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ZpgX },
+            0x38 => { self.op_code = OpCode::SEC; self.addr_mode = Addressing::IMPL },
+            0x39 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::AbsY },
+            0x3D => { self.op_code = OpCode::AND; self.addr_mode = Addressing::AbsX },
+            0x3E => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::AbsX },
+            0x40 => { self.op_code = OpCode::RTI; self.addr_mode = Addressing::IMPL },
+            0x41 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IndX },
+            0x45 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ZPG },
+            0x46 => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ZPG },
+            0x48 => { self.op_code = OpCode::PHA; self.addr_mode = Addressing::IMPL },
+            0x49 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IMM },
+            0x4A => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ACC },
+            0x4C => { self.op_code = OpCode::JMP; self.addr_mode = Addressing::ABS },
+            0x4D => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ABS },
+            0x4E => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ABS },
+            0x50 => { self.op_code = OpCode::BVC; self.addr_mode = Addressing::REL },
+            0x51 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IndY },
+            0x55 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ZpgX },
+            0x56 => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ZpgX },
+            0x58 => { self.op_code = OpCode::CLI; self.addr_mode = Addressing::IMPL },
+            0x59 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::AbsY },
+            0x5D => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::AbsX },
+            0x5E => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::AbsX },
+            0x60 => { self.op_code = OpCode::RTS; self.addr_mode = Addressing::IMPL },
+            0x61 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IndX },
+            0x65 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ZPG },
+            0x66 => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ZPG },
+            0x68 => { self.op_code = OpCode::PLA; self.addr_mode = Addressing::IMPL },
+            0x69 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IMM },
+            0x6A => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ACC },
+            0x6C => { self.op_code = OpCode::JMP; self.addr_mode = Addressing::IND },
+            0x6D => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ABS },
+            0x6E => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ABS },
+            0x70 => { self.op_code = OpCode::BVS; self.addr_mode = Addressing::REL },
+            0x71 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IndY },
+            0x75 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ZpgX },
+            0x76 => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ZpgX },
+            0x78 => { self.op_code = OpCode::SEI; self.addr_mode = Addressing::IMPL },
+            0x79 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::AbsY },
+            0x7D => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::AbsX },
+            0x7E => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::AbsX },
+            0x81 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::IndX },
+            0x84 => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ZPG },
+            0x85 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ZPG },
+            0x86 => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ZPG },
+            0x88 => { self.op_code = OpCode::DEY; self.addr_mode = Addressing::IMPL },
+            0x8A => { self.op_code = OpCode::TXA; self.addr_mode = Addressing::IMPL },
+            0x8C => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ABS },
+            0x8D => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ABS },
+            0x8E => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ABS },
+            0x90 => { self.op_code = OpCode::BCC; self.addr_mode = Addressing::REL },
+            0x91 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::IndY },
+            0x94 => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ZpgX },
+            0x95 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ZpgX },
+            0x96 => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ZpgY },
+            0x98 => { self.op_code = OpCode::TYA; self.addr_mode = Addressing::IMPL },
+            0x99 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::AbsY },
+            0x9A => { self.op_code = OpCode::TXS; self.addr_mode = Addressing::IMPL },
+            0x9D => { self.op_code = OpCode::STA; self.addr_mode = Addressing::AbsX },
+            0xA0 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::IMM },
+            0xA1 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IndX },
+            0xA2 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::IMM },
+            0xA4 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ZPG },
+            0xA5 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ZPG },
+            0xA6 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ZPG },
+            0xA8 => { self.op_code = OpCode::TAY; self.addr_mode = Addressing::IMPL },
+            0xA9 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IMM },
+            0xAA => { self.op_code = OpCode::TAX; self.addr_mode = Addressing::IMPL },
+            0xAC => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ABS },
+            0xAD => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ABS },
+            0xAE => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ABS },
+            0xB0 => { self.op_code = OpCode::BCS; self.addr_mode = Addressing::REL },
+            0xB1 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IndY },
+            0xB4 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ZpgX },
+            0xB5 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ZpgX },
+            0xB6 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ZpgY },
+            0xB8 => { self.op_code = OpCode::CLV; self.addr_mode = Addressing::IMPL },
+            0xB9 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::AbsY },
+            0xBA => { self.op_code = OpCode::TSX; self.addr_mode = Addressing::IMPL },
+            0xBC => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::AbsX },
+            0xBD => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::AbsX },
+            0xBE => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::AbsY },
+            0xC0 => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::IMM },
+            0xC1 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IndX },
+            0xC4 => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::ZPG },
+            0xC5 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ZPG },
+            0xC6 => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ZPG },
+            0xC8 => { self.op_code = OpCode::INY; self.addr_mode = Addressing::IMPL },
+            0xC9 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IMM },
+            0xCA => { self.op_code = OpCode::DEX; self.addr_mode = Addressing::IMPL },
+            0xCC => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::ABS },
+            0xCD => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ABS },
+            0xCE => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ABS },
+            0xD0 => { self.op_code = OpCode::BNE; self.addr_mode = Addressing::REL },
+            0xD1 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IndY },
+            0xD5 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ZpgX },
+            0xD6 => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ZpgX },
+            0xD8 => { self.op_code = OpCode::CLD; self.addr_mode = Addressing::IMPL },
+            0xD9 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::AbsY },
+            0xDD => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::AbsX },
+            0xDE => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::AbsX },
+            0xE0 => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::IMM },
+            0xE1 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IndX },
+            0xE4 => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::ZPG },
+            0xE5 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ZPG },
+            0xE6 => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ZPG },
+            0xE8 => { self.op_code = OpCode::INX; self.addr_mode = Addressing::IMPL },
+            0xE9 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IMM },
+            0xEC => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::ABS },
+            0xED => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ABS },
+            0xEE => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ABS },
+            0xF0 => { self.op_code = OpCode::BEQ; self.addr_mode = Addressing::REL },
+            0xF1 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IndY },
+            0xF5 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ZpgX },
+            0xF6 => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ZpgX },
+            0xF8 => { self.op_code = OpCode::SED; self.addr_mode = Addressing::IMPL },
+            0xF9 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::AbsY },
+            0xFD => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::AbsX },
+            0xFE => { self.op_code = OpCode::INC; self.addr_mode = Addressing::AbsX },
 
             // NOP
             0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xEA | 0xFA => {
-                self.op_code = Opcode::NOP; self.addr_mode = Addressing::IMPL },
+                self.op_code = OpCode::NOP; self.addr_mode = Addressing::IMPL },
             0x80 | 0x82 | 0x89 | 0xC2 | 0xE2 => {
-                self.op_code = Opcode::NOP; self.addr_mode = Addressing::IMM },
+                self.op_code = OpCode::NOP; self.addr_mode = Addressing::IMM },
             0x04 | 0x44 | 0x64 => {
-                self.op_code = Opcode::NOP; self.addr_mode = Addressing::ZPG },
+                self.op_code = OpCode::NOP; self.addr_mode = Addressing::ZPG },
             0x14 | 0x34 | 0x54 | 0x74| 0xD4| 0xF4 => {
-                self.op_code = Opcode::NOP; self.addr_mode = Addressing::ZpgX },
-            0x0C => { self.op_code = Opcode::NOP; self.addr_mode = Addressing::ABS },
+                self.op_code = OpCode::NOP; self.addr_mode = Addressing::ZpgX },
+            0x0C => { self.op_code = OpCode::NOP; self.addr_mode = Addressing::ABS },
             0x1C | 0x3C | 0x5C | 0x7C| 0xDC| 0xFC => {
-                self.op_code = Opcode::NOP; self.addr_mode = Addressing::AbsX },
+                self.op_code = OpCode::NOP; self.addr_mode = Addressing::AbsX },
 
             // STP
             0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xB2 | 0xD2 | 0xF2  => {
-                self.op_code = Opcode::STP; self.addr_mode = Addressing::IMPL },
+                self.op_code = OpCode::STP; self.addr_mode = Addressing::IMPL },
 
-            _ => { self.op_code = Opcode::UNK; self.addr_mode = Addressing::IMPL }
+            _ => { self.op_code = OpCode::UNK; self.addr_mode = Addressing::IMPL }
         };
     }
 
@@ -423,13 +423,13 @@ impl RP2A03{
         let mut jmp_flg: bool = false;
 
         match self.op_code {
-            Opcode::NOP => {
+            OpCode::NOP => {
                 // No operation, do nothing
                 println!("{}",format!("[DEBUG]: NOP ${}",dbg_str));
             }
 
             // // Logical Operations / 論理演算命令
-            Opcode::AND => {
+            OpCode::AND => {
                 println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
                 let mut result: u8 = 0;
                 let mut val = 0;
@@ -443,7 +443,7 @@ impl RP2A03{
                 self.reg_a = result as u8;
                 self.nzv_flg_update(result);
             }
-            Opcode::ORA => {
+            OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
                 let mut result: u8 = 0;
                 let mut val = 0;
@@ -457,7 +457,7 @@ impl RP2A03{
                 self.reg_a = result as u8;
                 self.nzv_flg_update(result);
             }
-            Opcode::EOR => {
+            OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
                 let mut result: u8 = 0;
                 let mut val = 0;
@@ -473,7 +473,7 @@ impl RP2A03{
             }
 
             // Arithmetic Operations / 算術倫理演算
-            Opcode::ADC => {
+            OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: u8 = value;
@@ -490,7 +490,7 @@ impl RP2A03{
                     self.nzv_flg_update(ret);
                 }
             }
-            Opcode::SBC => {
+            OpCode::SBC => {
                 println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: u8 = value;
@@ -507,7 +507,7 @@ impl RP2A03{
                     self.nzv_flg_update(ret);
                 }
             }
-            Opcode::CMP => {
+            OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: u8 = value;
@@ -531,7 +531,7 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::CPX => {
+            OpCode::CPX => {
                 println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: u8 = value;
@@ -555,7 +555,7 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::CPY => {
+            OpCode::CPY => {
                 println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
                 if let Some(value) = operand {
                     let val: u8 = value;
@@ -579,57 +579,60 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::INC => {
+            OpCode::INC => {
                 println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
-                if let Some(value) = operand {
-                    let val1: u8 = value;
-                    let mut ret: u8 = self.c_flg_update_add(val1 as u8,1);
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = self.c_flg_update_add((((val2 as u16) << 8) | val1 as u16) as u8, 1);
+                let mut _addr: u16 = 0;
+                let mut _ret: u8 = 0;
+                if let Some(val) = operand {
+                    _addr = val as u16;
+                    if let Some(val2) = operand_second {
+                        _addr = ((val2 as u16) << 8) | val as u16;
                     }
-                    self.write(self.reg_pc, ret);
-                    self.nzv_flg_update(ret as u8);
+                    _ret = self.read(_addr);
+                    _ret = self.c_flg_update_add(_ret, 0x01);
+                    self.write(self.reg_pc, _ret);
+                    self.nzv_flg_update(_ret as u8);
                 }
             }
-            Opcode::INX => {
+            OpCode::INX => {
                 println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_x, 1);
                 self.reg_x = ret;
                 self.nzv_flg_update(ret);
             }
-            Opcode::INY => {
+            OpCode::INY => {
                 println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_y, 1);
                 self.reg_y = ret;
                 self.nzv_flg_update(ret);
             }
-            Opcode::DEC => {
+            OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
-                if let Some(value) = operand {
-                    let val1: u8 = value;
-                    let mut ret: u8 = val1.wrapping_sub(0x01);
-                    if let Some(value2) = operand_second {
-                        let val2: u8 = value2;
-                        ret = (((val2 as u16) << 8) | val1 as u16).wrapping_sub(0x01) as u8;
+                let mut _addr: u16 = 0;
+                let mut _ret: u8 = 0;
+                if let Some(val) = operand {
+                    _addr = val as u16;
+                    if let Some(val2) = operand_second {
+                        _addr = ((val2 as u16) << 8) | val as u16;
                     }
-                    self.write(self.reg_pc, ret);
-                    self.nzv_flg_update(ret as u8);
+                    _ret = self.read(_addr).wrapping_sub(0x01);
+                    self.write(self.reg_pc, _ret);
+                    self.nzv_flg_update(_ret as u8);
                 }
             }
-            Opcode::DEX => {
+            OpCode::DEX => {
                 println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
                 self.reg_x = self.reg_x.wrapping_sub(0x01);
                 self.nzv_flg_update(self.reg_x);
             }
-            Opcode::DEY => {
+            OpCode::DEY => {
                 println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
                 self.reg_y = self.reg_y.wrapping_sub(0x01);
                 self.nzv_flg_update(self.reg_y);
             }
 
             // Shift and Rotate Operations
-            Opcode::ASL => {
+            OpCode::ASL => {
                 println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
                 match self.addr_mode {
                     Addressing::ACC => {
@@ -657,7 +660,7 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::LSR => {
+            OpCode::LSR => {
                 println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
                 match self.addr_mode {
                     Addressing::ACC => {
@@ -685,7 +688,7 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::ROL => {
+            OpCode::ROL => {
                 match self.addr_mode {
                     Addressing::ACC => {
                         println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
@@ -722,7 +725,7 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::ROR => {
+            OpCode::ROR => {
                 println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
                 match self.addr_mode {
                     Addressing::ACC => {
@@ -761,43 +764,43 @@ impl RP2A03{
             }
 
             // Load/Store Operations
-            Opcode::LDA => {
+            OpCode::LDA => {
                 println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
                 let mut ret: u8 = 0;
-                if let Some(value) = operand {
-                    ret = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
+                if let Some(val) = operand {
+                    ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
                 }
                 self.reg_a = ret;
                 self.nzv_flg_update(ret);
             }
-            Opcode::LDX => {
+            OpCode::LDX => {
                 println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
                 let mut ret: u8 = 0;
-                if let Some(value) = operand {
-                    ret = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
+                if let Some(val) = operand {
+                    ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
                 }
                 self.reg_x = ret;
                 self.nzv_flg_update(ret);
             }
-            Opcode::LDY => {
+            OpCode::LDY => {
                 println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
                 let mut ret: u8 = 0;
-                if let Some(value) = operand {
-                    ret = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        ret = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
+                if let Some(val) = operand {
+                    ret = self.read_operand_mem(val as u16);
+                    if let Some(val2) = operand_second {
+                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
                 }
                 self.reg_y = ret;
                 self.nzv_flg_update(ret);
             }
-            Opcode::STA => {
+            OpCode::STA => {
                 println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
@@ -808,7 +811,7 @@ impl RP2A03{
                 }
                 self.write(addr, self.reg_a);
             }
-            Opcode::STX => {
+            OpCode::STX => {
                 println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
@@ -819,7 +822,7 @@ impl RP2A03{
                 }
                 self.write(addr, self.reg_x);
             }
-            Opcode::STY => {
+            OpCode::STY => {
                 println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
@@ -832,61 +835,60 @@ impl RP2A03{
             }
 
             // Register Transfer Operations/レジスタ転送関連の命令
-            Opcode::TAX => {
+            OpCode::TAX => {
                 println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
                 self.reg_x = self.reg_a;
             }
-            Opcode::TAY => {
+            OpCode::TAY => {
                 println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
                 self.reg_y = self.reg_a;
             }
-            Opcode::TXA => {
+            OpCode::TXA => {
                 println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
                 self.reg_a = self.reg_x;
             }
-            Opcode::TYA => {
+            OpCode::TYA => {
                 println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
                 self.reg_a = self.reg_y;
             }
 
             // Stack Operations / スタック関連の命令
-            Opcode::TSX => {
+            OpCode::TSX => {
                 println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
                 self.reg_x = self.reg_sp;
             }
-            Opcode::TXS => {
+            OpCode::TXS => {
                 println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
                 self.reg_sp = self.reg_x;
             }
-            Opcode::PHA => {
+            OpCode::PHA => {
                 println!("{}",format!("[DEBUG]: PHA ${}",dbg_str));
                 self.push_stack(self.reg_a);
             }
-            Opcode::PHP => {
+            OpCode::PHP => {
                 println!("{}",format!("[DEBUG]: PHP ${}",dbg_str));
                 self.push_stack(self.reg_p);
             }
-            Opcode::PLA => {
+            OpCode::PLA => {
                 println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
                 let value = self.pop_stack();
                 self.reg_a = value;
                 self.nzv_flg_update(value);
             }
-            Opcode::PLP => {
+            OpCode::PLP => {
                 println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
                 let value = self.pop_stack();
                 self.set_status_flg_all(value);
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
-            Opcode::BIT => {
+            OpCode::BIT => {
                 println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
                 let mut addr: u16 = 0;
-                if let Some(value) = operand {
-                    addr = value as u16;
-                    if let Some(value2) = operand_second {
-                        let addr_u: u16 = value2 as u16;
-                        addr = addr_u << 8 | addr;
+                if let Some(val1) = operand {
+                    addr = val1 as u16;
+                    if let Some(val2) = operand_second {
+                        addr = (val2 as u16) << 8 | val1 as u16;
                     }
                     let ret: u8 = self.read_operand_mem(addr);
                     let result = self.reg_a & ret;
@@ -901,142 +903,126 @@ impl RP2A03{
                     }
                 }
             }
-            Opcode::CLC => {
+            OpCode::CLC => {
                 self.cls_status_flg(CARRY_FLG);
                 println!("{}",format!("[DEBUG]: CLC ${}",dbg_str));
             }
-            Opcode::CLD => {
+            OpCode::CLD => {
                 self.cls_status_flg(DECIMAL_MODE_FLG);
                 println!("{}",format!("[DEBUG]: CLD ${}",dbg_str));
             }
-            Opcode::CLI => {
+            OpCode::CLI => {
                 self.cls_status_flg(INTERRUPT_DISABLE_FLG);
                 println!("{}",format!("[DEBUG]: CLI ${}",dbg_str));
             }
-            Opcode::CLV => {
+            OpCode::CLV => {
                 self.cls_status_flg(OVERFLOW_FLG);
                 println!("{}",format!("[DEBUG]: CLV ${}",dbg_str));
             }
-            Opcode::SEC => {
+            OpCode::SEC => {
                 self.set_status_flg(CARRY_FLG);
                 println!("{}",format!("[DEBUG]: SEC ${}",dbg_str));
             }
-            Opcode::SED => {
+            OpCode::SED => {
                 self.set_status_flg(DECIMAL_MODE_FLG);
                 println!("{}",format!("[DEBUG]: SED ${}",dbg_str));
             }
-            Opcode::SEI => {
+            OpCode::SEI => {
                 self.set_status_flg(INTERRUPT_DISABLE_FLG);
                 println!("{}",format!("[DEBUG]: SEI ${}",dbg_str));
             }
 
             // Branch Operations / 分岐命令
-            Opcode::BCC => {
+            OpCode::BCC => {
                 println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != true {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BCS => {
+            OpCode::BCS => {
                 println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != false {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BEQ => {
+            OpCode::BEQ => {
                 println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != false {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BNE => {
+            OpCode::BNE => {
                 println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != true {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BVC => {
+            OpCode::BVC => {
                 println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != true {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BVS => {
+            OpCode::BVS => {
                 println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != false {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BPL => {
+            OpCode::BPL => {
                 println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != true {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
                     }
                 }
             }
-            Opcode::BMI => {
+            OpCode::BMI => {
                 println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != false {
-                    if let Some(value) = operand {
-                        if let Some(value2) = operand_second {
-                            let val: u16 = value as u16;
-                            let val2:u16 = value2 as u16;
-                            let branch_addr: u16 = (val2 << 8) | val;
+                    if let Some(val1) = operand {
+                        if let Some(val2) = operand_second {
+                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
                             self.reg_pc = branch_addr;
                             jmp_flg = true;
                         }
@@ -1045,19 +1031,17 @@ impl RP2A03{
             }
 
             // Jump and Call Operations
-            Opcode::JMP => {
+            OpCode::JMP => {
                 println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
-                if let Some(value) = operand {
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value;
-                        let val2: u8 = value2;
+                if let Some(val) = operand {
+                    if let Some(val2) = operand_second {
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
                         self.reg_pc = jump_addr;
                         jmp_flg = true;
                     }
                 }
             }
-            Opcode::JSR => {
+            OpCode::JSR => {
                 println!("{}",format!("[DEBUG]: JSR {}",dbg_str));
                 let mut jump_addr: u16 = 0x00;
                 let return_addr: u16 = self.reg_pc;
@@ -1065,37 +1049,35 @@ impl RP2A03{
                 self.push_stack((return_addr & 0x00FF) as u8);
                 self.push_stack(((return_addr & 0xFF00) >> 0x0008) as u8);
 
-                if let Some(value) = operand {
-                    if let Some(value2) = operand_second {
-                        let val: u8 = value;
-                        let val2: u8 = value2;
+                if let Some(val) = operand {
+                    if let Some(val2) = operand_second {
                         jump_addr = (val2 as u16) << 8 | val as u16;
                         self.reg_pc = jump_addr;
                         jmp_flg = true;
                     }
                 }
             }
-            Opcode::RTS => {
+            OpCode::RTS => {
                 println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
-                let return_addr_u: u16 = self.pop_stack() as u16;
-                let return_addr_l: u16 = self.pop_stack() as u16;
-                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
+                let addr_u: u8 = self.pop_stack();
+                let addr_l: u8 = self.pop_stack();
+                let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;
                 self.reg_pc = return_addr + 1;
                 jmp_flg = true;
             }
 
             // Intrrupt Operations / 割込み関連
-            Opcode::RTI => {
+            OpCode::RTI => {
                 println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
                 let status = self.pop_stack();
                 self.set_status_flg_all(status.into());
-                let return_addr_l: u16 = self.pop_stack() as u16;
-                let return_addr_u: u16 = self.pop_stack() as u16;
-                let return_addr: u16 = (return_addr_u << 8) | return_addr_l;
+                let addr_u: u8 = self.pop_stack();
+                let addr_l: u8 = self.pop_stack();
+                let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;
                 self.reg_pc = return_addr;
                 jmp_flg = true;
             }
-            Opcode::BRK => {
+            OpCode::BRK => {
                 println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
                 if self.get_status_flg(BREAK_COMMAND_FLG) != true {
                     self.reg_pc += 1;
@@ -1113,7 +1095,7 @@ impl RP2A03{
             }
 
             // Other
-            Opcode::STP | _ => {
+            OpCode::STP | _ => {
                 // TODO STPと未定義命令をどうするか
                 println!("[DEBUG]: Undefined Instruction!");
             }

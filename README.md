@@ -4,6 +4,13 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 (`Rustの勉強`で`『習うより慣れろ』`でファミコンをエミュレータ作成中　(≧▽≦) /  
 ※ マイコン畑なC/C++の組み込み屋さんのRust奮闘記でもあるwww)  
 
+# 📍Develop
+I purchased a `🤑$4 NES🤑` and`🤑$2 NES Soft🤑`.  
+I am developing an emulator based on them! (I even took it apart and analyzed it)  
+<img src="dev/IMG_20230612_214934.jpg" alt="book" width="30%">
+<img src="dev/IMG_20230612_215026.jpg" alt="book" width="30%">
+<img src="dev/IMG_20230612_223018.jpg" alt="book" width="30%">
+
 # 📍Emulator Structure (Design)
 `Self Promotion` ... `Multi Threaded NES Emulator!!!`  
 
@@ -25,7 +32,7 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 ## `PJ Status / 進捗率` ... `📊70.588%📊`  
 `Sorry for Japanese 🙇`  
 
-<img src="dev/pj_status.png" alt="file">
+<img src="dev/pj_status.png" alt="file"  width="50%">
 
 # 📍Reference🎓📘📖
 下記に参考文献を示す。
@@ -36,9 +43,7 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 >PCポケットカルチャーシリーズ ファミコンの驚くべき発想力 ―限界を突破する技術に学べ―  
 [About]💰💸🤑 -> : https://gihyo.jp/book/2010/978-4-7741-4429-0
   
-<div align="center">
 <img src="dev/nes_refarence_book.jpg" alt="book" width="50%">
-</div>
   
 ## Block Diagram Reference🎓📘📖
 👇Very Very Nice! Block Diagram Reference!👇
