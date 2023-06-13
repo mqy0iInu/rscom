@@ -126,14 +126,6 @@ impl RP2A03{
         self.reg_p
     }
 
-    fn set_status_flg_all(&mut self, val: u8) {
-        self.reg_p = val;
-    }
-
-    fn cls_status_flg_all(&mut self) {
-        self.reg_p = R_FLG;
-    }
-
     fn nzv_flg_update(&mut self, val: u8) {
         if val == 0{
             self.set_status_flg(ZERO_FLG);
@@ -161,29 +153,24 @@ impl RP2A03{
     fn c_flg_update_l_shit(&mut self, val: u8) -> u8{
         let mut ret: u16 = val as u16;
 
-        ret = ret << 1;
-        if ret >  0x00FF {
-            ret = ret & 0x00FF;
-        }
         if (ret & (BIN_BIT_7 as u16)) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
             self.cls_status_flg(CARRY_FLG);
         }
+        ret = ret.wrapping_shl(1);
         ret as u8
     }
 
     fn c_flg_update_r_shit(&mut self, val: u8) -> u8{
         let mut ret: u16 = val as u16;
-        ret = ret >> 1;
-        if ret <= 0x00 {
-            ret = 0;
-        }
+
         if (ret & (BIN_BIT_0 as u16)) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
             self.cls_status_flg(CARRY_FLG);
         }
+        ret = ret.wrapping_shr(1);
         ret as u8
     }
 
@@ -191,7 +178,7 @@ impl RP2A03{
         self.reg_a = 0;
         self.reg_x = 0;
         self.reg_y = 0;
-        self.cls_status_flg_all();
+        self.reg_p = 0;
         self.reg_sp = 0xFF;
         self.set_status_flg(INTERRUPT_DISABLE_FLG);
         self.cpu_run = true;
@@ -628,131 +615,96 @@ impl RP2A03{
             // Shift and Rotate Operations
             OpCode::ASL => {
                 println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
+                let mut _ret: u8 = 0;
+                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        let mut ret: u8 = self.c_flg_update_l_shit(self.reg_a);
-                        ret = ret & 0xFE; // bit0, clear
-                        self.nzv_flg_update(ret);
-                        self.reg_a = ret;
+                        _ret = self.c_flg_update_l_shit(self.reg_a);
+                        self.nzv_flg_update(_ret);
+                        self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(value) = operand {
-                            let addr: u8 = value;
-                            let mut val: u8 = 0;
-                            val =  self.read(addr as u16);
-                            if let Some(value2) = operand_second {
-                                let addr_l: u8 = value;
-                                let addr_u: u8 = value2;
-                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                val = self.read(addr as u16);
+                        if let Some(val1) = operand {
+                            val =  self.read(val as u16);
+                            if let Some(val2) = operand_second {
+                                val = self.read((val2 as u16) << 8 | val1 as u16);
                             }
-                            let mut ret: u8 = self.c_flg_update_l_shit(val as u8);
-                            ret = ret & 0xFE; // bit0, clear
-                            self.nzv_flg_update(ret);
-                            self.write(self.reg_pc, ret);
+                            let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
+                        _ret = _ret & 0xFE; // bit0, clear
+                        self.nzv_flg_update(_ret);
+                        self.write(self.reg_pc, _ret);
                     }
                 }
             }
             OpCode::LSR => {
                 println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
+                let mut _ret: u8 = 0;
+                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        let mut ret: u8 = self.c_flg_update_r_shit(self.reg_a);
-                        ret = ret & 0x7F; // bit7, clear
-                        self.nzv_flg_update(ret);
-                        self.reg_a = ret;
+                        _ret = self.c_flg_update_r_shit(self.reg_a);
+                        self.nzv_flg_update(_ret);
+                        self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(value) = operand {
-                            let addr: u8 = value;
-                            let mut val: u8 = 0;
-                            val =  self.read(addr as u16);
-                            if let Some(value2) = operand_second {
-                                let addr_l: u8 = value;
-                                let addr_u: u8 = value2;
-                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                val = self.read(addr as u16);
+                        if let Some(val1) = operand {
+                            val =  self.read(val as u16);
+                            if let Some(val2) = operand_second {
+                                val = self.read((val2 as u16) << 8 | val1 as u16);
                             }
-                            let mut ret: u8 = self.c_flg_update_r_shit(val as u8);
-                            ret = ret & 0x7F; // bit7, clear
-                            self.nzv_flg_update(ret);
-                            self.write(self.reg_pc, ret);
+                            let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
+                        _ret = _ret & 0x7F; // bit7, clear
+                        self.nzv_flg_update(_ret);
+                        self.write(self.reg_pc, _ret);
                     }
                 }
             }
             OpCode::ROL => {
+                let mut _ret: u8 = 0;
+                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        println!("{}",format!("[DEBUG]: ROL ${}",dbg_str));
-                        let mut ret: u8 = self.c_flg_update_l_shit(self.reg_a);
-                        if self.get_status_flg(CARRY_FLG) {
-                            ret = ret | BIN_BIT_0; // bit0 = C Flag Set
-                        }else{
-                            ret = ret & 0xFE; // bit0 = C Flag Clear
-                        }
-                        self.nzv_flg_update(ret);
-                        self.reg_a = ret;
+                        _ret = self.c_flg_update_l_shit(self.reg_a);
+                        self.nzv_flg_update(_ret);
+                        self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(value) = operand {
-                            let addr: u8 = value;
-                            let mut val: u8 = 0;
-                            val =  self.read(addr as u16);
-                            if let Some(value2) = operand_second {
-                                let addr_l: u8 = value;
-                                let addr_u: u8 = value2;
-                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                val = self.read(addr as u16);
+                        if let Some(val1) = operand {
+                            val =  self.read(val as u16);
+                            if let Some(val2) = operand_second {
+                                val = self.read((val2 as u16) << 8 | val1 as u16);
                             }
-
-                            let mut ret: u8 = self.c_flg_update_l_shit(val as u8);
-                            if self.get_status_flg(CARRY_FLG) {
-                                ret = ret | BIN_BIT_0; // bit0 = C Flag Set
-                            }else{
-                                ret = ret & 0xFE; // bit0 = C Flag Clear
-                            }
-                            self.nzv_flg_update(ret);
-                            self.write(self.reg_pc, ret);
+                            let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
+                        _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
+                        self.nzv_flg_update(_ret);
+                        self.write(self.reg_pc, _ret);
                     }
                 }
             }
             OpCode::ROR => {
-                println!("{}",format!("[DEBUG]: ROR ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
+                let mut _ret: u8 = 0;
+                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        let mut ret: u8 = self.c_flg_update_r_shit(self.reg_a);
-                        if self.get_status_flg(CARRY_FLG) {
-                            ret = ret | BIN_BIT_7; // bit7 = C Flag Set
-                        }else{
-                            ret = ret & 0x7F;      // bit7 = C Flag Clear
-                        }
-                        self.nzv_flg_update(ret);
-                        self.reg_a = ret;
+                        _ret = self.c_flg_update_r_shit(self.reg_a);
+                        self.nzv_flg_update(_ret);
+                        self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(value) = operand {
-                            let addr: u8 = value;
-                            let mut val: u8 = 0;
-                            val =  self.read(addr as u16);
-                            if let Some(value2) = operand_second {
-                                let addr_l: u8 = value;
-                                let addr_u: u8 = value2;
-                                let addr: u16 = (addr_u as u16) << 8 | addr_l as u16;
-                                val = self.read(addr as u16);
+                        if let Some(val1) = operand {
+                            val =  self.read(val as u16);
+                            if let Some(val2) = operand_second {
+                                val = self.read((val2 as u16) << 8 | val1 as u16);
                             }
-
-                            let mut ret: u8 = self.c_flg_update_r_shit(val as u8);
-                            if self.get_status_flg(CARRY_FLG) {
-                                ret = ret | BIN_BIT_7; // bit7 = C Flag Set
-                            }else{
-                                ret = ret & 0x7F;      // bit7 = C Flag Clear
-                            }
-                            self.nzv_flg_update(ret);
-                            self.write(self.reg_pc, ret);
+                            let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
+                        _ret = _ret | ((self.reg_p & CARRY_FLG) << BIN_BIT_7); // bit7, Set C
+                        self.nzv_flg_update(_ret);
+                        self.write(self.reg_pc, _ret);
                     }
                 }
             }
@@ -871,8 +823,7 @@ impl RP2A03{
             }
             OpCode::PLP => {
                 println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
-                let value = self.pop_stack();
-                self.set_status_flg_all(value);
+                self.reg_p = self.pop_stack();
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
@@ -1063,8 +1014,7 @@ impl RP2A03{
             // Intrrupt Operations / 割込み関連
             OpCode::RTI => {
                 println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
-                let status = self.pop_stack();
-                self.set_status_flg_all(status.into());
+                self.reg_p = self.pop_stack();
                 let addr_u: u8 = self.pop_stack();
                 let addr_l: u8 = self.pop_stack();
                 let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;

@@ -8,10 +8,8 @@ This repository is making a NES emulator as a Rust study 😉😁😃.
 I purchased a `🤑$4 NES🤑` and`🤑$2 NES Soft🤑`.  
 I am developing an emulator based on them! (I even took it apart and analyzed it)  
 
-<img src="dev/IMG_20230612_214934.jpg" alt="book" width="35%">
-<img src="dev/IMG_20230612_215026.jpg" alt="book" width="35%">
-<img src="dev/IMG_20230612_223018.jpg" alt="book" width="35%">
-<img src="dev/IMG_20230612_222947.jpg" alt="book" width="35%">
+<img src="dev/IMG_20230612_214934.jpg" alt="book" width="45%">
+<img src="dev/IMG_20230612_215026.jpg" alt="book" width="45%">
 
 # 📍Emulator Structure (Design)
 `Self Promotion` ... `Multi Threaded NES Emulator!!!`  
@@ -34,7 +32,7 @@ I am developing an emulator based on them! (I even took it apart and analyzed it
 ## `PJ Status / 進捗率` ... `📊70.588%📊`  
 `Sorry for Japanese 🙇`  
 
-<img src="dev/pj_status.png" alt="file"  width="50%">
+<img src="dev/pj_status.png" alt="file"  width="95%">
 
 # 📍Reference🎓📘📖
 下記に参考文献を示す。
