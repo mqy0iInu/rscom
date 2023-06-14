@@ -111,8 +111,9 @@ fn main()
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            thread::sleep(Duration::from_nanos(559));
-            // thread::sleep(Duration::from_millis(100));
+            // thread::sleep(Duration::from_nanos(559));
+            thread::sleep(Duration::from_micros(600));
+            // thread::sleep(Duration::from_millis(6));
         }
     });
 
@@ -149,8 +150,9 @@ fn main()
         // ,cpu_handler.nes_mem.mem_read(0x00FE)
         // ,cpu_handler.nes_mem.mem_read(0x00FF));
 
-        thread::sleep(Duration::from_nanos(187));
-        // thread::sleep(Duration::from_millis(30));
+        // thread::sleep(Duration::from_nanos(187));
+        thread::sleep(Duration::from_micros(200));
+        // thread::sleep(Duration::from_millis(2));
     }
     // ==================================================================================
 }

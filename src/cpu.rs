@@ -1113,16 +1113,16 @@ impl RP2A03{
                 format!("{:#02X} (ZPG)",oprand))
             }
             Addressing::ZpgX => {
-                let address: u8 = self.read(self.reg_pc) + self.reg_x;
-                (Some(address),
+                let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_x as u16;
+                (Some((addr & 0x00FF) as u8),
                 Some(0),
-                format!("{:#02X} (ZpgX)",oprand))
+                format!("{:#02X},X (ZpgX: ZeroPage = {})",oprand, (addr & 0x00FF) as u8))
             }
             Addressing::ZpgY => {
-                let address: u8 = self.read(self.reg_pc) + self.reg_y;
-                (Some(address),
+                let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_y as u16;
+                (Some((addr & 0x00FF) as u8),
                 Some(0),
-                format!("{:#02X} (ZpgY)",oprand))
+                format!("{:#02X},Y (ZpgY: ZeroPage = {})",oprand, (addr & 0x00FF) as u8))
             }
             Addressing::ABS => {
                 let addr_l:u8 = self.read(self.reg_pc);
