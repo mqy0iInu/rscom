@@ -431,12 +431,12 @@ impl RP2A03{
         match self.op_code {
             OpCode::NOP => {
                 // No operation, do nothing
-                println!("{}",format!("[DEBUG]: NOP ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: NOP {}",dbg_str));
             }
 
             // // Logical Operations / 論理演算命令
             OpCode::AND => {
-                println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
+                println!("{}", format!("[DEBUG]: AND {}", dbg_str));
                 let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -449,7 +449,7 @@ impl RP2A03{
                 self.nz_flg_update(result);
             }
             OpCode::ORA => {
-                println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
+                println!("{}", format!("[DEBUG]: ORA {}", dbg_str));
                 let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -462,7 +462,7 @@ impl RP2A03{
                 self.nz_flg_update(result);
             }
             OpCode::EOR => {
-                println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
+                println!("{}", format!("[DEBUG]: EOR {}", dbg_str));
                 let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
@@ -477,7 +477,7 @@ impl RP2A03{
 
             // Arithmetic Operations / 算術倫理演算
             OpCode::ADC => {
-                println!("{}",format!("[DEBUG]: ADC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut _val: u8 = 0;
                 let carry: u8 = self.reg_p & CARRY_FLG;
@@ -495,7 +495,7 @@ impl RP2A03{
                 }
             }
             OpCode::SBC => {
-                println!("{}",format!("[DEBUG]: SBC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: SBC {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut _val: u8 = 0;
                 let carry: u8 = !(self.reg_p & CARRY_FLG);
@@ -513,7 +513,7 @@ impl RP2A03{
                 }
             }
             OpCode::CMP => {
-                println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CMP {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut _sub = 0;
                 if let Some(val) = operand {
@@ -536,7 +536,7 @@ impl RP2A03{
                 }
             }
             OpCode::CPX => {
-                println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CPX {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut _sub = 0;
                 if let Some(val) = operand {
@@ -559,7 +559,7 @@ impl RP2A03{
                 }
             }
             OpCode::CPY => {
-                println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CPY {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut _sub = 0;
                 if let Some(val) = operand {
@@ -582,7 +582,7 @@ impl RP2A03{
                 }
             }
             OpCode::INC => {
-                println!("{}",format!("[DEBUG]: INC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: INC {}",dbg_str));
                 let mut _addr: u16 = 0;
                 let mut _ret: u8 = 0;
                 if let Some(val) = operand {
@@ -597,19 +597,19 @@ impl RP2A03{
                 }
             }
             OpCode::INX => {
-                println!("{}",format!("[DEBUG]: INX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: INX {}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_x, 1);
                 self.reg_x = ret;
                 self.nz_flg_update(ret);
             }
             OpCode::INY => {
-                println!("{}",format!("[DEBUG]: INY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: INY {}",dbg_str));
                 let ret: u8 = self.c_flg_update_add(self.reg_y, 1);
                 self.reg_y = ret;
                 self.nz_flg_update(ret);
             }
             OpCode::DEC => {
-                println!("{}",format!("[DEBUG]: DEC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
                 let mut _addr: u16 = 0;
                 let mut _ret: u8 = 0;
                 if let Some(val) = operand {
@@ -623,22 +623,23 @@ impl RP2A03{
                 }
             }
             OpCode::DEX => {
-                println!("{}",format!("[DEBUG]: DEX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: DEX {}",dbg_str));
                 self.reg_x = self.nz_flg_update_sub(self.reg_x, 1);
             }
             OpCode::DEY => {
-                println!("{}",format!("[DEBUG]: DEY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: DEY {}",dbg_str));
                 self.reg_y = self.nz_flg_update_sub(self.reg_y, 1);
             }
 
             // Shift and Rotate Operations
             OpCode::ASL => {
-                println!("{}",format!("[DEBUG]: ASL ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: ASL {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_l_shit(self.reg_a);
+                        _ret = _ret & 0xFE; // bit0, clear
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
@@ -657,12 +658,13 @@ impl RP2A03{
                 }
             }
             OpCode::LSR => {
-                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_r_shit(self.reg_a);
+                        _ret = _ret & 0x7F; // bit7, clear
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
@@ -686,6 +688,7 @@ impl RP2A03{
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_l_shit(self.reg_a);
+                        _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
@@ -704,12 +707,13 @@ impl RP2A03{
                 }
             }
             OpCode::ROR => {
-                println!("{}",format!("[DEBUG]: LSR ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
                 let mut _ret: u8 = 0;
                 let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
                         _ret = self.c_flg_update_r_shit(self.reg_a);
+                        _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
@@ -730,7 +734,7 @@ impl RP2A03{
 
             // Load/Store Operations
             OpCode::LDA => {
-                println!("{}",format!("[DEBUG]: LDA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LDA {}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(val) = operand {
                     ret = self.read_operand_mem(val as u16);
@@ -742,7 +746,7 @@ impl RP2A03{
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::LDX => {
-                println!("{}",format!("[DEBUG]: LDX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LDX {}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(val) = operand {
                     ret = self.read_operand_mem(val as u16);
@@ -754,7 +758,7 @@ impl RP2A03{
                 self.nz_flg_update(self.reg_x);
             }
             OpCode::LDY => {
-                println!("{}",format!("[DEBUG]: LDY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: LDY {}",dbg_str));
                 let mut ret: u8 = 0;
                 if let Some(val) = operand {
                     ret = self.read_operand_mem(val as u16);
@@ -766,7 +770,7 @@ impl RP2A03{
                 self.nz_flg_update(self.reg_y);
             }
             OpCode::STA => {
-                println!("{}",format!("[DEBUG]: STA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: STA {}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
                     addr = val as u16;
@@ -777,7 +781,7 @@ impl RP2A03{
                 self.write(addr, self.reg_a);
             }
             OpCode::STX => {
-                println!("{}",format!("[DEBUG]: STX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: STX {}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
                     addr = val as u16;
@@ -788,7 +792,7 @@ impl RP2A03{
                 self.write(addr, self.reg_x);
             }
             OpCode::STY => {
-                println!("{}",format!("[DEBUG]: STY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: STY {}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val) = operand {
                     addr = val as u16;
@@ -801,58 +805,58 @@ impl RP2A03{
 
             // Register Transfer Operations/レジスタ転送関連の命令
             OpCode::TAX => {
-                println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TAX {}",dbg_str));
                 self.reg_x = self.reg_a;
                 self.nz_flg_update(self.reg_x);
             }
             OpCode::TAY => {
-                println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TAY {}",dbg_str));
                 self.reg_y = self.reg_a;
                 self.nz_flg_update(self.reg_y);
             }
             OpCode::TXA => {
-                println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TXA {}",dbg_str));
                 self.reg_a = self.reg_x;
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::TYA => {
-                println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TYA {}",dbg_str));
                 self.reg_a = self.reg_y;
                 self.nz_flg_update(self.reg_a);
             }
 
             // Stack Operations / スタック関連の命令
             OpCode::TSX => {
-                println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TSX {}",dbg_str));
                 self.reg_x = self.reg_sp;
                 self.nz_flg_update(self.reg_x);
             }
             OpCode::TXS => {
-                println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: TXS {}",dbg_str));
                 self.reg_sp = self.reg_x;
             }
             OpCode::PHA => {
-                println!("{}",format!("[DEBUG]: PHA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: PHA {}",dbg_str));
                 self.push_stack(self.reg_a);
             }
             OpCode::PHP => {
-                println!("{}",format!("[DEBUG]: PHP ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: PHP {}",dbg_str));
                 self.push_stack(self.reg_p);
             }
             OpCode::PLA => {
-                println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: PLA {}",dbg_str));
                 let value = self.pop_stack();
                 self.reg_a = value;
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::PLP => {
-                println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: PLP {}",dbg_str));
                 self.reg_p = self.pop_stack();
             }
 
             // Status Flag Operations / ステータスフラグ関連の命令
             OpCode::BIT => {
-                println!("{}",format!("[DEBUG]: BIT ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BIT {}",dbg_str));
                 let mut addr: u16 = 0;
                 if let Some(val1) = operand {
                     addr = val1 as u16;
@@ -874,36 +878,36 @@ impl RP2A03{
             }
             OpCode::CLC => {
                 self.cls_status_flg(CARRY_FLG);
-                println!("{}",format!("[DEBUG]: CLC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CLC {}",dbg_str));
             }
             OpCode::CLD => {
                 self.cls_status_flg(DECIMAL_MODE_FLG);
-                println!("{}",format!("[DEBUG]: CLD ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CLD {}",dbg_str));
             }
             OpCode::CLI => {
                 self.cls_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("{}",format!("[DEBUG]: CLI ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CLI {}",dbg_str));
             }
             OpCode::CLV => {
                 self.cls_status_flg(OVERFLOW_FLG);
-                println!("{}",format!("[DEBUG]: CLV ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: CLV {}",dbg_str));
             }
             OpCode::SEC => {
                 self.set_status_flg(CARRY_FLG);
-                println!("{}",format!("[DEBUG]: SEC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: SEC {}",dbg_str));
             }
             OpCode::SED => {
                 self.set_status_flg(DECIMAL_MODE_FLG);
-                println!("{}",format!("[DEBUG]: SED ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: SED {}",dbg_str));
             }
             OpCode::SEI => {
                 self.set_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("{}",format!("[DEBUG]: SEI ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: SEI {}",dbg_str));
             }
 
             // Branch Operations / 分岐命令
             OpCode::BCC => {
-                println!("{}",format!("[DEBUG]: BCC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BCC {}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != true {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -915,7 +919,7 @@ impl RP2A03{
                 }
             }
             OpCode::BCS => {
-                println!("{}",format!("[DEBUG]: BCS ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BCS {}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != false {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -927,7 +931,7 @@ impl RP2A03{
                 }
             }
             OpCode::BEQ => {
-                println!("{}",format!("[DEBUG]: BEQ ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BEQ {}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != false {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -939,7 +943,7 @@ impl RP2A03{
                 }
             }
             OpCode::BNE => {
-                println!("{}",format!("[DEBUG]: BNE ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BNE {}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != true {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -951,7 +955,7 @@ impl RP2A03{
                 }
             }
             OpCode::BVC => {
-                println!("{}",format!("[DEBUG]: BVC ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BVC {}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != true {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -963,7 +967,7 @@ impl RP2A03{
                 }
             }
             OpCode::BVS => {
-                println!("{}",format!("[DEBUG]: BVS ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BVS {}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != false {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -975,7 +979,7 @@ impl RP2A03{
                 }
             }
             OpCode::BPL => {
-                println!("{}",format!("[DEBUG]: BPL ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BPL {}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != true {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -987,7 +991,7 @@ impl RP2A03{
                 }
             }
             OpCode::BMI => {
-                println!("{}",format!("[DEBUG]: BMI ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BMI {}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != false {
                     if let Some(val1) = operand {
                         if let Some(val2) = operand_second {
@@ -1001,7 +1005,7 @@ impl RP2A03{
 
             // Jump and Call Operations
             OpCode::JMP => {
-                println!("{}",format!("[DEBUG]: JMP ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: JMP {}",dbg_str));
                 if let Some(val) = operand {
                     if let Some(val2) = operand_second {
                         let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
@@ -1027,7 +1031,7 @@ impl RP2A03{
                 }
             }
             OpCode::RTS => {
-                println!("{}",format!("[DEBUG]: RTS ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: RTS {}",dbg_str));
                 let addr_u: u8 = self.pop_stack();
                 let addr_l: u8 = self.pop_stack();
                 let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;
@@ -1037,7 +1041,7 @@ impl RP2A03{
 
             // Intrrupt Operations / 割込み関連
             OpCode::RTI => {
-                println!("{}",format!("[DEBUG]: RTI ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: RTI {}",dbg_str));
                 self.reg_p = self.pop_stack();
                 let addr_u: u8 = self.pop_stack();
                 let addr_l: u8 = self.pop_stack();
@@ -1046,7 +1050,7 @@ impl RP2A03{
                 jmp_flg = true;
             }
             OpCode::BRK => {
-                println!("{}",format!("[DEBUG]: BRK ${}",dbg_str));
+                println!("{}",format!("[DEBUG]: BRK {}",dbg_str));
                 // if self.get_status_flg(BREAK_COMMAND_FLG) != true {
                 //     self.reg_pc += 1;
                 //     self.set_status_flg(BREAK_COMMAND_FLG);
@@ -1097,32 +1101,29 @@ impl RP2A03{
 
         match self.addr_mode {
             Addressing::ACC => {
-                let acc:u8 = self.reg_a;
-                (Some(self.reg_a),
-                None,
-                format!("{:#02X} (ACC)", acc))
+                (None, None,format!("(ACC)"))
             }
             Addressing::IMM => {
                 (Some(self.read(self.reg_pc)),
                 None,
-                format!("{:#02X} (IMM)",oprand))
+                format!("#{:02X} (IMM)",oprand))
             }
             Addressing::ZPG => {
                 (Some(self.read(self.reg_pc)),
                 Some(0),
-                format!("{:#02X} (ZPG)",oprand))
+                format!("${:#02X} (ZPG)",oprand))
             }
             Addressing::ZpgX => {
                 let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_x as u16;
                 (Some((addr & 0x00FF) as u8),
                 Some(0),
-                format!("{:#02X},X (ZpgX: ZeroPage = {})",oprand, (addr & 0x00FF) as u8))
+                format!("${:02X},X (ZpgX: ZeroPage = ${:02X})",oprand, (addr & 0x00FF) as u8))
             }
             Addressing::ZpgY => {
                 let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_y as u16;
                 (Some((addr & 0x00FF) as u8),
                 Some(0),
-                format!("{:#02X},Y (ZpgY: ZeroPage = {})",oprand, (addr & 0x00FF) as u8))
+                format!("${:02X},Y (ZpgY: ZeroPage = ${:02X})",oprand, (addr & 0x00FF) as u8))
             }
             Addressing::ABS => {
                 let addr_l:u8 = self.read(self.reg_pc);
@@ -1130,7 +1131,7 @@ impl RP2A03{
                 let addr_u:u8 = self.read(self.reg_pc);
                 (Some(addr_l),
                 Some(addr_u),
-                format!("{:#02X} {:#02X} (ABS)",addr_l, addr_u))
+                format!("${:02X} ${:02X} (ABS)",addr_l, addr_u))
             }
             Addressing::AbsX => {
                 let mut addr_l: u8 = self.read(self.reg_pc);
@@ -1140,7 +1141,7 @@ impl RP2A03{
                 addr_u |= addr_l;
                 (Some(addr_l),
                 Some(addr_u),
-                format!("{:#02X} {:#02X} (AbsX)",addr_l, addr_u))
+                format!("${:02X} ${:02X},X (AbsX)",addr_l, addr_u))
             }
             Addressing::AbsY => {
                 let mut addr_l: u8 = self.read(self.reg_pc);
@@ -1150,7 +1151,7 @@ impl RP2A03{
                 addr_u |= addr_l;
                 (Some(addr_l),
                 Some(addr_u),
-                format!("{:#02X} {:#02X} (AbsY)",addr_l, addr_u))
+                format!("${:02X} ${:02X},Y (AbsY)",addr_l, addr_u))
             }
             Addressing::IND => { // Indirect Indexed
                 let val1: u16 = self.read(self.reg_pc) as u16;
@@ -1159,7 +1160,7 @@ impl RP2A03{
                 let addr: u16 = ((val2 << 8) | val1).wrapping_add(1);
                 (Some((addr & 0x00FF) as u8),
                 Some(((addr & 0xFF00) >> 8) as u8),
-                format!("{:#02X} (IND)",oprand))
+                format!("${:02X} (IND)",oprand))
             }
             Addressing::IndX => { // Indexed Indirect
                 let b1:u8 = self.read(self.reg_pc);
@@ -1168,7 +1169,7 @@ impl RP2A03{
                 let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
                 (Some(addr_l as u8),
                 Some(addr_u as u8),
-                format!("{:#02X} (IndX)",oprand))
+                format!("(${:02X},X) (IndX)",oprand))
             }
             Addressing::IndY => { // Indirect Indexed
                 let b1:u8 = self.read(self.reg_pc);
@@ -1176,7 +1177,7 @@ impl RP2A03{
                 let addr_u: u8 = self.read(b1.wrapping_add(1) as u16);
                 (Some(addr_l as u8),
                 Some(addr_u as u8),
-                format!("{:#02X} (IndY)",oprand))
+                format!("(${:02X}),Y (IndY)",oprand))
             }
             Addressing::REL => { // Relative Addressing(相対アドレッシング)
                 let offset: u8 = self.read(self.reg_pc);
@@ -1186,7 +1187,7 @@ impl RP2A03{
                 let addr_u: u8 = (addr >> 8) as u8;
                 (Some(addr_l as u8),
                 Some(addr_u as u8),
-                format!("${:04X} (REL)(Offset: 0x{:02X}({}))", addr, s_offset, s_offset))
+                format!("${:04X} (REL)(Offset: #{:02X}({}))", addr, s_offset, s_offset))
             }
             Addressing::IMPL => { // Implied Addressing
                 // Not, Have Operand
@@ -1198,7 +1199,10 @@ impl RP2A03{
     fn read_operand_mem(&mut self, addr: u16) -> u8
     {
         match self.addr_mode {
-            Addressing::ACC | Addressing::IMM => {
+            Addressing::ACC => {
+                self.reg_a
+            },
+            Addressing::IMM => {
                 addr as u8
             },
             Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
