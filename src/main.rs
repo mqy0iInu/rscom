@@ -111,27 +111,27 @@ fn main()
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
-            // thread::sleep(Duration::from_nanos(559));
-            thread::sleep(Duration::from_millis(6));
+            thread::sleep(Duration::from_nanos(559));
+            // thread::sleep(Duration::from_millis(3));
         }
     });
 
     // PPU Thred @5.37 MHz(186.4 nsec)
-    let _ppu_thread = thread::spawn(|| {
-        loop {
-            ppu_main();
-            // thread::sleep(Duration::from_nanos(187));
-            thread::sleep(Duration::from_millis(500));
-        }
-    });
+    // let _ppu_thread = thread::spawn(|| {
+    //     loop {
+    //         ppu_main();
+    //         // thread::sleep(Duration::from_nanos(187));
+    //         thread::sleep(Duration::from_millis(500));
+    //     }
+    // });
 
-    let _apu_thread = thread::spawn(|| {
-        loop {
-            apu_main();
-            // thread::sleep(Duration::from_nanos(559));
-            thread::sleep(Duration::from_millis(500));
-        }
-    });
+    // let _apu_thread = thread::spawn(|| {
+    //     loop {
+    //         apu_main();
+    //         // thread::sleep(Duration::from_nanos(559));
+    //         thread::sleep(Duration::from_millis(500));
+    //     }
+    // });
 
     // ==================================================================================
     // [Main Loop]
@@ -144,12 +144,13 @@ fn main()
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();
         }
-        println!("(DEBUG): $00FE = {:#02X}, $00FF = {:#02X}"
-        ,cpu_handler.nes_mem.mem_read(0x00FE)
-        ,cpu_handler.nes_mem.mem_read(0x00FF));
 
-        // thread::sleep(Duration::from_nanos(559));
-        thread::sleep(Duration::from_millis(2));
+        // println!("(DEBUG): $00FE = {:#02X}, $00FF = {:#02X}"
+        // ,cpu_handler.nes_mem.mem_read(0x00FE)
+        // ,cpu_handler.nes_mem.mem_read(0x00FF));
+
+        thread::sleep(Duration::from_nanos(187));
+        // thread::sleep(Duration::from_millis(1));
     }
     // ==================================================================================
 }

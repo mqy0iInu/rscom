@@ -799,24 +799,29 @@ impl RP2A03{
             OpCode::TAX => {
                 println!("{}",format!("[DEBUG]: TAX ${}",dbg_str));
                 self.reg_x = self.reg_a;
+                self.nz_flg_update(self.reg_x);
             }
             OpCode::TAY => {
                 println!("{}",format!("[DEBUG]: TAY ${}",dbg_str));
                 self.reg_y = self.reg_a;
+                self.nz_flg_update(self.reg_y);
             }
             OpCode::TXA => {
                 println!("{}",format!("[DEBUG]: TXA ${}",dbg_str));
                 self.reg_a = self.reg_x;
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::TYA => {
                 println!("{}",format!("[DEBUG]: TYA ${}",dbg_str));
                 self.reg_a = self.reg_y;
+                self.nz_flg_update(self.reg_a);
             }
 
             // Stack Operations / スタック関連の命令
             OpCode::TSX => {
                 println!("{}",format!("[DEBUG]: TSX ${}",dbg_str));
                 self.reg_x = self.reg_sp;
+                self.nz_flg_update(self.reg_x);
             }
             OpCode::TXS => {
                 println!("{}",format!("[DEBUG]: TXS ${}",dbg_str));
@@ -834,7 +839,7 @@ impl RP2A03{
                 println!("{}",format!("[DEBUG]: PLA ${}",dbg_str));
                 let value = self.pop_stack();
                 self.reg_a = value;
-                self.nz_flg_update(value);
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::PLP => {
                 println!("{}",format!("[DEBUG]: PLP ${}",dbg_str));
