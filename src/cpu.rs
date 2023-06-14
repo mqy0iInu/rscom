@@ -139,13 +139,12 @@ impl RP2A03{
 
     fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
         let ret: u16 = (val_a as u16).wrapping_add(val_b as u16) as u16;
-        if ret >= 0x00FF {
+        if (ret & (BIN_BIT_7 as u16)) != 0 {
             self.set_status_flg(CARRY_FLG);
-            0x00
         }else{
             self.cls_status_flg(CARRY_FLG);
-            val_a.wrapping_add(val_b)
         }
+        (ret & 0x00FF) as u8
     }
 
     fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
@@ -153,7 +152,7 @@ impl RP2A03{
         if (val_a == val_b) || (ret == 0x00) {
             self.set_status_flg(ZERO_FLG);
             0
-        } else if (val_a < val_b) || (ret < 0) {
+        } else if ret < 0 {
             self.set_status_flg(NEGATIVE_FLG);
             ret as u8
         } else{
@@ -566,20 +565,20 @@ impl RP2A03{
                         _addr = ((val2 as u16) << 8) | val as u16;
                     }
                     _ret = self.read(_addr);
-                    _ret = self.c_flg_update_add(_ret, 0x01);
-                    self.write(self.reg_pc, _ret);
+                    _ret = _ret.wrapping_add(1);
                     self.nz_flg_update(_ret as u8);
+                    self.write(_addr, _ret);
                 }
             }
             OpCode::INX => {
                 println!("{}",format!("[DEBUG]: INX {}",dbg_str));
-                let ret: u8 = self.c_flg_update_add(self.reg_x, 1);
+                let ret: u8 = self.reg_x.wrapping_add(1);
                 self.reg_x = ret;
                 self.nz_flg_update(ret);
             }
             OpCode::INY => {
                 println!("{}",format!("[DEBUG]: INY {}",dbg_str));
-                let ret: u8 = self.c_flg_update_add(self.reg_y, 1);
+                let ret: u8 = self.reg_y.wrapping_add(1);
                 self.reg_y = ret;
                 self.nz_flg_update(ret);
             }
@@ -594,7 +593,7 @@ impl RP2A03{
                     }
                     let mem = self.read(_addr);
                     _ret = self.nz_flg_update_sub(mem, 0x01);
-                    self.write(self.reg_pc, _ret);
+                    self.write(_addr, _ret);
                 }
             }
             OpCode::DEX => {
@@ -832,22 +831,32 @@ impl RP2A03{
             // Status Flag Operations / ステータスフラグ関連の命令
             OpCode::BIT => {
                 println!("{}",format!("[DEBUG]: BIT {}",dbg_str));
-                let mut addr: u16 = 0;
+                let mut _addr: u16 = 0;
                 if let Some(val1) = operand {
-                    addr = val1 as u16;
+                    _addr = val1 as u16;
                     if let Some(val2) = operand_second {
-                        addr = (val2 as u16) << 8 | val1 as u16;
+                        _addr = (val2 as u16) << 8 | val1 as u16;
                     }
-                    let ret: u8 = self.read_operand_mem(addr);
+
+                    let ret: u8 = self.read_operand_mem(_addr);
                     let result = self.reg_a & ret;
+
                     if result == 0 {
                         self.set_status_flg(ZERO_FLG);
+                    }else{
+                        self.cls_status_flg(ZERO_FLG);
                     }
+
                     if (ret & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
+                    }else{
+                        self.cls_status_flg(NEGATIVE_FLG);
                     }
+
                     if (ret & BIN_BIT_6) != 0 {
                         self.set_status_flg(OVERFLOW_FLG);
+                    }else {
+                        self.cls_status_flg(OVERFLOW_FLG);
                     }
                 }
             }
