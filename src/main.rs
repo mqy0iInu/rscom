@@ -38,9 +38,6 @@ fn color(byte: u8) -> Color {
 fn read_screen_state(cpu_rp2a03: &mut RP2A03, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     let mut frame_idx = 0;
     let mut update = false;
-    let mut rng = rand::thread_rng();
-    cpu_rp2a03.nes_mem.mem_write(0xfe, rng.gen_range(1..16) as u8);
-
     for i in 0x0200..0x600 {
         let color_idx = cpu_rp2a03.nes_mem.mem_read(i as u16);
         let (b1, b2, b3) = color(color_idx).rgb();
@@ -61,23 +58,22 @@ fn key_pad_polling(cpu_rp2a03: &mut RP2A03, event_pump: &mut EventPump) {
             Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                 std::process::exit(0)
             },
-            Event::KeyDown { keycode: Some(Keycode::W), .. } => {
-                cpu_rp2a03.nes_mem.mem_write(0xff, 0x77);
+            Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0x00FF, 0x77);
             },
-            Event::KeyDown { keycode: Some(Keycode::S), .. } => {
-                cpu_rp2a03.nes_mem.mem_write(0xff, 0x73);
+            Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0x00FF, 0x73);
             },
-            Event::KeyDown { keycode: Some(Keycode::A), .. } => {
-                cpu_rp2a03.nes_mem.mem_write(0xff, 0x61);
+            Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0x00FF, 0x61);
             },
-            Event::KeyDown { keycode: Some(Keycode::D), .. } => {
-                cpu_rp2a03.nes_mem.mem_write(0xff, 0x64);
+            Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
+                cpu_rp2a03.nes_mem.mem_write(0x00FF, 0x64);
             },
             _ => {/* do nothing */}
         }
     }
 }
-
 
 fn app_init()
 {
@@ -91,7 +87,7 @@ fn main()
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("Snake game", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
+        .window("Snake Game", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
         .position_centered()
         .build().unwrap();
 
@@ -116,37 +112,44 @@ fn main()
         loop {
             cpu_main();
             // thread::sleep(Duration::from_nanos(559));
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(6));
         }
     });
 
     // PPU Thred @5.37 MHz(186.4 nsec)
-    // let _ppu_thread = thread::spawn(|| {
-    //     loop {
-    //         ppu_main();
-    //         thread::sleep(Duration::from_nanos(187));
-    //     }
-    // });
+    let _ppu_thread = thread::spawn(|| {
+        loop {
+            ppu_main();
+            // thread::sleep(Duration::from_nanos(187));
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
 
-    // let _apu_thread = thread::spawn(|| {
-    //     loop {
-    //         apu_main();
-    //         thread::sleep(Duration::from_millis(500));
-    //     }
-    // });
+    let _apu_thread = thread::spawn(|| {
+        loop {
+            apu_main();
+            // thread::sleep(Duration::from_nanos(559));
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
 
     // ==================================================================================
     // [Main Loop]
+    let mut rng = rand::thread_rng();
     loop {
         key_pad_polling(&mut cpu_handler, &mut event_pump);
-
+        cpu_handler.nes_mem.mem_write(0x00FE, rng.gen_range(1..16) as u8);
         if read_screen_state(&mut cpu_handler, &mut screen_state) {
             texture.update(None, &screen_state, 32 * 3).unwrap();
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();
         }
+        println!("(DEBUG): $00FE = {:#02X}, $00FF = {:#02X}"
+        ,cpu_handler.nes_mem.mem_read(0x00FE)
+        ,cpu_handler.nes_mem.mem_read(0x00FF));
+
         // thread::sleep(Duration::from_nanos(559));
-        thread::sleep(Duration::from_millis(1));
+        thread::sleep(Duration::from_millis(2));
     }
     // ==================================================================================
 }

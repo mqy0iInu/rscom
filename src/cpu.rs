@@ -17,6 +17,9 @@ pub const ADDR_VEC_TBL_RST: u16 = 0xFFFC;  // RESET Vector Table
 pub const ADDR_VEC_TBL_NMI: u16 = 0xFFFA;  // NMI Vector Table
 pub const ADDR_VEC_TBL_IRQ: u16 = 0xFFFE;  // IRQ Vector Table
 
+pub const OVF_ADD: bool = false;
+pub const OVF_SUB: bool = true;
+
 #[derive(Clone)]
 enum InterruptType {
     RST,
@@ -180,6 +183,22 @@ impl RP2A03{
         }
         ret = ret.wrapping_shr(1);
         ret as u8
+    }
+
+    fn v_flg_update(&mut self, val_a: u8, val_b: u8, is_subtraction: bool) {
+        let sign_a = (val_a & BIN_BIT_7) != 0;
+        let sign_b = (val_b & BIN_BIT_7) != 0;
+        let result = if is_subtraction {
+            val_a.wrapping_sub(val_b)
+        } else {
+            val_a.wrapping_add(val_b)
+        };
+        let sign_result = (result & BIN_BIT_7) != 0;
+        if (sign_a == sign_b) && (sign_a != sign_result) {
+            self.set_status_flg(OVERFLOW_FLG);
+        } else {
+            self.cls_status_flg(OVERFLOW_FLG);
+        }
     }
 
     fn reset(&mut self){
@@ -470,6 +489,7 @@ impl RP2A03{
                     _ret = self.c_flg_update_add(self.reg_a, _val.wrapping_add(carry));
                     self.reg_a = _ret;
                     self.nz_flg_update(_ret);
+                    self.v_flg_update(self.reg_a, _val.wrapping_add(carry), OVF_ADD);
                 }
             }
             OpCode::SBC => {
@@ -485,6 +505,7 @@ impl RP2A03{
                     _ret = self.nz_flg_update_sub(self.reg_a, _val.wrapping_sub(carry));
                     self.reg_a = _ret;
                     self.nz_flg_update(_ret);
+                    self.v_flg_update(self.reg_a, _val.wrapping_add(carry), OVF_SUB);
                 }
             }
             OpCode::CMP => {
