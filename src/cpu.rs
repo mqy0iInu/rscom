@@ -126,12 +126,14 @@ impl RP2A03{
     fn nz_flg_update(&mut self, val: u8) {
         if val == 0{
             self.set_status_flg(ZERO_FLG);
-            self.cls_status_flg(NEGATIVE_FLG);
+        }else{
+            self.cls_status_flg(ZERO_FLG);
         }
 
         if (val & BIN_BIT_7) != 0 {
             self.set_status_flg(NEGATIVE_FLG);
-            self.cls_status_flg(ZERO_FLG);
+        }else{
+            self.cls_status_flg(NEGATIVE_FLG);
         }
     }
 
@@ -150,11 +152,9 @@ impl RP2A03{
         let ret: i8 = (val_a as i8).wrapping_sub(val_b as i8) as i8;
         if (val_a == val_b) || (ret == 0x00) {
             self.set_status_flg(ZERO_FLG);
-            self.cls_status_flg(NEGATIVE_FLG);
             0
         } else if (val_a < val_b) || (ret < 0) {
             self.set_status_flg(NEGATIVE_FLG);
-            self.cls_status_flg(ZERO_FLG);
             ret as u8
         } else{
             ret as u8
@@ -199,6 +199,17 @@ impl RP2A03{
         } else {
             self.cls_status_flg(OVERFLOW_FLG);
         }
+    }
+
+    fn cnz_cmp(&mut self, reg: u8, val: u8,)
+    {
+        if reg >= val {
+            self.set_status_flg(CARRY_FLG);
+        }else{
+            self.cls_status_flg(CARRY_FLG);
+        }
+        let sub = reg.wrapping_sub(val);
+        self.nz_flg_update(sub);
     }
 
     fn reset(&mut self){
@@ -515,71 +526,35 @@ impl RP2A03{
             OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP {}",dbg_str));
                 let mut _ret: u8 = 0;
-                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
-                    _sub = self.nz_flg_update_sub(self.reg_a, _ret);
-
-                    if self.reg_a > _ret {
-                        self.set_status_flg(CARRY_FLG);
-                    }
-                    if self.reg_a == _ret {
-                        self.set_status_flg(CARRY_FLG);
-                        self.set_status_flg(ZERO_FLG);
-                    }
-                    if (_sub & BIN_BIT_7) != 0 {
-                        self.set_status_flg(NEGATIVE_FLG);
-                    }
                 }
+                self.cnz_cmp(self.reg_a, _ret);
             }
             OpCode::CPX => {
                 println!("{}",format!("[DEBUG]: CPX {}",dbg_str));
                 let mut _ret: u8 = 0;
-                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
-                    _sub = self.nz_flg_update_sub(self.reg_x, _ret);
-
-                    if self.reg_x > _ret {
-                        self.set_status_flg(CARRY_FLG);
-                    }
-                    if self.reg_x == _ret {
-                        self.set_status_flg(CARRY_FLG);
-                        self.set_status_flg(ZERO_FLG);
-                    }
-                    if (_sub & BIN_BIT_7) != 0 {
-                        self.set_status_flg(NEGATIVE_FLG);
-                    }
                 }
+                self.cnz_cmp(self.reg_x, _ret);
             }
             OpCode::CPY => {
                 println!("{}",format!("[DEBUG]: CPY {}",dbg_str));
                 let mut _ret: u8 = 0;
-                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
-                    _sub = self.nz_flg_update_sub(self.reg_y, _ret);
-
-                    if self.reg_y > _ret {
-                        self.set_status_flg(CARRY_FLG);
-                    }
-                    if self.reg_y == _ret {
-                        self.set_status_flg(CARRY_FLG);
-                        self.set_status_flg(ZERO_FLG);
-                    }
-                    if (_sub & BIN_BIT_7) != 0 {
-                        self.set_status_flg(NEGATIVE_FLG);
-                    }
                 }
+                self.cnz_cmp(self.reg_y, _ret);
             }
             OpCode::INC => {
                 println!("{}",format!("[DEBUG]: INC {}",dbg_str));
