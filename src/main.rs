@@ -112,7 +112,7 @@ fn main()
         loop {
             cpu_main();
             thread::sleep(Duration::from_nanos(559));
-            // thread::sleep(Duration::from_millis(3));
+            // thread::sleep(Duration::from_millis(100));
         }
     });
 
@@ -150,7 +150,7 @@ fn main()
         // ,cpu_handler.nes_mem.mem_read(0x00FF));
 
         thread::sleep(Duration::from_nanos(187));
-        // thread::sleep(Duration::from_millis(1));
+        // thread::sleep(Duration::from_millis(30));
     }
     // ==================================================================================
 }

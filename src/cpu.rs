@@ -437,40 +437,40 @@ impl RP2A03{
             // // Logical Operations / 論理演算命令
             OpCode::AND => {
                 println!("{}", format!("[DEBUG]: AND ${}", dbg_str));
-                let mut val = 0;
+                let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                let result = self.reg_a & val;
+                let result: u8 = self.reg_a & val;
                 self.reg_a = result;
                 self.nz_flg_update(result);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA ${}", dbg_str));
-                let mut val = 0;
+                let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                let result = self.reg_a | val;
+                let result: u8 = self.reg_a | val;
                 self.reg_a = result as u8;
                 self.nz_flg_update(result);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR ${}", dbg_str));
-                let mut val = 0;
+                let mut val: u8 = 0;
                 if let Some(value) = operand {
                     val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
                         val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
                     }
                 }
-                let result = self.reg_a ^ val;
+                let result: u8 = self.reg_a ^ val;
                 self.reg_a = result as u8;
                 self.nz_flg_update(result);
             }
@@ -486,10 +486,12 @@ impl RP2A03{
                     if let Some(value2) = operand_second {
                         _val = self.read((value2 as u16) << 8 | value as u16);
                     }
-                    _ret = self.c_flg_update_add(self.reg_a, _val.wrapping_add(carry));
+                    _ret = self.c_flg_update_add(self.reg_a, _val);
+                    self.v_flg_update(self.reg_a, _val, OVF_ADD);
+                    _ret = self.c_flg_update_add(_ret, carry);
+                    self.v_flg_update(_ret, carry, OVF_ADD);
                     self.reg_a = _ret;
-                    self.nz_flg_update(_ret);
-                    self.v_flg_update(self.reg_a, _val.wrapping_add(carry), OVF_ADD);
+                    self.nz_flg_update(self.reg_a);
                 }
             }
             OpCode::SBC => {
@@ -502,20 +504,24 @@ impl RP2A03{
                     if let Some(value2) = operand_second {
                         _val = self.read((value2 as u16) << 8 | value as u16);
                     }
-                    _ret = self.nz_flg_update_sub(self.reg_a, _val.wrapping_sub(carry));
+                    _ret = self.nz_flg_update_sub(self.reg_a, _val);
+                    self.v_flg_update(self.reg_a, _val, OVF_SUB);
+                    _ret = self.nz_flg_update_sub(_ret, carry);
+                    self.v_flg_update(_ret, carry, OVF_SUB);
                     self.reg_a = _ret;
-                    self.nz_flg_update(_ret);
-                    self.v_flg_update(self.reg_a, _val.wrapping_add(carry), OVF_SUB);
+                    self.nz_flg_update(self.reg_a);
                 }
             }
             OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP ${}",dbg_str));
                 let mut _ret: u8 = 0;
+                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
+                    _sub = self.nz_flg_update_sub(self.reg_a, _ret);
 
                     if self.reg_a > _ret {
                         self.set_status_flg(CARRY_FLG);
@@ -524,9 +530,7 @@ impl RP2A03{
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_a < _ret {
-                    }
-                    if (_ret & BIN_BIT_7) != 0 {
+                    if (_sub & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
@@ -534,11 +538,13 @@ impl RP2A03{
             OpCode::CPX => {
                 println!("{}",format!("[DEBUG]: CPX ${}",dbg_str));
                 let mut _ret: u8 = 0;
+                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
+                    _sub = self.nz_flg_update_sub(self.reg_x, _ret);
 
                     if self.reg_x > _ret {
                         self.set_status_flg(CARRY_FLG);
@@ -547,9 +553,7 @@ impl RP2A03{
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_x < _ret {
-                    }
-                    if (_ret & BIN_BIT_7) != 0 {
+                    if (_sub & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
@@ -557,11 +561,13 @@ impl RP2A03{
             OpCode::CPY => {
                 println!("{}",format!("[DEBUG]: CPY ${}",dbg_str));
                 let mut _ret: u8 = 0;
+                let mut _sub = 0;
                 if let Some(val) = operand {
                     _ret = self.read_operand_mem(val as u16);
                     if let Some(val2) = operand_second {
                         _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
                     }
+                    _sub = self.nz_flg_update_sub(self.reg_y, _ret);
 
                     if self.reg_y > _ret {
                         self.set_status_flg(CARRY_FLG);
@@ -570,9 +576,7 @@ impl RP2A03{
                         self.set_status_flg(CARRY_FLG);
                         self.set_status_flg(ZERO_FLG);
                     }
-                    if self.reg_y < _ret {
-                    }
-                    if (_ret & BIN_BIT_7) != 0 {
+                    if (_sub & BIN_BIT_7) != 0 {
                         self.set_status_flg(NEGATIVE_FLG);
                     }
                 }
