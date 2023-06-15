@@ -497,7 +497,6 @@ impl RP2A03{
                         _val = self.read((value2 as u16) << 8 | value as u16);
                     }
                     _ret = self.c_flg_update_add(self.reg_a, _val);
-                    self.v_flg_update(self.reg_a, _val, OVF_ADD);
                     _ret = self.c_flg_update_add(_ret, carry);
                     self.v_flg_update(_ret, carry, OVF_ADD);
                     self.reg_a = _ret;
@@ -515,7 +514,6 @@ impl RP2A03{
                         _val = self.read((value2 as u16) << 8 | value as u16);
                     }
                     _ret = self.nz_flg_update_sub(self.reg_a, _val);
-                    self.v_flg_update(self.reg_a, _val, OVF_SUB);
                     _ret = self.nz_flg_update_sub(_ret, carry);
                     self.v_flg_update(_ret, carry, OVF_SUB);
                     self.reg_a = _ret;
@@ -585,14 +583,13 @@ impl RP2A03{
             OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
                 let mut _addr: u16 = 0;
-                let mut _ret: u8 = 0;
                 if let Some(val) = operand {
                     _addr = val as u16;
                     if let Some(val2) = operand_second {
                         _addr = ((val2 as u16) << 8) | val as u16;
                     }
                     let mem = self.read(_addr);
-                    _ret = self.nz_flg_update_sub(mem, 0x01);
+                    let mut _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
                     self.write(_addr, _ret);
                 }
             }

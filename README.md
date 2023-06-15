@@ -62,14 +62,15 @@ https://github.com/suzukiplan/mgp-fc
 
 ## NES Reference🎓📘📖
 [MMU & Mapper]  
-http://pasofami.game.coocan.jp/FamTitleList.htm  
-
+https://www.nesdev.org/wiki/Mapper
+http://pasofami.game.coocan.jp/nesalltitlelst.htm  
+  
 [Emu]
 https://bugzmanov.github.io/nes_ebook/index.html  
-
+  
 [iNES]
-https://www.nesdev.org/wiki/INES
-
+https://www.nesdev.org/wiki/INES  
+  
 ## Rust Reference🎓📘📖
 https://doc.rust-jp.rs/book-ja/  
 https://doc.rust-jp.rs/  
