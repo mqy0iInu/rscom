@@ -156,6 +156,8 @@ impl RP2A03{
             self.set_status_flg(NEGATIVE_FLG);
             ret as u8
         } else{
+            self.cls_status_flg(ZERO_FLG);
+            self.cls_status_flg(NEGATIVE_FLG);
             ret as u8
         }
     }
@@ -492,9 +494,9 @@ impl RP2A03{
                 let mut _val: u8 = 0;
                 let carry: u8 = self.reg_p & CARRY_FLG;
                 if let Some(value) = operand {
-                    _val = self.read(value as u16);
+                    _val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        _val = self.read((value2 as u16) << 8 | value as u16);
+                        _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
                     }
                     _ret = self.c_flg_update_add(self.reg_a, _val);
                     _ret = self.c_flg_update_add(_ret, carry);
@@ -509,15 +511,15 @@ impl RP2A03{
                 let mut _val: u8 = 0;
                 let carry: u8 = !(self.reg_p & CARRY_FLG);
                 if let Some(value) = operand {
-                    _val = self.read(value as u16);
+                    _val = self.read_operand_mem(value as u16);
                     if let Some(value2) = operand_second {
-                        _val = self.read((value2 as u16) << 8 | value as u16);
+                        _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
                     }
                     _ret = self.nz_flg_update_sub(self.reg_a, _val);
                     _ret = self.nz_flg_update_sub(_ret, carry);
                     self.v_flg_update(_ret, carry, OVF_SUB);
                     self.reg_a = _ret;
-                    self.nz_flg_update(self.reg_a);
+                    // self.nz_flg_update(self.reg_a);
                 }
             }
             OpCode::CMP => {
@@ -562,7 +564,7 @@ impl RP2A03{
                     if let Some(val2) = operand_second {
                         _addr = ((val2 as u16) << 8) | val as u16;
                     }
-                    _ret = self.read(_addr);
+                    _ret = self.read_operand_mem(_addr);
                     _ret = _ret.wrapping_add(1);
                     self.nz_flg_update(_ret as u8);
                     self.write(_addr, _ret);
@@ -588,7 +590,7 @@ impl RP2A03{
                     if let Some(val2) = operand_second {
                         _addr = ((val2 as u16) << 8) | val as u16;
                     }
-                    let mem = self.read(_addr);
+                    let mem = self.read_operand_mem(_addr);
                     let mut _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
                     self.write(_addr, _ret);
                 }
@@ -616,9 +618,9 @@ impl RP2A03{
                     },
                     _ => {
                         if let Some(val1) = operand {
-                            val =  self.read(val as u16);
+                            val =  self.read_operand_mem(val as u16);
                             if let Some(val2) = operand_second {
-                                val = self.read((val2 as u16) << 8 | val1 as u16);
+                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
                             }
                             let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
@@ -641,9 +643,9 @@ impl RP2A03{
                     },
                     _ => {
                         if let Some(val1) = operand {
-                            val =  self.read(val as u16);
+                            val =  self.read_operand_mem(val as u16);
                             if let Some(val2) = operand_second {
-                                val = self.read((val2 as u16) << 8 | val1 as u16);
+                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
                             }
                             let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
@@ -665,9 +667,9 @@ impl RP2A03{
                     },
                     _ => {
                         if let Some(val1) = operand {
-                            val =  self.read(val as u16);
+                            val =  self.read_operand_mem(val as u16);
                             if let Some(val2) = operand_second {
-                                val = self.read((val2 as u16) << 8 | val1 as u16);
+                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
                             }
                             let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         }
@@ -690,9 +692,9 @@ impl RP2A03{
                     },
                     _ => {
                         if let Some(val1) = operand {
-                            val =  self.read(val as u16);
+                            val =  self.read_operand_mem(val as u16);
                             if let Some(val2) = operand_second {
-                                val = self.read((val2 as u16) << 8 | val1 as u16);
+                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
                             }
                             let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         }
@@ -997,7 +999,7 @@ impl RP2A03{
             }
             OpCode::JSR => {
                 println!("{}",format!("[DEBUG]: JSR {}",dbg_str));
-                let mut jump_addr: u16 = 0x00;
+                let mut _jump_addr: u16 = 0x00;
                 let return_addr: u16 = self.reg_pc;
                 // let return_addr: u16 = self.reg_pc + 1;
                 self.push_stack((return_addr & 0x00FF) as u8);
@@ -1005,8 +1007,8 @@ impl RP2A03{
 
                 if let Some(val) = operand {
                     if let Some(val2) = operand_second {
-                        jump_addr = (val2 as u16) << 8 | val as u16;
-                        self.reg_pc = jump_addr;
+                        _jump_addr = (val2 as u16) << 8 | val as u16;
+                        self.reg_pc = _jump_addr;
                         jmp_flg = true;
                     }
                 }
@@ -1052,7 +1054,8 @@ impl RP2A03{
             // Other
             OpCode::STP | _ => {
                 // TODO STPと未定義命令をどうするか
-                println!("[DEBUG]: Undefined Instruction!");
+                // println!("[DEBUG]: Undefined Instruction!");
+                panic!("[ERR]: Undefined Instruction!");
             }
         }
 
@@ -1088,6 +1091,9 @@ impl RP2A03{
                 (Some(self.read(self.reg_pc)),
                 None,
                 format!("#{:02X} (IMM)",oprand))
+            }
+            Addressing::IMPL => { // Implied Addressing
+                (None, None,format!("(IMPL)"))
             }
             Addressing::ZPG => {
                 (Some(self.read(self.reg_pc)),
@@ -1170,10 +1176,6 @@ impl RP2A03{
                 Some(addr_u as u8),
                 format!("${:04X} (REL)(Offset: #{:02X}({}))", addr, s_offset, s_offset))
             }
-            Addressing::IMPL => { // Implied Addressing
-                // Not, Have Operand
-                (None, None,format!("(IMPL)"))
-            }
         }
     }
 
@@ -1186,18 +1188,16 @@ impl RP2A03{
             Addressing::IMM => {
                 addr as u8
             },
-            Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
-            Addressing::ABS | Addressing::AbsX |
-            Addressing::IND | Addressing::IndX | Addressing::IndY  => {
-                self.read(addr)
-            },
             Addressing::AbsY => {
                 let _addr: u16 = addr.wrapping_add(self.reg_y as u16) as u16;
                 self.read(_addr)
-            }
+            },
+            Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
+            Addressing::ABS | Addressing::AbsX |
+            Addressing::IND | Addressing::IndX | Addressing::IndY |
             _ => {
-                0
-            }
+                self.read(addr)
+            },
         }
     }
 }
@@ -1205,7 +1205,7 @@ impl RP2A03{
 fn cpu_reg_show()
 {
     unsafe {
-        let mut cpu = Pin::into_inner_unchecked(Pin::clone(&*S_CPU));
+        let cpu = Pin::into_inner_unchecked(Pin::clone(&*S_CPU));
         println!("[DEBUG]: A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",
         cpu.reg_a,
         cpu.reg_x,
