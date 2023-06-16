@@ -137,16 +137,6 @@ impl RP2A03{
         }
     }
 
-    fn c_flg_update_add(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: u16 = (val_a as u16).wrapping_add(val_b as u16) as u16;
-        if (ret & (BIN_BIT_7 as u16)) != 0 {
-            self.set_status_flg(CARRY_FLG);
-        }else{
-            self.cls_status_flg(CARRY_FLG);
-        }
-        (ret & 0x00FF) as u8
-    }
-
     fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
         let ret: i8 = (val_a as i8).wrapping_sub(val_b as i8) as i8;
         if (val_a == val_b) || (ret == 0x00) {
@@ -209,7 +199,7 @@ impl RP2A03{
         }else{
             self.cls_status_flg(CARRY_FLG);
         }
-        let sub = reg.wrapping_sub(val);
+        let sub: u8 = reg.wrapping_sub(val);
         self.nz_flg_update(sub);
     }
 
@@ -458,7 +448,7 @@ impl RP2A03{
                 }
                 let result: u8 = self.reg_a & val;
                 self.reg_a = result;
-                self.nz_flg_update(result);
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA {}", dbg_str));
@@ -471,7 +461,7 @@ impl RP2A03{
                 }
                 let result: u8 = self.reg_a | val;
                 self.reg_a = result as u8;
-                self.nz_flg_update(result);
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR {}", dbg_str));
@@ -484,13 +474,12 @@ impl RP2A03{
                 }
                 let result: u8 = self.reg_a ^ val;
                 self.reg_a = result as u8;
-                self.nz_flg_update(result);
+                self.nz_flg_update(self.reg_a);
             }
 
             // Arithmetic Operations / 算術倫理演算
             OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
-                let mut _ret: u8 = 0;
                 let mut _val: u8 = 0;
                 let carry: u8 = self.reg_p & CARRY_FLG;
                 if let Some(value) = operand {
@@ -498,11 +487,19 @@ impl RP2A03{
                     if let Some(value2) = operand_second {
                         _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
                     }
-                    _ret = self.c_flg_update_add(self.reg_a, _val);
-                    _ret = self.c_flg_update_add(_ret, carry);
-                    self.v_flg_update(_ret, carry, OVF_ADD);
+                    let mut _ret: u8 = self.reg_a;
+                    _ret = _ret.wrapping_add(carry);
+                    self.v_flg_update(_ret, _val, OVF_ADD);
+                    _ret = _ret.wrapping_add(_val);
                     self.reg_a = _ret;
                     self.nz_flg_update(self.reg_a);
+                    if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                    {
+                        // Set if overflow in bit 7
+                        self.set_status_flg(CARRY_FLG);
+                    }else{
+                        self.cls_status_flg(CARRY_FLG);
+                    }
                 }
             }
             OpCode::SBC => {
@@ -515,11 +512,19 @@ impl RP2A03{
                     if let Some(value2) = operand_second {
                         _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
                     }
-                    _ret = self.nz_flg_update_sub(self.reg_a, _val);
-                    _ret = self.nz_flg_update_sub(_ret, carry);
-                    self.v_flg_update(_ret, carry, OVF_SUB);
+                    let mut _ret: u8 = self.reg_a;
+                    _ret = _ret.wrapping_sub(carry);
+                    self.v_flg_update(_ret, _val, OVF_SUB);
+                    _ret = _ret.wrapping_sub(_val);
                     self.reg_a = _ret;
-                    // self.nz_flg_update(self.reg_a);
+                    self.nz_flg_update(self.reg_a);
+                    if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                    {
+                        // Clear if overflow in bit 7
+                        self.cls_status_flg(CARRY_FLG);
+                    }else{
+                        self.set_status_flg(CARRY_FLG);
+                    }
                 }
             }
             OpCode::CMP => {
@@ -1098,7 +1103,7 @@ impl RP2A03{
             Addressing::ZPG => {
                 (Some(self.read(self.reg_pc)),
                 Some(0),
-                format!("${:#02X} (ZPG)",oprand))
+                format!("${:02X},X (ZPG: ZeroPage = ${:02X})",oprand, (self.reg_pc & 0x00FF) as u8))
             }
             Addressing::ZpgX => {
                 let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_x as u16;
