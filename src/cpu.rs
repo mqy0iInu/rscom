@@ -138,17 +138,17 @@ impl RP2A03{
     }
 
     fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: i8 = (val_a as i8).wrapping_sub(val_b as i8) as i8;
-        if (val_a == val_b) || (ret == 0x00) {
+        let ret: u8 = val_a.wrapping_sub(val_b);
+        if (val_a == val_b) || (ret == 0) {
             self.set_status_flg(ZERO_FLG);
             0
-        } else if ret < 0 {
+        } else if (ret & BIN_BIT_7) != 0  {
             self.set_status_flg(NEGATIVE_FLG);
-            ret as u8
+            ret
         } else{
             self.cls_status_flg(ZERO_FLG);
             self.cls_status_flg(NEGATIVE_FLG);
-            ret as u8
+            ret
         }
     }
 
@@ -567,7 +567,7 @@ impl RP2A03{
                 if let Some(val) = operand {
                     _addr = val as u16;
                     if let Some(val2) = operand_second {
-                        _addr = ((val2 as u16) << 8) | val as u16;
+                        _addr = (((val2 as u16) << 8) | val as u16) as u16;
                     }
                     _ret = self.read_operand_mem(_addr);
                     _ret = _ret.wrapping_add(1);
@@ -577,15 +577,13 @@ impl RP2A03{
             }
             OpCode::INX => {
                 println!("{}",format!("[DEBUG]: INX {}",dbg_str));
-                let ret: u8 = self.reg_x.wrapping_add(1);
-                self.reg_x = ret;
-                self.nz_flg_update(ret);
+                self.reg_x = self.reg_x.wrapping_add(1);
+                self.nz_flg_update(self.reg_x );
             }
             OpCode::INY => {
                 println!("{}",format!("[DEBUG]: INY {}",dbg_str));
-                let ret: u8 = self.reg_y.wrapping_add(1);
-                self.reg_y = ret;
-                self.nz_flg_update(ret);
+                self.reg_y = self.reg_y.wrapping_add(1);
+                self.nz_flg_update(self.reg_y );
             }
             OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
