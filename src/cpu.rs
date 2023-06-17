@@ -178,22 +178,6 @@ impl RP2A03{
         ret
     }
 
-    fn v_flg_update(&mut self, val_a: u8, val_b: u8, is_subtraction: bool) {
-        let sign_a = (val_a & BIN_BIT_7) != 0;
-        let sign_b = (val_b & BIN_BIT_7) != 0;
-        let result = if is_subtraction {
-            val_a.wrapping_sub(val_b)
-        } else {
-            val_a.wrapping_add(val_b)
-        };
-        let sign_result = (result & BIN_BIT_7) != 0;
-        if (sign_a == sign_b) && (sign_a != sign_result) {
-            self.set_status_flg(OVERFLOW_FLG);
-        } else {
-            self.cls_status_flg(OVERFLOW_FLG);
-        }
-    }
-
     fn cnz_cmp(&mut self, reg: u8, val: u8,)
     {
         if reg >= val {
@@ -505,36 +489,47 @@ impl RP2A03{
             OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
                 let mut _val: u8 = self.operand_val(operand,operand_second);
-                let carry: u8 = (self.reg_p & CARRY_FLG) & 0x01;
-                let mut _ret: u8 = self.reg_a.wrapping_add(carry);
-                self.v_flg_update(_ret, _val, OVF_ADD);
-                _ret = _ret.wrapping_add(_val);
-                self.reg_a = _ret;
-                self.nz_flg_update(self.reg_a);
-                if (self.reg_p & OVERFLOW_FLG) != 0
-                {
-                    // Set if overflow in bit 7
+                let carry: u8 = self.reg_p & CARRY_FLG;
+                let (mut _ret1, _ovf1) = self.reg_a.overflowing_add(carry);
+                let (mut _ret2, _ovf2) = _ret1.overflowing_add(_val);
+                self.reg_a = _ret2;
+
+                if _ovf1 || _ovf2 {
                     self.set_status_flg(CARRY_FLG);
                 }else{
                     self.cls_status_flg(CARRY_FLG);
                 }
+
+                if (((self.reg_a ^ _ret2) & 0x80) != 0) && (((self.reg_a ^ _ret2) & 0x80) != 0){
+                    self.set_status_flg(OVERFLOW_FLG);
+                }else{
+                    self.cls_status_flg(OVERFLOW_FLG);
+                }
+
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::SBC => {
                 println!("{}",format!("[DEBUG]: SBC {}",dbg_str));
                 let mut _val: u8 = self.operand_val(operand,operand_second);
                 let carry: u8 = !(self.reg_p & CARRY_FLG) & 0x01;
-                let mut _ret: u8 = self.reg_a.wrapping_sub(carry);
-                self.v_flg_update(_ret, _val, OVF_SUB);
-                _ret = _ret.wrapping_sub(_val);
-                self.reg_a = _ret;
-                self.nz_flg_update(self.reg_a);
-                if (self.reg_p & OVERFLOW_FLG) != 0
-                {
-                    // Clear if overflow in bit 7
-                    self.cls_status_flg(CARRY_FLG);
-                }else{
+                let (mut _ret1, _ovf1) = self.reg_a.overflowing_sub(carry);
+                let (mut _ret2, _ovf2) = _ret1.overflowing_sub(_val);
+                self.reg_a = _ret2;
+
+                if !(_ovf1 || _ovf2) {
                     self.set_status_flg(CARRY_FLG);
+                }else{
+                    self.cls_status_flg(CARRY_FLG);
                 }
+
+                if (((self.reg_a ^ _val) & 0x80) != 0) && (((self.reg_a ^ _ret2) & 0x80) != 0)
+                {
+                    self.set_status_flg(OVERFLOW_FLG);
+                }else{
+                    self.cls_status_flg(OVERFLOW_FLG);
+                }
+
+                self.nz_flg_update(self.reg_a);
             }
             OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP {}",dbg_str));
@@ -934,7 +929,7 @@ impl RP2A03{
             Addressing::IMM => {
                 (Some(self.read(self.reg_pc)),
                 None,
-                format!("#{:02X} (IMM)",oprand))
+                format!("#${:02X} (IMM)",oprand))
             }
             Addressing::IMPL => { // Implied Addressing
                 (None, None,format!("(IMPL)"))
@@ -942,7 +937,7 @@ impl RP2A03{
             Addressing::ZPG => {
                 (Some(self.read(self.reg_pc)),
                 Some(0),
-                format!("${:02X},X (ZPG: ZPG = ${:02X}, Val = #{:02X})",oprand, oprand, self.read(oprand as u16)))
+                format!("${:02X} (ZPG: ZPG = ${:02X}, Val = #{:02X})",oprand, oprand, self.read(oprand as u16)))
             }
             Addressing::ZpgX => {
                 let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_x);
@@ -954,7 +949,7 @@ impl RP2A03{
                 let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_y);
                 (Some(addr_l),
                 Some(0),
-                format!("${:02X},X (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
+                format!("${:02X},Y (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
             }
             Addressing::ABS => {
                 let addr_l:u8 = self.read(self.reg_pc);
@@ -963,7 +958,7 @@ impl RP2A03{
                 let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
                 (Some(addr_l),
                 Some(addr_u),
-                format!("${:02X} ${:02X} (ABS: Addr = ${:04X}, Val = #{:02X})",addr_l, addr_u, _addr, self.read(_addr)))
+                format!("${:04X} (ABS: Addr = ${:04X}, Val = #{:02X})",_addr, _addr, self.read(_addr)))
             }
             Addressing::AbsX => {
                 let mut addr_l: u8 = self.read(self.reg_pc);
