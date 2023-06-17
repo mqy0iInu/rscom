@@ -139,10 +139,10 @@ impl RP2A03{
 
     fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
         let ret: u8 = val_a.wrapping_sub(val_b);
-        if (val_a == val_b) || (ret == 0) {
+        if val_a == val_b {
             self.set_status_flg(ZERO_FLG);
             0
-        } else if (ret & BIN_BIT_7) != 0  {
+        } else if (ret & BIN_BIT_7) != 0 {
             self.set_status_flg(NEGATIVE_FLG);
             ret
         } else{
@@ -245,6 +245,18 @@ impl RP2A03{
     fn write(&mut self, address: u16, data: u8)
     {
         self.nes_mem.mem_write(address, data);
+    }
+
+    fn push_stack(&mut self, data: u8) {
+        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
+        self.write(address, data);
+        self.reg_sp -= 1;
+    }
+
+    fn pop_stack(&mut self) -> u8 {
+        self.reg_sp += 1;
+        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
+        self.read(address)
     }
 
     fn fetch_instruction(&mut self) -> u8 {
@@ -439,40 +451,19 @@ impl RP2A03{
             // // Logical Operations / 論理演算命令
             OpCode::AND => {
                 println!("{}", format!("[DEBUG]: AND {}", dbg_str));
-                let mut val: u8 = 0;
-                if let Some(value) = operand {
-                    val = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
-                    }
-                }
-                let result: u8 = self.reg_a & val;
+                let result: u8 = self.reg_a & self.operand_val(operand,operand_second);
                 self.reg_a = result;
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA {}", dbg_str));
-                let mut val: u8 = 0;
-                if let Some(value) = operand {
-                    val = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
-                    }
-                }
-                let result: u8 = self.reg_a | val;
+                let result: u8 = self.reg_a | self.operand_val(operand,operand_second);
                 self.reg_a = result as u8;
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR {}", dbg_str));
-                let mut val: u8 = 0;
-                if let Some(value) = operand {
-                    val = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        val = self.read_operand_mem(((value2 as u16) << 8) | value as u16);
-                    }
-                }
-                let result: u8 = self.reg_a ^ val;
+                let result: u8 = self.reg_a ^ self.operand_val(operand,operand_second);
                 self.reg_a = result as u8;
                 self.nz_flg_update(self.reg_a);
             }
@@ -480,84 +471,54 @@ impl RP2A03{
             // Arithmetic Operations / 算術倫理演算
             OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
-                let mut _val: u8 = 0;
+                let mut _val: u8 = self.operand_val(operand,operand_second);
                 let carry: u8 = self.reg_p & CARRY_FLG;
-                if let Some(value) = operand {
-                    _val = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
-                    }
-                    let mut _ret: u8 = self.reg_a;
-                    _ret = _ret.wrapping_add(carry);
-                    self.v_flg_update(_ret, _val, OVF_ADD);
-                    _ret = _ret.wrapping_add(_val);
-                    self.reg_a = _ret;
-                    self.nz_flg_update(self.reg_a);
-                    if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
-                    {
-                        // Set if overflow in bit 7
-                        self.set_status_flg(CARRY_FLG);
-                    }else{
-                        self.cls_status_flg(CARRY_FLG);
-                    }
+                let mut _ret: u8 = self.reg_a;
+                _ret = _ret.wrapping_add(carry);
+                self.v_flg_update(_ret, _val, OVF_ADD);
+                _ret = _ret.wrapping_add(_val);
+                self.reg_a = _ret;
+                self.nz_flg_update(self.reg_a);
+                if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                {
+                    // Set if overflow in bit 7
+                    self.set_status_flg(CARRY_FLG);
+                }else{
+                    self.cls_status_flg(CARRY_FLG);
                 }
             }
             OpCode::SBC => {
                 println!("{}",format!("[DEBUG]: SBC {}",dbg_str));
                 let mut _ret: u8 = 0;
-                let mut _val: u8 = 0;
+                let mut _val: u8 = self.operand_val(operand,operand_second);
                 let carry: u8 = !(self.reg_p & CARRY_FLG);
-                if let Some(value) = operand {
-                    _val = self.read_operand_mem(value as u16);
-                    if let Some(value2) = operand_second {
-                        _val = self.read_operand_mem((value2 as u16) << 8 | value as u16);
-                    }
-                    let mut _ret: u8 = self.reg_a;
-                    _ret = _ret.wrapping_sub(carry);
-                    self.v_flg_update(_ret, _val, OVF_SUB);
-                    _ret = _ret.wrapping_sub(_val);
-                    self.reg_a = _ret;
-                    self.nz_flg_update(self.reg_a);
-                    if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
-                    {
-                        // Clear if overflow in bit 7
-                        self.cls_status_flg(CARRY_FLG);
-                    }else{
-                        self.set_status_flg(CARRY_FLG);
-                    }
+                let mut _ret: u8 = self.reg_a;
+                _ret = _ret.wrapping_sub(carry);
+                self.v_flg_update(_ret, _val, OVF_SUB);
+                _ret = _ret.wrapping_sub(_val);
+                self.reg_a = _ret;
+                self.nz_flg_update(self.reg_a);
+                if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                {
+                    // Clear if overflow in bit 7
+                    self.cls_status_flg(CARRY_FLG);
+                }else{
+                    self.set_status_flg(CARRY_FLG);
                 }
             }
             OpCode::CMP => {
                 println!("{}",format!("[DEBUG]: CMP {}",dbg_str));
-                let mut _ret: u8 = 0;
-                if let Some(val) = operand {
-                    _ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
+                let mut _ret: u8 = self.operand_val(operand,operand_second);
                 self.cnz_cmp(self.reg_a, _ret);
             }
             OpCode::CPX => {
                 println!("{}",format!("[DEBUG]: CPX {}",dbg_str));
-                let mut _ret: u8 = 0;
-                if let Some(val) = operand {
-                    _ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
+                let mut _ret: u8 = self.operand_val(operand,operand_second);
                 self.cnz_cmp(self.reg_x, _ret);
             }
             OpCode::CPY => {
                 println!("{}",format!("[DEBUG]: CPY {}",dbg_str));
-                let mut _ret: u8 = 0;
-                if let Some(val) = operand {
-                    _ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
+                let mut _ret: u8 = self.operand_val(operand,operand_second);
                 self.cnz_cmp(self.reg_y, _ret);
             }
             OpCode::INC => {
@@ -610,23 +571,16 @@ impl RP2A03{
             // Shift and Rotate Operations
             OpCode::ASL => {
                 println!("{}",format!("[DEBUG]: ASL {}",dbg_str));
-                let mut _ret: u8 = 0;
-                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        _ret = self.c_flg_update_l_shit(self.reg_a);
+                        let mut _ret: u8 = self.c_flg_update_l_shit(self.reg_a);
                         _ret = _ret & 0xFE; // bit0, clear
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(val1) = operand {
-                            val =  self.read_operand_mem(val as u16);
-                            if let Some(val2) = operand_second {
-                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
-                            }
-                            let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
-                        }
+                        let val: u8 =  self.operand_val(operand,operand_second);
+                        let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         _ret = _ret & 0xFE; // bit0, clear
                         self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
@@ -635,23 +589,16 @@ impl RP2A03{
             }
             OpCode::LSR => {
                 println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
-                let mut _ret: u8 = 0;
-                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        _ret = self.c_flg_update_r_shit(self.reg_a);
+                        let mut _ret: u8 = self.c_flg_update_r_shit(self.reg_a);
                         _ret = _ret & 0x7F; // bit7, clear
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(val1) = operand {
-                            val =  self.read_operand_mem(val as u16);
-                            if let Some(val2) = operand_second {
-                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
-                            }
-                            let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
-                        }
+                        let val: u8 =  self.operand_val(operand,operand_second);
+                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         _ret = _ret & 0x7F; // bit7, clear
                         self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
@@ -659,23 +606,16 @@ impl RP2A03{
                 }
             }
             OpCode::ROL => {
-                let mut _ret: u8 = 0;
-                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        _ret = self.c_flg_update_l_shit(self.reg_a);
+                        let mut _ret: u8 = self.c_flg_update_l_shit(self.reg_a);
                         _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(val1) = operand {
-                            val =  self.read_operand_mem(val as u16);
-                            if let Some(val2) = operand_second {
-                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
-                            }
-                            let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
-                        }
+                        let val: u8 =  self.operand_val(operand,operand_second);
+                        let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
                         self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
@@ -684,23 +624,16 @@ impl RP2A03{
             }
             OpCode::ROR => {
                 println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
-                let mut _ret: u8 = 0;
-                let mut val: u8 = 0;
                 match self.addr_mode {
                     Addressing::ACC => {
-                        _ret = self.c_flg_update_r_shit(self.reg_a);
+                        let mut _ret: u8 = self.c_flg_update_r_shit(self.reg_a);
                         _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
                         self.nz_flg_update(_ret);
                         self.reg_a = _ret;
                     },
                     _ => {
-                        if let Some(val1) = operand {
-                            val =  self.read_operand_mem(val as u16);
-                            if let Some(val2) = operand_second {
-                                val = self.read_operand_mem((val2 as u16) << 8 | val1 as u16);
-                            }
-                            let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
-                        }
+                        let val: u8 =  self.operand_val(operand,operand_second);                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
+                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
                         self.nz_flg_update(_ret);
                         self.write(self.reg_pc, _ret);
@@ -711,38 +644,17 @@ impl RP2A03{
             // Load/Store Operations
             OpCode::LDA => {
                 println!("{}",format!("[DEBUG]: LDA {}",dbg_str));
-                let mut ret: u8 = 0;
-                if let Some(val) = operand {
-                    ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
-                self.reg_a = ret;
+                self.reg_a = self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::LDX => {
                 println!("{}",format!("[DEBUG]: LDX {}",dbg_str));
-                let mut ret: u8 = 0;
-                if let Some(val) = operand {
-                    ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
-                self.reg_x = ret;
+                self.reg_x = self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_x);
             }
             OpCode::LDY => {
                 println!("{}",format!("[DEBUG]: LDY {}",dbg_str));
-                let mut ret: u8 = 0;
-                if let Some(val) = operand {
-                    ret = self.read_operand_mem(val as u16);
-                    if let Some(val2) = operand_second {
-                        ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
-                    }
-                }
-                self.reg_y = ret;
+                self.reg_y = self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_y);
             }
             OpCode::STA => {
@@ -1069,18 +981,6 @@ impl RP2A03{
         }
     }
 
-    fn push_stack(&mut self, data: u8) {
-        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
-        self.write(address, data);
-        self.reg_sp -= 1;
-    }
-
-    fn pop_stack(&mut self) -> u8 {
-        self.reg_sp += 1;
-        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
-        self.read(address)
-    }
-
     fn read_operand(&mut self) -> (Option<u8>, Option<u8>, String)
     {
         self.reg_pc += 1;
@@ -1203,6 +1103,19 @@ impl RP2A03{
             },
         }
     }
+
+    fn operand_val(&mut self, operand_1: Option<u8>, operand_2: Option<u8>,) -> u8
+    {
+        let mut _ret: u8 = 0;
+        if let Some(val) = operand_1 {
+            _ret = self.read_operand_mem(val as u16);
+            if let Some(val2) = operand_2 {
+                _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
+            }
+        }
+        _ret
+    }
+
 }
 
 fn cpu_reg_show()
