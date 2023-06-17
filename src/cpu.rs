@@ -546,7 +546,7 @@ impl RP2A03{
             OpCode::INC => {
                 println!("{}",format!("[DEBUG]: INC {}",dbg_str));
                 let _addr: u16 = self.operand_addr(operand,operand_second);
-                let mut _ret: u8 = self.read_operand_mem(_addr);
+                let mut _ret: u8 = self.operand_val(operand,operand_second);
                 _ret = _ret.wrapping_add(1);
                 self.nz_flg_update(_ret as u8);
                 self.write(_addr, _ret);
@@ -564,8 +564,8 @@ impl RP2A03{
             OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
                 let _addr: u16 = self.operand_addr(operand,operand_second);
-                let mem = self.read_operand_mem(_addr);
-                let mut _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
+                let mem: u8 = self.operand_val(operand,operand_second);
+                let _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
                 self.write(_addr, _ret);
             }
             OpCode::DEX => {
@@ -742,25 +742,22 @@ impl RP2A03{
             OpCode::BIT => {
                 println!("{}",format!("[DEBUG]: BIT {}",dbg_str));
                 let _addr: u16 = self.operand_addr(operand,operand_second);
-                let ret: u8 = self.read_operand_mem(_addr);
+                let ret: u8 = self.operand_val(operand,operand_second);
                 let result = self.reg_a & ret;
-
                 if result == 0 {
                     self.set_status_flg(ZERO_FLG);
                 }else{
                     self.cls_status_flg(ZERO_FLG);
                 }
-
-                if (ret & BIN_BIT_7) != 0 {
-                    self.set_status_flg(NEGATIVE_FLG);
-                }else{
-                    self.cls_status_flg(NEGATIVE_FLG);
-                }
-
                 if (ret & BIN_BIT_6) != 0 {
                     self.set_status_flg(OVERFLOW_FLG);
                 }else {
                     self.cls_status_flg(OVERFLOW_FLG);
+                }
+                if (ret & BIN_BIT_7) != 0 {
+                    self.set_status_flg(NEGATIVE_FLG);
+                }else{
+                    self.cls_status_flg(NEGATIVE_FLG);
                 }
             }
             OpCode::CLC => {
