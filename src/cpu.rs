@@ -523,18 +523,11 @@ impl RP2A03{
             }
             OpCode::INC => {
                 println!("{}",format!("[DEBUG]: INC {}",dbg_str));
-                let mut _addr: u16 = 0;
-                let mut _ret: u8 = 0;
-                if let Some(val) = operand {
-                    _addr = val as u16;
-                    if let Some(val2) = operand_second {
-                        _addr = (((val2 as u16) << 8) | val as u16) as u16;
-                    }
-                    _ret = self.read_operand_mem(_addr);
-                    _ret = _ret.wrapping_add(1);
-                    self.nz_flg_update(_ret as u8);
-                    self.write(_addr, _ret);
-                }
+                let _addr: u16 = self.operand_addr(operand,operand_second);
+                let mut _ret: u8 = self.read_operand_mem(_addr);
+                _ret = _ret.wrapping_add(1);
+                self.nz_flg_update(_ret as u8);
+                self.write(_addr, _ret);
             }
             OpCode::INX => {
                 println!("{}",format!("[DEBUG]: INX {}",dbg_str));
@@ -548,16 +541,10 @@ impl RP2A03{
             }
             OpCode::DEC => {
                 println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
-                let mut _addr: u16 = 0;
-                if let Some(val) = operand {
-                    _addr = val as u16;
-                    if let Some(val2) = operand_second {
-                        _addr = ((val2 as u16) << 8) | val as u16;
-                    }
-                    let mem = self.read_operand_mem(_addr);
-                    let mut _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
-                    self.write(_addr, _ret);
-                }
+                let _addr: u16 = self.operand_addr(operand,operand_second);
+                let mem = self.read_operand_mem(_addr);
+                let mut _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
+                self.write(_addr, _ret);
             }
             OpCode::DEX => {
                 println!("{}",format!("[DEBUG]: DEX {}",dbg_str));
@@ -659,35 +646,17 @@ impl RP2A03{
             }
             OpCode::STA => {
                 println!("{}",format!("[DEBUG]: STA {}",dbg_str));
-                let mut addr: u16 = 0;
-                if let Some(val) = operand {
-                    addr = val as u16;
-                    if let Some(val2) = operand_second {
-                        addr = (val2 as u16) << 8 | val as u16;
-                    }
-                }
+                let addr: u16 = self.operand_addr(operand,operand_second);
                 self.write(addr, self.reg_a);
             }
             OpCode::STX => {
                 println!("{}",format!("[DEBUG]: STX {}",dbg_str));
-                let mut addr: u16 = 0;
-                if let Some(val) = operand {
-                    addr = val as u16;
-                    if let Some(val2) = operand_second {
-                        addr = (val2 as u16) << 8 | val as u16;
-                    }
-                }
+                let addr: u16 = self.operand_addr(operand,operand_second);
                 self.write(addr, self.reg_x);
             }
             OpCode::STY => {
                 println!("{}",format!("[DEBUG]: STY {}",dbg_str));
-                let mut addr: u16 = 0;
-                if let Some(val) = operand {
-                    addr = val as u16;
-                    if let Some(val2) = operand_second {
-                        addr = (val2 as u16) << 8 | val as u16;
-                    }
-                }
+                let addr: u16 = self.operand_addr(operand,operand_second);
                 self.write(addr, self.reg_y);
             }
 
@@ -745,33 +714,26 @@ impl RP2A03{
             // Status Flag Operations / ステータスフラグ関連の命令
             OpCode::BIT => {
                 println!("{}",format!("[DEBUG]: BIT {}",dbg_str));
-                let mut _addr: u16 = 0;
-                if let Some(val1) = operand {
-                    _addr = val1 as u16;
-                    if let Some(val2) = operand_second {
-                        _addr = (val2 as u16) << 8 | val1 as u16;
-                    }
+                let _addr: u16 = self.operand_addr(operand,operand_second);
+                let ret: u8 = self.read_operand_mem(_addr);
+                let result = self.reg_a & ret;
 
-                    let ret: u8 = self.read_operand_mem(_addr);
-                    let result = self.reg_a & ret;
+                if result == 0 {
+                    self.set_status_flg(ZERO_FLG);
+                }else{
+                    self.cls_status_flg(ZERO_FLG);
+                }
 
-                    if result == 0 {
-                        self.set_status_flg(ZERO_FLG);
-                    }else{
-                        self.cls_status_flg(ZERO_FLG);
-                    }
+                if (ret & BIN_BIT_7) != 0 {
+                    self.set_status_flg(NEGATIVE_FLG);
+                }else{
+                    self.cls_status_flg(NEGATIVE_FLG);
+                }
 
-                    if (ret & BIN_BIT_7) != 0 {
-                        self.set_status_flg(NEGATIVE_FLG);
-                    }else{
-                        self.cls_status_flg(NEGATIVE_FLG);
-                    }
-
-                    if (ret & BIN_BIT_6) != 0 {
-                        self.set_status_flg(OVERFLOW_FLG);
-                    }else {
-                        self.cls_status_flg(OVERFLOW_FLG);
-                    }
+                if (ret & BIN_BIT_6) != 0 {
+                    self.set_status_flg(OVERFLOW_FLG);
+                }else {
+                    self.cls_status_flg(OVERFLOW_FLG);
                 }
             }
             OpCode::CLC => {
@@ -807,126 +769,85 @@ impl RP2A03{
             OpCode::BCC => {
                 println!("{}",format!("[DEBUG]: BCC {}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != true {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BCS => {
                 println!("{}",format!("[DEBUG]: BCS {}",dbg_str));
                 if self.get_status_flg(CARRY_FLG) != false {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BEQ => {
                 println!("{}",format!("[DEBUG]: BEQ {}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != false {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BNE => {
                 println!("{}",format!("[DEBUG]: BNE {}",dbg_str));
                 if self.get_status_flg(ZERO_FLG) != true {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BVC => {
                 println!("{}",format!("[DEBUG]: BVC {}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != true {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BVS => {
                 println!("{}",format!("[DEBUG]: BVS {}",dbg_str));
                 if self.get_status_flg(OVERFLOW_FLG) != false {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BPL => {
                 println!("{}",format!("[DEBUG]: BPL {}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != true {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
             OpCode::BMI => {
                 println!("{}",format!("[DEBUG]: BMI {}",dbg_str));
                 if self.get_status_flg(NEGATIVE_FLG) != false {
-                    if let Some(val1) = operand {
-                        if let Some(val2) = operand_second {
-                            let branch_addr: u16 =(val2 as u16) << 8 | val1 as u16;
-                            self.reg_pc = branch_addr;
-                            jmp_flg = true;
-                        }
-                    }
+                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
+                    self.reg_pc = branch_addr;
+                    jmp_flg = true;
                 }
             }
 
             // Jump and Call Operations
             OpCode::JMP => {
                 println!("{}",format!("[DEBUG]: JMP {}",dbg_str));
-                if let Some(val) = operand {
-                    if let Some(val2) = operand_second {
-                        let jump_addr: u16 = (val2 as u16) << 8 | val as u16;
-                        self.reg_pc = jump_addr;
-                        jmp_flg = true;
-                    }
-                }
+                let jmp_addr: u16 = self.operand_addr(operand,operand_second);
+                self.reg_pc = jmp_addr;
+                jmp_flg = true;
             }
             OpCode::JSR => {
                 println!("{}",format!("[DEBUG]: JSR {}",dbg_str));
-                let mut _jump_addr: u16 = 0x00;
                 let return_addr: u16 = self.reg_pc;
                 // let return_addr: u16 = self.reg_pc + 1;
                 self.push_stack((return_addr & 0x00FF) as u8);
                 self.push_stack(((return_addr & 0xFF00) >> 0x0008) as u8);
 
-                if let Some(val) = operand {
-                    if let Some(val2) = operand_second {
-                        _jump_addr = (val2 as u16) << 8 | val as u16;
-                        self.reg_pc = _jump_addr;
-                        jmp_flg = true;
-                    }
-                }
+                let jmp_addr: u16 = self.operand_addr(operand,operand_second);
+                self.reg_pc = jmp_addr;
+                jmp_flg = true;
             }
             OpCode::RTS => {
                 println!("{}",format!("[DEBUG]: RTS {}",dbg_str));
@@ -1114,6 +1035,18 @@ impl RP2A03{
             }
         }
         _ret
+    }
+
+    fn operand_addr(&mut self, operand_1: Option<u8>, operand_2: Option<u8>,) -> u16
+    {
+        let mut _addr: u16 = 0;
+        if let Some(val) = operand_1 {
+            _addr = val as u16;
+            if let Some(val2) = operand_2 {
+                _addr = (val2 as u16) << 8 | val as u16;
+            }
+        }
+        _addr
     }
 
 }
