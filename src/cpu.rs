@@ -511,7 +511,7 @@ impl RP2A03{
                 _ret = _ret.wrapping_add(_val);
                 self.reg_a = _ret;
                 self.nz_flg_update(self.reg_a);
-                if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                if (self.reg_p & OVERFLOW_FLG) != 0
                 {
                     // Set if overflow in bit 7
                     self.set_status_flg(CARRY_FLG);
@@ -528,7 +528,7 @@ impl RP2A03{
                 _ret = _ret.wrapping_sub(_val);
                 self.reg_a = _ret;
                 self.nz_flg_update(self.reg_a);
-                if ((_ret & BIN_BIT_7) != 0) && ((self.reg_p & OVERFLOW_FLG) != 0)
+                if (self.reg_p & OVERFLOW_FLG) != 0
                 {
                     // Clear if overflow in bit 7
                     self.cls_status_flg(CARRY_FLG);
