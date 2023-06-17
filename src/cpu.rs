@@ -1043,12 +1043,8 @@ impl RP2A03{
             Addressing::IMM => {
                 addr as u8
             },
-            Addressing::AbsY => {
-                let _addr: u16 = addr.wrapping_add(self.reg_y as u16) as u16;
-                self.read(_addr)
-            },
             Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
-            Addressing::ABS | Addressing::AbsX |
+            Addressing::ABS | Addressing::AbsX | Addressing::AbsY |
             Addressing::IND | Addressing::IndX | Addressing::IndY |
             _ => {
                 self.read(addr)
