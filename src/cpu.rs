@@ -83,8 +83,8 @@ pub struct RP2A03
     pub nmi: bool,
     pub irq: bool,
 
-    pub cpu_run: bool,
     pub nes_mem: NESMemory,
+    pub cpu_run: bool,
 }
 
 
@@ -103,11 +103,12 @@ impl RP2A03{
             cycle: 0,
             addr_mode: Addressing::IMPL,
 
-            cpu_run: false,
             rst: false,
             nmi: false,
             irq: false,
             nes_mem: NESMemory::new(),
+
+            cpu_run: false,
         }
     }
 
@@ -153,27 +154,27 @@ impl RP2A03{
     }
 
     fn c_flg_update_l_shit(&mut self, val: u8) -> u8{
-        let mut ret: u16 = val as u16;
+        let mut ret: u8 = val;
 
-        if (ret & (BIN_BIT_7 as u16)) != 0 {
+        if (ret & BIN_BIT_7) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
             self.cls_status_flg(CARRY_FLG);
         }
         ret = ret.wrapping_shl(1);
-        ret as u8
+        ret
     }
 
     fn c_flg_update_r_shit(&mut self, val: u8) -> u8{
-        let mut ret: u16 = val as u16;
+        let mut ret: u8 = val;
 
-        if (ret & (BIN_BIT_0 as u16)) != 0 {
+        if (ret & BIN_BIT_0) != 0 {
             self.set_status_flg(CARRY_FLG);
         }else {
             self.cls_status_flg(CARRY_FLG);
         }
         ret = ret.wrapping_shr(1);
-        ret as u8
+        ret
     }
 
     fn v_flg_update(&mut self, val_a: u8, val_b: u8, is_subtraction: bool) {
@@ -566,11 +567,12 @@ impl RP2A03{
                         self.reg_a = _ret;
                     },
                     _ => {
+                        let addr: u16 =  self.operand_addr(operand,operand_second);
                         let val: u8 =  self.operand_val(operand,operand_second);
                         let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         _ret = _ret & 0xFE; // bit0, clear
                         self.nz_flg_update(_ret);
-                        self.write(self.reg_pc, _ret);
+                        self.write(addr, _ret);
                     }
                 }
             }
@@ -584,11 +586,12 @@ impl RP2A03{
                         self.reg_a = _ret;
                     },
                     _ => {
+                        let addr: u16 =  self.operand_addr(operand,operand_second);
                         let val: u8 =  self.operand_val(operand,operand_second);
                         let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         _ret = _ret & 0x7F; // bit7, clear
                         self.nz_flg_update(_ret);
-                        self.write(self.reg_pc, _ret);
+                        self.write(addr, _ret);
                     }
                 }
             }
@@ -601,11 +604,12 @@ impl RP2A03{
                         self.reg_a = _ret;
                     },
                     _ => {
+                        let addr: u16 =  self.operand_addr(operand,operand_second);
                         let val: u8 =  self.operand_val(operand,operand_second);
                         let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
                         _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
                         self.nz_flg_update(_ret);
-                        self.write(self.reg_pc, _ret);
+                        self.write(addr, _ret);
                     }
                 }
             }
@@ -619,11 +623,12 @@ impl RP2A03{
                         self.reg_a = _ret;
                     },
                     _ => {
-                        let val: u8 =  self.operand_val(operand,operand_second);                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
+                        let addr: u16 =  self.operand_addr(operand,operand_second);
+                        let val: u8 =  self.operand_val(operand,operand_second);
                         let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
                         _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
                         self.nz_flg_update(_ret);
-                        self.write(self.reg_pc, _ret);
+                        self.write(addr, _ret);
                     }
                 }
             }
