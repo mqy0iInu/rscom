@@ -201,8 +201,19 @@ impl RP2A03{
         }else{
             self.cls_status_flg(CARRY_FLG);
         }
+
+        if reg == val {
+            self.set_status_flg(ZERO_FLG);
+        }else{
+            self.cls_status_flg(ZERO_FLG);
+        }
+
         let sub: u8 = reg.wrapping_sub(val);
-        self.nz_flg_update(sub);
+        if (sub & BIN_BIT_7) != 0 {
+            self.set_status_flg(NEGATIVE_FLG);
+        }else{
+            self.cls_status_flg(NEGATIVE_FLG);
+        }
     }
 
     fn reset(&mut self){
@@ -494,9 +505,8 @@ impl RP2A03{
             OpCode::ADC => {
                 println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
                 let mut _val: u8 = self.operand_val(operand,operand_second);
-                let carry: u8 = self.reg_p & CARRY_FLG;
-                let mut _ret: u8 = self.reg_a;
-                _ret = _ret.wrapping_add(carry);
+                let carry: u8 = (self.reg_p & CARRY_FLG) & 0x01;
+                let mut _ret: u8 = self.reg_a.wrapping_add(carry);
                 self.v_flg_update(_ret, _val, OVF_ADD);
                 _ret = _ret.wrapping_add(_val);
                 self.reg_a = _ret;
@@ -511,11 +521,9 @@ impl RP2A03{
             }
             OpCode::SBC => {
                 println!("{}",format!("[DEBUG]: SBC {}",dbg_str));
-                let mut _ret: u8 = 0;
                 let mut _val: u8 = self.operand_val(operand,operand_second);
-                let carry: u8 = !(self.reg_p & CARRY_FLG);
-                let mut _ret: u8 = self.reg_a;
-                _ret = _ret.wrapping_sub(carry);
+                let carry: u8 = !(self.reg_p & CARRY_FLG) & 0x01;
+                let mut _ret: u8 = self.reg_a.wrapping_sub(carry);
                 self.v_flg_update(_ret, _val, OVF_SUB);
                 _ret = _ret.wrapping_sub(_val);
                 self.reg_a = _ret;
