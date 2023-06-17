@@ -25,6 +25,7 @@ enum InterruptType {
     RST,
     NMI,
     IRQ,
+    BRK,
 }
 
 #[derive(Clone)]
@@ -210,7 +211,6 @@ impl RP2A03{
         self.reg_y = 0;
         self.reg_p = R_FLG;
         self.reg_sp = 0xFF;
-        self.set_status_flg(INTERRUPT_DISABLE_FLG);
         self.cpu_run = true;
 
         // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
@@ -223,13 +223,37 @@ impl RP2A03{
         let mut _vet_tbl_addr: u16 = 0x0000;
         match int_type {
             InterruptType::RST => {
+                self.reg_p |= INTERRUPT_DISABLE_FLG;
                 _vet_tbl_addr = ADDR_VEC_TBL_RST;
             },
             InterruptType::NMI => {
+                self.reg_p &= !BREAK_COMMAND_FLG;
+                self.push_stack((self.reg_pc & 0x00FF) as u8);
+                self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
+                self.push_stack(self.reg_p);
+                self.reg_p |= INTERRUPT_DISABLE_FLG;
                 _vet_tbl_addr = ADDR_VEC_TBL_NMI;
             },
             InterruptType::IRQ => {
-                _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
+                if self.get_status_flg(BREAK_COMMAND_FLG) != true {
+                    self.reg_p &= !BREAK_COMMAND_FLG;
+                    self.push_stack((self.reg_pc & 0x00FF) as u8);
+                    self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
+                    self.push_stack(self.reg_p);
+                    self.reg_p |= INTERRUPT_DISABLE_FLG;
+                    _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
+                }
+            },
+            InterruptType::BRK => {
+                if self.get_status_flg(BREAK_COMMAND_FLG) != true {
+                    self.reg_p |= BREAK_COMMAND_FLG;
+                    self.reg_pc += 1;
+                    self.push_stack((self.reg_pc & 0x00FF) as u8);
+                    self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
+                    self.push_stack(self.reg_p);
+                    self.reg_p |= INTERRUPT_DISABLE_FLG;
+                    _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
+                }
             },
         }
 
@@ -452,20 +476,17 @@ impl RP2A03{
             // // Logical Operations / 論理演算命令
             OpCode::AND => {
                 println!("{}", format!("[DEBUG]: AND {}", dbg_str));
-                let result: u8 = self.reg_a & self.operand_val(operand,operand_second);
-                self.reg_a = result;
+                self.reg_a = self.reg_a & self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::ORA => {
                 println!("{}", format!("[DEBUG]: ORA {}", dbg_str));
-                let result: u8 = self.reg_a | self.operand_val(operand,operand_second);
-                self.reg_a = result as u8;
+                self.reg_a = self.reg_a | self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_a);
             }
             OpCode::EOR => {
                 println!("{}", format!("[DEBUG]: EOR {}", dbg_str));
-                let result: u8 = self.reg_a ^ self.operand_val(operand,operand_second);
-                self.reg_a = result as u8;
+                self.reg_a = self.reg_a ^ self.operand_val(operand,operand_second);
                 self.nz_flg_update(self.reg_a);
             }
 
@@ -596,6 +617,7 @@ impl RP2A03{
                 }
             }
             OpCode::ROL => {
+                println!("{}",format!("[DEBUG]: ROL {}",dbg_str));
                 match self.addr_mode {
                     Addressing::ACC => {
                         let mut _ret: u8 = self.c_flg_update_l_shit(self.reg_a);
@@ -614,7 +636,7 @@ impl RP2A03{
                 }
             }
             OpCode::ROR => {
-                println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
+                println!("{}",format!("[DEBUG]: ROR {}",dbg_str));
                 match self.addr_mode {
                     Addressing::ACC => {
                         let mut _ret: u8 = self.c_flg_update_r_shit(self.reg_a);
@@ -875,20 +897,8 @@ impl RP2A03{
             }
             OpCode::BRK => {
                 println!("{}",format!("[DEBUG]: BRK {}",dbg_str));
-                // if self.get_status_flg(BREAK_COMMAND_FLG) != true {
-                //     self.reg_pc += 1;
-                //     self.set_status_flg(BREAK_COMMAND_FLG);
-                //     self.push_stack((self.reg_pc & 0x00FF) as u8);
-                //     self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
-                //     self.push_stack(self.get_status_flg_all());
-                //     self.set_status_flg(BREAK_COMMAND_FLG);
-                //     let mut _jmp_addr: u16 = self.read(ADDR_VEC_TBL_IRQ) as u16;
-                //     _jmp_addr |= (self.read(ADDR_VEC_TBL_IRQ + 1) as u16) << 0x0008;
-                //     self.reg_pc = _jmp_addr;
-                //     jmp_flg = true;
-                //     print!("BRK Jmp to: ${:04X}", self.reg_pc);
-                // }
-
+                // self.interrupt_proc(InterruptType::BRK);
+                // jmp_flg = true;
                 panic!("[ERR]: BRK Call!")
             }
 
