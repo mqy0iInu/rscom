@@ -990,13 +990,16 @@ impl RP2A03{
                 format!("${:02X} ${:02X},Y (AbsY: Addr = ${:04X}, Val = #{:02X})",addr_l, addr_u, _addr, self.read(_addr)))
             }
             Addressing::IND => { // Indirect Indexed
-                let val1: u16 = self.read(self.reg_pc) as u16;
+                let b1: u16 = self.read(self.reg_pc) as u16;
                 self.reg_pc += 1;
-                let val2: u16 = self.read(self.reg_pc) as u16;
-                let addr: u16 = ((val2 << 8) | val1).wrapping_add(1);
-                (Some((addr & 0x00FF) as u8),
-                Some(((addr & 0xFF00) >> 8) as u8),
-                format!("${:02X} (IND: Addr = ${:04X}, Val = #{:02X})",oprand, addr, self.read(addr)))
+                let b2: u16 = self.read(self.reg_pc) as u16;
+                let m: u16 = (b2 << 8) | b1;
+                let addr_l: u8 = self.read(m as u16);
+                let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
+                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
+                (Some((_addr & 0x00FF) as u8),
+                Some(((_addr & 0xFF00) >> 8) as u8),
+                format!("${:02X} (IND: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, m, _addr, self.read(_addr)))
             }
             Addressing::IndX => { // Indexed Indirect
                 let b1:u8 = self.read(self.reg_pc);
@@ -1004,18 +1007,18 @@ impl RP2A03{
                 let addr_l: u8 = self.read(m as u16);
                 let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
                 let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
-                format!("(${:02X},X) (IndX: Addr = ${:04X}, Val = #{:02X})",oprand, _addr, self.read(_addr)))
+                (Some((_addr & 0x00FF) as u8),
+                Some(((_addr & 0xFF00) >> 8) as u8),
+                format!("(${:02X},X) (IndX: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, m, _addr, self.read(_addr)))
             }
             Addressing::IndY => { // Indirect Indexed
                 let b1:u8 = self.read(self.reg_pc);
                 let addr_l: u8 = self.read(b1 as u16);
                 let addr_u: u8 = self.read(b1.wrapping_add(1) as u16);
                 let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
-                format!("(${:02X}),Y (IndY: Addr = ${:04X}, Val = #{:02X})",oprand, _addr, self.read(_addr)))
+                (Some((_addr & 0x00FF) as u8),
+                Some(((_addr & 0xFF00) >> 8) as u8),
+                format!("(${:02X}),Y (IndY: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, b1, _addr, self.read(_addr)))
             }
             Addressing::REL => { // Relative Addressing(相対アドレッシング)
                 let offset: u8 = self.read(self.reg_pc);
