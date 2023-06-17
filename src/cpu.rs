@@ -945,16 +945,16 @@ impl RP2A03{
                 format!("${:02X},X (ZPG: ZPG = ${:02X}, Val = #{:02X})",oprand, oprand, self.read(oprand as u16)))
             }
             Addressing::ZpgX => {
-                let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_x as u16;
-                (Some((addr & 0x00FF) as u8),
+                let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_x);
+                (Some(addr_l),
                 Some(0),
-                format!("${:02X},X (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, (addr & 0x00FF) as u8, self.read(oprand as u16)))
+                format!("${:02X},X (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
             }
             Addressing::ZpgY => {
-                let addr: u16 = self.read(self.reg_pc) as u16 + self.reg_y as u16;
-                (Some((addr & 0x00FF) as u8),
+                let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_y);
+                (Some(addr_l),
                 Some(0),
-                format!("${:02X},Y (ZpgY: ZPG = ${:02X}, Val = #{:02X})",oprand, (addr & 0x00FF) as u8, self.read(oprand as u16)))
+                format!("${:02X},X (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
             }
             Addressing::ABS => {
                 let addr_l:u8 = self.read(self.reg_pc);
@@ -1015,7 +1015,8 @@ impl RP2A03{
                 let b1:u8 = self.read(self.reg_pc);
                 let addr_l: u8 = self.read(b1 as u16);
                 let addr_u: u8 = self.read(b1.wrapping_add(1) as u16);
-                let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
+                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
+                _addr = _addr.wrapping_add(self.reg_y as u16);
                 (Some((_addr & 0x00FF) as u8),
                 Some(((_addr & 0xFF00) >> 8) as u8),
                 format!("(${:02X}),Y (IndY: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, b1, _addr, self.read(_addr)))
