@@ -111,6 +111,7 @@ pub struct PPU {
 
     oam: [u8; 0x100],
 
+    vram: [u8; 2048],
     vram_addr_inc: u8,
     vram_addr_write: u8,
     vram_addr: u16,
@@ -135,6 +136,7 @@ impl PPU {
 
             oam: [0; 0x100],
 
+            vram: [0; 2048],
             vram_addr_inc: 1,
             vram_addr_write: 0,
             vram_addr: 0x2000,
@@ -155,7 +157,7 @@ impl PPU {
             PPU_REG_PPUSCROLL => self.ppuscroll,
             PPU_REG_PPUADDR   => self.ppuaddr,
             PPU_REG_PPUDATA   => {
-                self.ppudata = vram_read(self.vram_addr);
+                self.ppudata = self.vram[self.vram_addr as usize];
                 self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
                 self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
                 self.ppudata
@@ -198,7 +200,7 @@ impl PPU {
             },
             PPU_REG_PPUDATA   => {
                 self.ppudata = data;
-                vram_write(self.vram_addr, self.ppudata);
+                self.vram[self.vram_addr as usize] = self.ppudata;
                 self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
                 self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
             },

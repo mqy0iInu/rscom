@@ -51,8 +51,8 @@ pub const SNAKE_GAME_TBL: [u8; 310] = [
 #[derive(Clone)]
 pub struct Memory {
     pub wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
-    pub vram: [u8; 2048],         // VRAM ... 2KB (For PPU)
-    pub dma_start_addr: u8,
+
+    pub dma_start: u8,
     pub apu_reg: APUReg,          // APUレジスタ
     pub ppu_reg: PPU,             // PPUレジスタ
     pub cassette: Cassette,       // カセット
@@ -62,8 +62,7 @@ impl Memory {
     pub fn new() -> Self {
         Memory {
             wram: [0; 2048],
-            vram: [0; 2048],
-            dma_start_addr: 0,
+            dma_start: 0,
             apu_reg: APUReg::new(),
             ppu_reg: PPU::new(),
             cassette: Cassette::new(),
@@ -89,7 +88,7 @@ impl Memory {
             0x0000..=0x07FF => self.wram[addr as usize],
             0x0800..=0x1FFF => self.wram[(addr % 0x0800) as usize],
             0x2000..=0x2007 => self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_READ, 0),
-            0x2008..=0x3FFF => self.vram[(addr - 0x2000) as usize],
+            0x2008..=0x3FFF => self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_READ, 0),
             0x4000..=0x4017 => self.apu_reg.apu_reg_ctrl(addr, APU_REG_READ, 0),
             0x4020..=0x5FFF => self.cassette.chr_rom[(addr - 0x4020) as usize],
             // TODO :(DEBUG) PRG-RAM
@@ -106,10 +105,10 @@ impl Memory {
             0x0000..=0x07FF => self.wram[addr as usize] = data,
             0x0800..=0x1FFF => self.wram[(addr % 0x0800) as usize] = data,
             0x2000..=0x2007 => { self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_WRITE, data);},
-            0x2008..=0x3FFF => self.vram[(addr - 0x2000) as usize] = data,
+            0x2008..=0x3FFF => { self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_WRITE, data);},
             0x4000..=0x4013 | 0x4015 | 0x4017 => { self.apu_reg.apu_reg_ctrl(addr, APU_REG_WRITE, data);},
             0x4014          => {
-                self.dma_start_addr = (addr >> 8) as u8 ;
+                self.dma_start = data ;
                 self.dma_start();
             },
             0x4020..=0x5FFF => self.cassette.chr_rom[(addr - 0x4020) as usize] = data,       // CHR ROM ... 8KB or 16KB
@@ -123,7 +122,7 @@ impl Memory {
 
     pub fn dma_start(&mut self)
     {
-        let mut start_addr:u16 = self.dma_start_addr as u16;
+        let mut start_addr:u16 = self.dma_start as u16;
         start_addr =  (start_addr << 0x08u8) as u16;
         println!("[DEBUG] : DMA Start");
 

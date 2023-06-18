@@ -1097,20 +1097,6 @@ fn cpu_proc() {
     }
 }
 
-pub fn vram_write(addr: u16, data: u8)
-{
-    unsafe {
-        S_CPU.nes_mem.mem_write(addr, data);
-    }
-}
-
-pub fn vram_read(addr: u16) -> u8
-{
-    unsafe {
-        S_CPU.nes_mem.mem_read(addr)
-    }
-}
-
 pub fn cpu_interrupt(int_type: InterruptType)
 {
     unsafe {
