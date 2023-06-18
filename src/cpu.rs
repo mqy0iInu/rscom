@@ -1089,18 +1089,32 @@ fn cpu_reg_show()
     }
 }
 
-pub fn cpu_interrupt(int_type: InterruptType)
-{
-    unsafe {
-        S_CPU.interrupt_proc(int_type);
-    }
-}
-
 fn cpu_proc() {
     unsafe {
         let val = S_CPU.fetch_instruction();
         S_CPU.decode_instruction(val);
         S_CPU.execute_instruction();
+    }
+}
+
+pub fn vram_write(addr: u16, data: u8)
+{
+    unsafe {
+        S_CPU.nes_mem.mem_write(addr, data);
+    }
+}
+
+pub fn vram_read(addr: u16) -> u8
+{
+    unsafe {
+        S_CPU.nes_mem.mem_read(addr)
+    }
+}
+
+pub fn cpu_interrupt(int_type: InterruptType)
+{
+    unsafe {
+        S_CPU.interrupt_proc(int_type);
     }
 }
 

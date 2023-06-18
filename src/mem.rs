@@ -20,6 +20,8 @@ pub const ADDR_PRG_ROM: u16 = 0x8000;   // PRG-ROM TOP
 // const VRAM_START_ADDR: u16 = 0x2008;    // VRAM 開始アドレス
 // const VRAM_END_ADDR: u16 = 0x3FFF;
 
+const DMA_SIZE:u8 = 0xFF;
+
 // (DEBUG) :Snake Game(Only 6502 OP-Code)
 // https://bugzmanov.github.io/nes_ebook/chapter_3_4.html
 // アセンブラ ... https://gist.github.com/wkjagt/9043907
@@ -52,7 +54,7 @@ pub struct Memory {
     pub vram: [u8; 2048],         // VRAM ... 2KB (For PPU)
     pub dma_start_addr: u8,
     pub apu_reg: APUReg,          // APUレジスタ
-    pub ppu_reg: PPU,          // PPUレジスタ
+    pub ppu_reg: PPU,             // PPUレジスタ
     pub cassette: Cassette,       // カセット
 }
 
@@ -127,10 +129,10 @@ impl Memory {
 
         cpu_run(false);
         // WRAM to OAM (256Byte)
-        for i in 0..=255 {
-            let mut data = self.mem_read(start_addr);
+        for i in 0..=DMA_SIZE {
+            let data = self.mem_read(start_addr);
             self.ppu_reg.ppu_oam_write(i, data);
-            start_addr = start_addr + 1;
+            start_addr += 1;
         }
         cpu_run(true);
     }

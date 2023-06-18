@@ -1,3 +1,4 @@
+use crate::mem::*;
 use crate::cpu::*;
 use std::pin::Pin;
 use once_cell::sync::Lazy;
@@ -12,7 +13,7 @@ const PPU_REG_OAMDATA: u16                       = 0x2004;
 const PPU_REG_PPUSCROLL: u16                     = 0x2005;
 const PPU_REG_PPUADDR: u16                       = 0x2006;
 const PPU_REG_PPUDATA: u16                       = 0x2007;
-const PPU_REG_OAMDMA: u16                        = 0x4014;
+// const PPU_REG_OAMDMA: u16                        = 0x4014;
 
 // [PPUCTRL Bits]
 const REG_PPUCTRL_BIT_GENERATE_NMI: u8           = 0b10000000; // Bit7: NMI生成 (0: オフ, 1: オン)
@@ -20,7 +21,7 @@ const REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT: u8    = 0b01000000; // Bit6: マス�
 const REG_PPUCTRL_BIT_SPRITE_SIZE: u8            = 0b00100000; // Bit5: スプライトサイズ
 const REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR: u8 = 0b00010000; // Bit4: 背景パターンテーブルアドレス
 const REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR: u8    = 0b00001000; // Bit3: スプライトパターンテーブルアドレス
-const REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT: u8     = 0b00000100; // Bit2: VRAMアドレス増加
+const REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT: u8     = 0b00000100; // Bit2: VRAMアドレスインクリメント (0: 1++, 1: 32++)
 const REG_PPUCTRL_BIT_NAMETABLE2: u8             = 0b00000010; // Bit1: 名前テーブル2
 const REG_PPUCTRL_BIT_NAMETABLE1: u8             = 0b00000001; // Bit0: 名前テーブル1
 
@@ -47,7 +48,6 @@ const REG_PPUSTATUS_BIT_SPRITE_OVERFLOW: u8      = 0b00100000; // Bit5: スプ�
 // [OAMADDR/OAMDATA/PPUSCROLL/PPUADDR/PPUDATA/OAMDMA Bits]
 // ビット定義なし
 
-const DMA_SIZE:u16 = 0x0100;
 // ==================================================================================
 // [PPU Memory]
 // const PPU_OAM_SIZE: usize = 0x0100;  // OAM（Object Attribute Memory）のサイズ (256バイト)
@@ -107,9 +107,17 @@ pub struct PPU {
     ppuscroll: u8,
     ppuaddr: u8,
     ppudata: u8,
-    oamdma: u8,
+    // oamdma: u8,
 
     oam: [u8; 0x100],
+
+    vram_addr_inc: u8,
+    vram_addr_write: u8,
+    vram_addr: u16,
+
+    scroll_x: u8,
+    scroll_y: u8,
+    scroll_write: u8,
 }
 
 impl PPU {
@@ -123,13 +131,21 @@ impl PPU {
             ppuscroll: 0,
             ppuaddr: 0,
             ppudata: 0,
-            oamdma: 0,
+            // oamdma: 0,
 
             oam: [0; 0x100],
+
+            vram_addr_inc: 1,
+            vram_addr_write: 0,
+            vram_addr: 0x2000,
+
+            scroll_x: 0,
+            scroll_y: 0,
+            scroll_write: 0,
         }
     }
 
-    fn ppu_reg_read(&self, address: u16) -> u8 {
+    fn ppu_reg_read(&mut self, address: u16) -> u8 {
         match address {
             PPU_REG_PPUCTRL   => self.ppuctrl,
             PPU_REG_PPUMASK   => self.ppumask,
@@ -138,23 +154,55 @@ impl PPU {
             PPU_REG_OAMDATA   => self.oamdata,
             PPU_REG_PPUSCROLL => self.ppuscroll,
             PPU_REG_PPUADDR   => self.ppuaddr,
-            PPU_REG_PPUDATA   => self.ppudata,
-            PPU_REG_OAMDMA    => self.oamdma,
+            PPU_REG_PPUDATA   => {
+                self.ppudata = vram_read(self.vram_addr);
+                self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
+                self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
+                self.ppudata
+            },
+            // PPU_REG_OAMDMA    => self.oamdma,
             _ => panic!("[PPU Read]: Invalid PPU Register Address: 0x{:04X}", address),
         }
     }
 
     fn ppu_reg_write(&mut self, address: u16, data: u8) {
         match address {
-            PPU_REG_PPUCTRL   => self.ppuctrl = data,
+            PPU_REG_PPUCTRL   => self.ppuctrl = data | REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT,
             PPU_REG_PPUMASK   => self.ppumask = data,
-            // PPU_REG_PPUSTATUS => self.ppustatus = data,　// RO, Can't Write
+            PPU_REG_PPUSTATUS => self.ppustatus = data,
             PPU_REG_OAMADDR   => self.oamaddr = data,
-            PPU_REG_OAMDATA   => self.oamdata = data,
-            PPU_REG_PPUSCROLL => self.ppuscroll = data,
-            PPU_REG_PPUADDR   => self.ppuaddr = data,
-            PPU_REG_PPUDATA   => self.ppudata = data,
-            PPU_REG_OAMDMA    => self.oamdma = data,
+            PPU_REG_OAMDATA   => {
+                self.oamdata = data;
+                self.oam[self.oamaddr as usize] = self.oamdata;
+                self.oamaddr = self.oamaddr.wrapping_add(1);
+            },
+            PPU_REG_PPUSCROLL => {
+                self.ppuscroll = data;
+                if self.scroll_write == 0 {
+                    self.scroll_x = data;
+                    self.scroll_write += 1;
+                }else{
+                    self.scroll_y = data;
+                    self.scroll_write = 0;
+                }
+            },
+            PPU_REG_PPUADDR   => {
+                self.ppuaddr = data;
+                if self.vram_addr_write == 0 {
+                    self.vram_addr = (self.ppuaddr as u16) << 8;
+                    self.vram_addr_write += 1;
+                }else{
+                    self.vram_addr |= self.ppuaddr as u16;
+                    self.vram_addr_write = 0;
+                }
+            },
+            PPU_REG_PPUDATA   => {
+                self.ppudata = data;
+                vram_write(self.vram_addr, self.ppudata);
+                self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
+                self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
+            },
+            // PPU_REG_OAMDMA    => self.oamdma = data,
             _ => panic!("[PPU Write]: Invalid PPU Register Address: 0x{:04X}", address),
         }
     }
@@ -198,6 +246,11 @@ fn ppu_reg_polling()
         // ==========================================================================
         // [PPUCTRL]
         // ==========================================================================
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT) != 0 {
+            S_PPU.vram_addr_inc = 32;
+        }else{
+            S_PPU.vram_addr_inc = 1;
+        }
 
         // ==========================================================================
         // [PPUMASK]
