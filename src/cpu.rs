@@ -1,7 +1,5 @@
 use crate::mem::*;
 use std::pin::Pin;
-// use std::sync::{Once, Mutex};
-// use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
@@ -21,7 +19,7 @@ pub const OVF_ADD: bool = false;
 pub const OVF_SUB: bool = true;
 
 #[derive(Clone)]
-enum InterruptType {
+pub enum InterruptType {
     RST,
     NMI,
     IRQ,
@@ -84,7 +82,7 @@ pub struct RP2A03
     pub nmi: bool,
     pub irq: bool,
 
-    pub nes_mem: NESMemory,
+    pub nes_mem: Memory,
     pub cpu_run: bool,
 }
 
@@ -107,7 +105,7 @@ impl RP2A03{
             rst: false,
             nmi: false,
             irq: false,
-            nes_mem: NESMemory::new(),
+            nes_mem: Memory::new(),
 
             cpu_run: false,
         }
@@ -200,16 +198,9 @@ impl RP2A03{
         }
     }
 
-    fn reset(&mut self){
-        self.reg_a = 0;
-        self.reg_x = 0;
-        self.reg_y = 0;
-        self.reg_p = R_FLG;
-        self.reg_sp = 0xFF;
-        self.cpu_run = true;
-
-        // (DEBUG) リセットベクタに飛ばず、PRG-ROMに
-        // self.reg_pc = ADDR_PRG_ROM;
+    fn reset(&mut self)
+    {
+        // TODO :Reset Func
         self.interrupt_proc(InterruptType::RST);
     }
 
@@ -218,6 +209,12 @@ impl RP2A03{
         let mut _vet_tbl_addr: u16 = 0x0000;
         match int_type {
             InterruptType::RST => {
+                self.reg_a = 0;
+                self.reg_x = 0;
+                self.reg_y = 0;
+                self.reg_p = R_FLG;
+                self.reg_sp = 0xFF;
+                self.cpu_run = true;
                 self.reg_p |= INTERRUPT_DISABLE_FLG;
                 _vet_tbl_addr = ADDR_VEC_TBL_RST;
             },
@@ -1073,6 +1070,11 @@ impl RP2A03{
 
 }
 
+static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
+    let cpu = Box::pin(RP2A03::new());
+    cpu
+});
+
 fn cpu_reg_show()
 {
     unsafe {
@@ -1087,10 +1089,12 @@ fn cpu_reg_show()
     }
 }
 
-static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
-    let cpu = Box::pin(RP2A03::new());
-    cpu
-});
+pub fn cpu_interrupt(int_type: InterruptType)
+{
+    unsafe {
+        S_CPU.interrupt_proc(int_type);
+    }
+}
 
 fn cpu_proc() {
     unsafe {

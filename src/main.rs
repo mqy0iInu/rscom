@@ -101,7 +101,7 @@ fn main()
     // ==================================================================================
     // [H/W Reset & App Init]
     let mut cpu_handler = cpu_reset();
-    ppu_reset();
+    let mut ppu_handler = ppu_reset();
     apu_reset();
     app_init();
     // ==================================================================================
@@ -118,13 +118,13 @@ fn main()
     });
 
     // PPU Thred @5.37 MHz(186.4 nsec)
-    // let _ppu_thread = thread::spawn(|| {
-    //     loop {
-    //         ppu_main();
-    //         // thread::sleep(Duration::from_nanos(187));
-    //         thread::sleep(Duration::from_millis(500));
-    //     }
-    // });
+    let _ppu_thread = thread::spawn(|| {
+        loop {
+            ppu_main();
+            // thread::sleep(Duration::from_nanos(187));
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
 
     // let _apu_thread = thread::spawn(|| {
     //     loop {
