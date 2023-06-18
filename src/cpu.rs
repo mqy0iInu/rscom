@@ -1097,6 +1097,13 @@ fn cpu_proc() {
     }
 }
 
+pub fn chr_rom_read(addr: u16) -> u8
+{
+    unsafe {
+        S_CPU.nes_mem.mem_read(addr)
+    }
+}
+
 pub fn cpu_interrupt(int_type: InterruptType)
 {
     unsafe {

@@ -16,10 +16,6 @@ pub const ADDR_CHR_ROM: u16 = 0x4020;   // CHR-ROM TOP
 pub const ADDR_PRG_RAM: u16 = 0xFFFE;   // PRG-RAM TOP
 pub const ADDR_PRG_ROM: u16 = 0x8000;   // PRG-ROM TOP
 
-// const VRAM_SIZE: u16 = 0x4000;          // VRAM (16KB)
-// const VRAM_START_ADDR: u16 = 0x2008;    // VRAM 開始アドレス
-// const VRAM_END_ADDR: u16 = 0x3FFF;
-
 const DMA_SIZE:u8 = 0xFF;
 
 // (DEBUG) :Snake Game(Only 6502 OP-Code)
@@ -96,7 +92,7 @@ impl Memory {
             // TODO :(DEBUG)一旦、PRG-ROMをミラーしとく
             0x8000..=0xBFFF => self.cassette.prg_rom[(addr - 0x8000) as usize],
             0xC000..=0xFFFF => self.cassette.prg_rom[(addr - 0xC000) as usize],
-            _ => panic!("Invalid Mem Addr: {:#06x}", addr),
+            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
         }
     }
 
@@ -116,21 +112,21 @@ impl Memory {
             0x8000..=0xBFFF => self.cassette.prg_rom[(addr - 0x8000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
             // TODO :(DEBUG)一旦、PRG-ROMをミラーしとく
             0xC000..=0xFFFF => self.cassette.prg_rom[(addr - 0xC000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
-            _ => panic!("Invalid Mem Addr: {:#06x}", addr),
+            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
         }
     }
 
     pub fn dma_start(&mut self)
     {
         let mut start_addr:u16 = self.dma_start as u16;
-        start_addr =  (start_addr << 0x08u8) as u16;
+        start_addr =  (start_addr << 0x08) as u16;
         println!("[DEBUG] : DMA Start");
 
         cpu_run(false);
         // WRAM to OAM (256Byte)
         for i in 0..=DMA_SIZE {
-            let data = self.mem_read(start_addr);
-            self.ppu_reg.ppu_oam_write(i, data);
+            let mut _data = self.mem_read(start_addr);
+            self.ppu_reg.ppu_oam_write(i, _data);
             start_addr += 1;
         }
         cpu_run(true);

@@ -50,49 +50,17 @@ const REG_PPUSTATUS_BIT_SPRITE_OVERFLOW: u8      = 0b00100000; // Bit5: スプ�
 
 // ==================================================================================
 // [PPU Memory]
-// const PPU_OAM_SIZE: usize = 0x0100;  // OAM（Object Attribute Memory）のサイズ (256バイト)
-// const PPU_OAM_START_ADDR: u16 = 0x0000;  // OAMの開始アドレス
-// const PPU_OAM_END_ADDR: u16 = PPU_OAM_START_ADDR + PPU_OAM_SIZE as u16 - 1;  // OAMの終了アドレス
+const PPU_OAM_SIZE: usize = 0x0100;
+const PPU_OAM_START_ADDR: u16 = 0x0000;
+const PPU_OAM_END_ADDR: u16 = 0x00FF;
 
-// ==================================================================================
-// [PPU Memory Map]
-// const PPU_PATTERN_TABLE_0_START_ADDR: u16 = 0x0000;  // パターンテーブル#0の開始アドレス
-// const PPU_PATTERN_TABLE_0_END_ADDR: u16 = 0x0FFF;  // パターンテーブル#0の終了アドレス
+const PPU_PRAM_SIZE: usize = 0x0020;
+const PPU_PRAM_START_ADDR: u16 = 0x3F00;
+const PPU_PRAM_END_ADDR: u16 = 0x3F1F;
 
-// const PPU_PATTERN_TABLE_1_START_ADDR: u16 = 0x1000;  // パターンテーブル#1の開始アドレス
-// const PPU_PATTERN_TABLE_1_END_ADDR: u16 = 0x1FFF;  // パターンテーブル#1の終了アドレス
-
-// const PPU_NAME_TABLE_0_START_ADDR: u16 = 0x2000;  // ネームテーブル#0の開始アドレス
-// const PPU_NAME_TABLE_0_END_ADDR: u16 = 0x23BF;  // ネームテーブル#0の終了アドレス
-
-// const PPU_ATTRIBUTE_TABLE_0_START_ADDR: u16 = 0x23C0;
-// const PPU_ATTRIBUTE_TABLE_0_START_END: u16 = 0x23FF;
-
-// const PPU_NAME_TABLE_1_START_ADDR: u16 = 0x2000;  // ネームテーブル#1の開始アドレス
-// const PPU_NAME_TABLE_1_END_ADDR: u16 = 0x23BF;  // ネームテーブル#1の終了アドレス
-
-// const PPU_ATTRIBUTE_TABLE_1_START_ADDR: u16 = 0x23C0;
-// const PPU_ATTRIBUTE_TABLE_1_START_END: u16 = 0x23FF;
-
-// const PPU_NAME_TABLE_2_START_ADDR: u16 = 0x2800;  // ネームテーブル#1の開始アドレス
-// const PPU_NAME_TABLE_2_END_ADDR: u16 = 0x2BBF;  // ネームテーブル#1の終了アドレス
-
-// const PPU_ATTRIBUTE_TABLE_2_START_ADDR: u16 = 0x2BC0;
-// const PPU_ATTRIBUTE_TABLE_2_START_END: u16 = 0x2BFF;
-
-// const PPU_NAME_TABLE_3_START_ADDR: u16 = 0x2C00;  // ネームテーブル#1の開始アドレス
-// const PPU_NAME_TABLE_3_END_ADDR: u16 = 0x2FBF;  // ネームテーブル#1の終了アドレス
-
-// const PPU_ATTRIBUTE_TABLE_3_START_ADDR: u16 = 0x2FC0;
-// const PPU_ATTRIBUTE_TABLE_3_START_END: u16 = 0x2FFF;
-
-// const PPU_PALETTE_START_ADDR: u16 = 0x3F00;  // BGパレットの開始アドレス
-// const PPU_PALETTE_END_ADDR: u16 = 0x3F0F;
-// const PPU_PALETTE_SIZE: u16 = 0x0010;  // BGパレットのサイズ
-
-// const PPU_PATTERN_TABLE_SIZE: u16 = 0x1000;
-// const PPU_NAME_TABLE_SIZE: u16 = 0x03C0;
-// const PPU_ATTRIBUTE_TABLE_SIZE: u16 = 0x0040;
+const VRAM_SIZE: usize = 0x4000;
+const VRAM_START_ADDR: u16 = 0x2008;
+const VRAM_END_ADDR: u16 = 0x3FFF;
 // ==================================================================================
 pub const PPU_REG_READ: u8 = 0x00;
 pub const PPU_REG_WRITE: u8 = 0x01;
@@ -109,9 +77,10 @@ pub struct PPU {
     ppudata: u8,
     // oamdma: u8,
 
-    oam: [u8; 0x100],
+    oam: [u8; PPU_OAM_SIZE],
+    pram: [u8; PPU_PRAM_SIZE],
 
-    vram: [u8; 2048],
+    vram: [u8; VRAM_SIZE],
     vram_addr_inc: u8,
     vram_addr_write: u8,
     vram_addr: u16,
@@ -134,9 +103,10 @@ impl PPU {
             ppudata: 0,
             // oamdma: 0,
 
-            oam: [0; 0x100],
+            oam: [0; PPU_OAM_SIZE],
+            pram: [0; PPU_PRAM_SIZE],
 
-            vram: [0; 2048],
+            vram: [0; VRAM_SIZE],
             vram_addr_inc: 1,
             vram_addr_write: 0,
             vram_addr: 0x2000,
@@ -157,7 +127,7 @@ impl PPU {
             PPU_REG_PPUSCROLL => self.ppuscroll,
             PPU_REG_PPUADDR   => self.ppuaddr,
             PPU_REG_PPUDATA   => {
-                self.ppudata = self.vram[self.vram_addr as usize];
+                self.ppudata = self.ppu_mem_read(self.vram_addr);
                 self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
                 self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
                 self.ppudata
@@ -175,7 +145,7 @@ impl PPU {
             PPU_REG_OAMADDR   => self.oamaddr = data,
             PPU_REG_OAMDATA   => {
                 self.oamdata = data;
-                self.oam[self.oamaddr as usize] = self.oamdata;
+                self.ppu_mem_write(self.oamaddr as u16, self.oamdata);
                 self.oamaddr = self.oamaddr.wrapping_add(1);
             },
             PPU_REG_PPUSCROLL => {
@@ -200,7 +170,7 @@ impl PPU {
             },
             PPU_REG_PPUDATA   => {
                 self.ppudata = data;
-                self.vram[self.vram_addr as usize] = self.ppudata;
+                self.ppu_mem_write(self.vram_addr, self.ppudata);
                 self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
                 self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
             },
@@ -219,14 +189,78 @@ impl PPU {
         }
     }
 
-    pub fn ppu_oam_read(&mut self, addr: u8) -> u8
-    {
-        self.oam[addr as usize]
-    }
+    // pub fn ppu_oam_read(&mut self, addr: u8) -> u8
+    // {
+    //     self.oam[addr as usize]
+    // }
 
     pub fn ppu_oam_write(&mut self, addr: u8, data: u8)
     {
         self.oam[addr as usize] = data;
+    }
+
+    fn ppu_mem_read(&mut self, addr: u16) -> u8 {
+        match addr {
+            // Pattern Table 0 (CHR-ROM)
+            0x0000..=0x0FFF => chr_rom_read(addr),
+            // Pattern Table 1 (CHR-ROM)
+            0x1000..=0x1FFF => chr_rom_read(addr),
+
+            // VRAM
+            0x2000..=0x2EFF => self.vram[(addr - 0x2000) as usize],
+            // VRAM Mirror
+            0x3000..=0x3EFF => self.vram[(addr - 0x3000) as usize],
+
+            // Palette RAM
+            0x3F00..=0x3F1F => self.pram[(addr - 0x3F00) as usize],
+            // Palette RAM Mirror #1
+            0x3F20..=0x3F3F => self.pram[(addr - 0x3F20) as usize],
+            // Palette RAM Mirror #2
+            0x3F40..=0x3F5F => self.pram[(addr - 0x3F40) as usize],
+            // Palette RAM Mirror #3
+            0x3F60..=0x3F7F => self.pram[(addr - 0x3F60) as usize],
+            // Palette RAM Mirror #4
+            0x3F80..=0x3F9F => self.pram[(addr - 0x3F80) as usize],
+            // Palette RAM Mirror #5
+            0x3FA0..=0x3FBF => self.pram[(addr - 0x3FA0) as usize],
+            // Palette RAM Mirror #6
+            0x3FC0..=0x3FDF => self.pram[(addr - 0x3FC0) as usize],
+            // Palette RAM Mirror #7
+            0x3FE0..=0x3FFF => self.pram[(addr - 0x3FE0) as usize],
+
+            // OAM
+            0x4000..=0x401F => self.oam[(addr - 0x4000) as usize],
+            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
+        }
+    }
+
+    fn ppu_mem_write(&mut self, addr: u16, data: u8) {
+        match addr {
+            // VRAM
+            0x2000..=0x2EFF => self.vram[(addr - 0x2000) as usize] = data,
+            // VRAM Mirror
+            0x3000..=0x3EFF => self.vram[(addr - 0x3000) as usize] = data,
+
+            // Palette RAM
+            0x3F00..=0x3F1F => self.pram[(addr - 0x3F00) as usize] = data,
+            // Palette RAM Mirror #1
+            0x3F20..=0x3F3F => self.pram[(addr - 0x3F20) as usize] = data,
+            // Palette RAM Mirror #2
+            0x3F40..=0x3F5F => self.pram[(addr - 0x3F40) as usize] = data,
+            // Palette RAM Mirror #3
+            0x3F60..=0x3F7F => self.pram[(addr - 0x3F60) as usize] = data,
+            // Palette RAM Mirror #4
+            0x3F80..=0x3F9F => self.pram[(addr - 0x3F80) as usize] = data,
+            // Palette RAM Mirror #5
+            0x3FA0..=0x3FBF => self.pram[(addr - 0x3FA0) as usize] = data,
+            // Palette RAM Mirror #6
+            0x3FC0..=0x3FDF => self.pram[(addr - 0x3FC0) as usize] = data,
+            // Palette RAM Mirror #7
+            0x3FE0..=0x3FFF => self.pram[(addr - 0x3FE0) as usize] = data,
+            // OAM
+            0x4000..=0x401F => self.oam[(addr - 0x4000) as usize] = data,
+            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
+        }
     }
 }
 
