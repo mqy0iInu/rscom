@@ -1,4 +1,4 @@
-use crate::mem::*;
+// use crate::mem::*;
 use crate::cpu::*;
 use std::pin::Pin;
 use once_cell::sync::Lazy;
@@ -22,22 +22,36 @@ const REG_PPUCTRL_BIT_SPRITE_SIZE: u8            = 0b00100000; // Bit5: スプ�
 const REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR: u8 = 0b00010000; // Bit4: 背景パターンテーブルアドレス
 const REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR: u8    = 0b00001000; // Bit3: スプライトパターンテーブルアドレス
 const REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT: u8     = 0b00000100; // Bit2: VRAMアドレスインクリメント (0: 1++, 1: 32++)
-const REG_PPUCTRL_BIT_NAMETABLE2: u8             = 0b00000010; // Bit1: 名前テーブル2
-const REG_PPUCTRL_BIT_NAMETABLE1: u8             = 0b00000001; // Bit0: 名前テーブル1
+const REG_PPUCTRL_BIT_NAMETABLE: u8              = 0b00000011; // Bit[1:0]: 名前テーブル0～3
+
+const SPRITE_SIZE_8X8: u8                        = 0;
+const SPRITE_SIZE_8X16: u8                       = 1;
+const CHR_ROM_BG_PATTERN_TABLE_0: u16            = 0x0000;
+const CHR_ROM_BG_PATTERN_TABLE_1: u16            = 0x1000;
+const CHR_ROM_SPRITE_PATTERN_TABLE_0: u16        = 0x0000;
+const CHR_ROM_SPRITE_PATTERN_TABLE_1: u16        = 0x1000;
+const VRAM_INCREMENT_1: u8                       = 1;
+const VRAM_INCREMENT_32: u8                      = 32;
+const NAME_TABLE_0: u16                          = 0x2000;
+const NAME_TABLE_1: u16                          = 0x2400;
+const NAME_TABLE_2: u16                          = 0x2800;
+const NAME_TABLE_3: u16                          = 0x2C00;
 
 // [PPUMASK Bits]
 const REG_PPUMASK_BIT_BG_COLOR: u8               = 0b11100000; // Bit7-5: 背景色
-const BG_COLOR_RED: u8                           = 0b100;      // 背景色 - 赤
-const BG_COLOR_GREEN: u8                         = 0b010;      // 背景色 - 緑
-const BG_COLOR_BLUE: u8                          = 0b001;      // 背景色 - 青
-const BG_COLOR_BLACK: u8                         = 0b000;      // 背景色 - ブラック
+
 const REG_PPUMASK_BIT_SPRITE_ENABLE: u8          = 0b00010000; // Bit4: スプライト表示 (0: オフ, 1: オン)
 const REG_PPUMASK_BIT_BACKGROUND_ENABLE: u8      = 0b00001000; // Bit3: 背景表示 (0: オフ, 1: オン)
 const REG_PPUMASK_BIT_SPRITE_LEFT_COLUMN: u8     = 0b00000100; // Bit2: スプライトマスク、画面左8ピクセルを描画しない。(0:描画しない、1:描画)
 const REG_PPUMASK_BIT_BACKGROUND_LEFT_COLUMN: u8 = 0b00000010; // Bit1: 背景マスク、画面左8ピクセルを描画しない。(0:描画しない、1:描画)
 const REG_PPUMASK_BIT_GRAYSCALE: u8              = 0b00000001; // Bit0: グレースケール (0: カラー, 1: モノクロ)
-const GRAYSCALE_COLOR: u8                        = 0;
-// const GRAYSCALE_MONOCHRO: u8                     = 1;
+
+const BG_COLOR_RED: u8                           = 0b100;      // 背景色 - 赤
+const BG_COLOR_GREEN: u8                         = 0b010;      // 背景色 - 緑
+const BG_COLOR_BLUE: u8                          = 0b001;      // 背景色 - 青
+const BG_COLOR_BLACK: u8                         = 0b000;      // 背景色 - ブラック
+const GRAYSCALE_COLOR: u8                        = 0;          // グレースケール: カラー
+const GRAYSCALE_MONOCHRO: u8                     = 1;          // グレースケール: 白黒
 
 // [PPUSTATUS Bits]
 const REG_PPUSTATUS_BIT_VBLANK: u8               = 0b10000000; // Bit7: VBLANK状態
@@ -47,7 +61,6 @@ const REG_PPUSTATUS_BIT_SPRITE_OVERFLOW: u8      = 0b00100000; // Bit5: スプ�
 
 // [OAMADDR/OAMDATA/PPUSCROLL/PPUADDR/PPUDATA/OAMDMA Bits]
 // ビット定義なし
-
 // ==================================================================================
 // [PPU Memory]
 const PPU_OAM_SIZE: usize = 0x0100;
@@ -80,6 +93,8 @@ pub struct PPU {
     oam: [u8; PPU_OAM_SIZE],
     pram: [u8; PPU_PRAM_SIZE],
 
+    nmi_gen: bool,
+    cycle: u16,
     vram: [u8; VRAM_SIZE],
     vram_addr_inc: u8,
     vram_addr_write: u8,
@@ -88,6 +103,18 @@ pub struct PPU {
     scroll_x: u8,
     scroll_y: u8,
     scroll_write: u8,
+
+    sprite_size: u8,
+    bg_pattern_tbl: u16,
+    sprite_pattern_tbl: u16,
+    name_table: u16,
+
+    bg_color: u8,
+    sprite_enable: bool,
+    bg_enable: bool,
+    sprite_left_enable: bool,
+    bg_left_enable: bool,
+    grayscale: u8,
 }
 
 impl PPU {
@@ -106,14 +133,29 @@ impl PPU {
             oam: [0; PPU_OAM_SIZE],
             pram: [0; PPU_PRAM_SIZE],
 
+            nmi_gen: false,
+            cycle: 0,
+
             vram: [0; VRAM_SIZE],
-            vram_addr_inc: 1,
+            vram_addr_inc: VRAM_INCREMENT_1,
             vram_addr_write: 0,
             vram_addr: 0x2000,
 
             scroll_x: 0,
             scroll_y: 0,
             scroll_write: 0,
+
+            sprite_size: SPRITE_SIZE_8X8,
+            bg_pattern_tbl: CHR_ROM_BG_PATTERN_TABLE_0,
+            sprite_pattern_tbl: CHR_ROM_SPRITE_PATTERN_TABLE_0,
+            name_table: NAME_TABLE_0,
+
+            bg_color: BG_COLOR_BLACK,
+            sprite_enable: false,
+            bg_enable: false,
+            sprite_left_enable: false,
+            bg_left_enable: false,
+            grayscale: GRAYSCALE_COLOR,
         }
     }
 
@@ -270,80 +312,117 @@ static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
     ppu
 });
 
-fn ppu_vblank_nmi()
+fn vblank_nmi()
 {
+    // TODO :V-Blank
     cpu_interrupt(InterruptType::NMI);
     print!("[DEBUG]: PPU V-Blank! NMI Generated!");
 }
 
-fn ppu_reg_polling()
+fn reg_polling()
 {
     unsafe {
         // ==========================================================================
         // [PPUCTRL]
         // ==========================================================================
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT) != 0 {
-            S_PPU.vram_addr_inc = 32;
+        // bit 7
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_GENERATE_NMI) != 0 {
+            S_PPU.nmi_gen = true;
         }else{
-            S_PPU.vram_addr_inc = 1;
+            S_PPU.nmi_gen = false;
+        }
+
+        // bit 6 ... 1固定
+
+        // bit 5
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_SIZE) != 0 {
+            S_PPU.sprite_size = SPRITE_SIZE_8X16;   // 8x16
+        }else{
+            S_PPU.vram_addr_inc = SPRITE_SIZE_8X8; // 8x8
+        }
+
+        // bit 4
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR) != 0 {
+            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_1;   // BG Pattern Tbl 1
+        }else{
+            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_0; // BG Pattern Tbl 0
+        }
+
+        // bit 3
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR) != 0 {
+            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_1;   // BG Pattern Tbl 1
+        }else{
+            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_0; // BG Pattern Tbl 0
+        }
+
+        // bit 2
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT) != 0 {
+            S_PPU.vram_addr_inc = VRAM_INCREMENT_32; // +=32
+        }else{
+            S_PPU.vram_addr_inc = VRAM_INCREMENT_1; // +=1
+        }
+
+        // bit[1:0]
+        let name_tbl_bit: u8 = S_PPU.ppuctrl & REG_PPUCTRL_BIT_NAMETABLE;
+        match name_tbl_bit {
+            0x03     => S_PPU.name_table = NAME_TABLE_3,
+            0x02     => S_PPU.name_table = NAME_TABLE_2,
+            0x01     => S_PPU.name_table = NAME_TABLE_1,
+            0x00 | _ => S_PPU.name_table = NAME_TABLE_0,
         }
 
         // ==========================================================================
         // [PPUMASK]
         // ==========================================================================
+        // bit [7:5]
         let bg_color: u8 = (S_PPU.ppumask & REG_PPUMASK_BIT_BG_COLOR) >> 6;
         match bg_color {
-            BG_COLOR_RED => {
-                // TODO :背景色　赤
-            },
-            BG_COLOR_GREEN => {
-                // TODO :背景色　緑
-            },
-            BG_COLOR_BLUE => {
-                // TODO :背景色　青
-            },
-            BG_COLOR_BLACK | _ => {
-                // TODO :背景色　黒
-            },
+            BG_COLOR_RED       => S_PPU.bg_color = BG_COLOR_RED,
+            BG_COLOR_GREEN     => S_PPU.bg_color = BG_COLOR_GREEN,
+            BG_COLOR_BLUE      => S_PPU.bg_color = BG_COLOR_BLUE,
+            BG_COLOR_BLACK | _ => S_PPU.bg_color = BG_COLOR_BLACK,
         }
 
+        // bit 4
         if(S_PPU.ppumask & REG_PPUMASK_BIT_SPRITE_ENABLE) != 0 {
-            // TODO :スプライト 表示
+            S_PPU.sprite_enable = true;
         }else{
-            // TODO :スプライト 非表示
+            S_PPU.sprite_enable = false;
         }
 
+        // bit 3
         if(S_PPU.ppumask & REG_PPUMASK_BIT_BACKGROUND_ENABLE) != 0 {
-            // TODO :背景 表示
+            S_PPU.bg_enable = true;
         }else{
-            // TODO :背景 非表示
+            S_PPU.bg_enable = false;
         }
 
+        // bit 2
         if(S_PPU.ppumask & REG_PPUMASK_BIT_SPRITE_LEFT_COLUMN) != 0 {
-            // TODO :スプライト画面左8ピクセル 表示
+            S_PPU.sprite_left_enable = true;
         }else{
-            // TODO :スプライト画面左8ピクセル 非表示
+            S_PPU.sprite_left_enable = false;
         }
 
+        // bit 1
         if(S_PPU.ppumask & REG_PPUMASK_BIT_BACKGROUND_LEFT_COLUMN) != 0 {
-            // TODO :背景画面左8ピクセル 表示
+            S_PPU.bg_left_enable = true;
         }else{
-            // TODO :背景画面左8ピクセル 非表示
+            S_PPU.bg_left_enable = false;
         }
 
+        // bit 0
         if(S_PPU.ppumask & REG_PPUMASK_BIT_GRAYSCALE) != GRAYSCALE_COLOR {
-            // TODO :モノクロ表示
+            S_PPU.grayscale = GRAYSCALE_MONOCHRO;
         }else{
-            // TODO :カラー表示
+            S_PPU.grayscale = GRAYSCALE_COLOR;
         }
-
         // ==========================================================================
         // [PPUSTATUS]
         // ==========================================================================
-        // TODO :V-Blank
         if(S_PPU.ppustatus & REG_PPUSTATUS_BIT_VBLANK) != 0 {
-            if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_GENERATE_NMI) != 0 {
-                ppu_vblank_nmi();
+            if S_PPU.nmi_gen != false {
+                vblank_nmi();
             }
         }
 
@@ -359,6 +438,16 @@ fn ppu_reg_polling()
     }
 }
 
+fn data_set()
+{
+    // TODO :描画データ準備処理
+}
+
+fn display_render()
+{
+    // TODO :描画データをSDL2に渡して画面描画
+}
+
 pub fn ppu_reset() -> Box<PPU>
 {
     unsafe {
@@ -370,7 +459,9 @@ pub fn ppu_reset() -> Box<PPU>
 
 pub fn ppu_main()
 {
-    ppu_reg_polling();
+    reg_polling();    // レジスタのポーリング
+    data_set();       // 描画データの準備
+    display_render(); // 画面描画(@SDL2)
 }
 
 // ====================================== TEST ======================================

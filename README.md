@@ -31,7 +31,7 @@ I am developing an emulator based on them! (I even took it apart and analyzed it
     - (TBD)Emu Stop,Emu Rewinding, etc.
 
 # 📍PJ Status / PJ進捗状況📊
-## `PJ Status / 進捗率` ... `📊70.588%📊`  
+## `PJ Status / 進捗率` ... `📊63.158%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file"  width="95%">
@@ -45,14 +45,9 @@ I am developing an emulator based on them! (I even took it apart and analyzed it
 >PCポケットカルチャーシリーズ ファミコンの驚くべき発想力 ―限界を突破する技術に学べ―  
 [About]💰💸🤑 -> : https://gihyo.jp/book/2010/978-4-7741-4429-0
   
+<div align="center">
 <img src="dev/nes_refarence_book.jpg" alt="book" width="50%">
-  
-## Block Diagram Reference🎓📘📖
-👇Very Very Nice! Block Diagram Reference!👇
-
-<img src="https://www.zupimages.net/up/20/35/rswa.png" alt="nes">
-
-> 引用元(Reference From): https://forums.nesdev.org/viewtopic.php?t=20685&start=75
+</div>
 
 ## 6502 & RP2A03 Reference🎓📘📖
 https://www.nesdev.org/wiki/NES_reference_guide  
