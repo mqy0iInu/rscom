@@ -54,6 +54,7 @@ sequenceDiagram
 # 📍PPU🎞️📺📺
 ```mermaid
 sequenceDiagram
+    participant CHR-ROM
     participant VRAM
     participant PPU
     participant CPU
@@ -62,6 +63,7 @@ sequenceDiagram
     participant OAM
 
     loop
+      activate CHR-ROM
       activate VRAM
       activate PPU
       activate CPU
@@ -72,6 +74,7 @@ sequenceDiagram
       CPU-)PPU: レジスタ操作
       DMA->>WRAM: DMA転送開始
       Note right of PPU: V-Blank期間
+      Note right of CPU:PPUにデータを詰める期間
       WRAM->>OAM: 256Byte 転送
       OAM-->>WRAM: 
       WRAM-->>DMA: 
@@ -80,15 +83,17 @@ sequenceDiagram
 
       PPU->>CPU: Vblank終了通知
       PPU->>CPU: NMI
+      CHR-ROM->>PPU: パターンテーブル
       PPU->>VRAM: 描画データ
       Note right of PPU: 描画中
       PPU->>CPU: Vblank開始通知
     end
 
+    deactivate CHR-ROM
+    deactivate VRAM
     deactivate PPU
     deactivate CPU
     deactivate WRAM
-    deactivate VRAM
 ```
 
 # 📍Reference🎓📘📖
