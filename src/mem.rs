@@ -123,12 +123,15 @@ impl Memory {
         println!("[DEBUG] : DMA Start");
 
         cpu_run(false);
+        self.ppu_reg.oamdma_run = true;
         // WRAM to OAM (256Byte)
         for i in 0..=DMA_SIZE {
             let mut _data = self.mem_read(start_addr);
             self.ppu_reg.ppu_oam_write(i, _data);
             start_addr += 1;
         }
+        self.ppu_reg.oamdma_run = false;
+        self.ppu_reg.oamdma_done = true;
         cpu_run(true);
     }
 }

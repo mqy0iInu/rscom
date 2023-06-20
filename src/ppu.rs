@@ -88,13 +88,15 @@ pub struct PPU {
     ppuscroll: u8,
     ppuaddr: u8,
     ppudata: u8,
-    // oamdma: u8,
 
+    pub oamdma_run: bool,
+    pub oamdma_done: bool,
     oam: [u8; PPU_OAM_SIZE],
     pram: [u8; PPU_PRAM_SIZE],
 
     nmi_gen: bool,
     cycle: u16,
+
     vram: [u8; VRAM_SIZE],
     vram_addr_inc: u8,
     vram_addr_write: u8,
@@ -128,8 +130,9 @@ impl PPU {
             ppuscroll: 0,
             ppuaddr: 0,
             ppudata: 0,
-            // oamdma: 0,
 
+            oamdma_run: false,
+            oamdma_done: false,
             oam: [0; PPU_OAM_SIZE],
             pram: [0; PPU_PRAM_SIZE],
 
@@ -312,13 +315,6 @@ static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
     ppu
 });
 
-fn vblank_nmi()
-{
-    // TODO :V-Blank
-    cpu_interrupt(InterruptType::NMI);
-    print!("[DEBUG]: PPU V-Blank! NMI Generated!");
-}
-
 fn reg_polling()
 {
     unsafe {
@@ -422,7 +418,7 @@ fn reg_polling()
         // ==========================================================================
         if(S_PPU.ppustatus & REG_PPUSTATUS_BIT_VBLANK) != 0 {
             if S_PPU.nmi_gen != false {
-                vblank_nmi();
+                nmi_gen();
             }
         }
 
@@ -448,6 +444,12 @@ fn display_render()
     // TODO :描画データをSDL2に渡して画面描画
 }
 
+fn nmi_gen()
+{
+    cpu_interrupt(InterruptType::NMI);
+    print!("[DEBUG]: PPU V-Blank! NMI Generated!");
+}
+
 pub fn ppu_reset() -> Box<PPU>
 {
     unsafe {
@@ -459,9 +461,23 @@ pub fn ppu_reset() -> Box<PPU>
 
 pub fn ppu_main()
 {
-    reg_polling();    // レジスタのポーリング
-    data_set();       // 描画データの準備
-    display_render(); // 画面描画(@SDL2)
+    unsafe {
+        if (S_PPU.oamdma_run != true) && (S_PPU.oamdma_done != false) {
+            // V-Blak終了
+            S_PPU.ppustatus &= !REG_PPUSTATUS_BIT_VBLANK;
+            if S_PPU.nmi_gen != false {
+                nmi_gen(); // NMI
+            }
+            // PPUのお仕事（1フレーム）
+            reg_polling();    // レジスタのポーリング
+            data_set();       // 描画データの準備
+            display_render(); // 画面描画(@SDL2)
+            S_PPU.oamdma_done = false;
+        }else{
+            // V-Blak開始
+            S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
+        }
+    }
 }
 
 // ====================================== TEST ======================================

@@ -13,33 +13,88 @@ I am developing an emulator based on them! (I even took it apart and analyzed it
 <img src="dev/IMG_20230612_215026.jpg" alt="2dness" width="45%">
 </div>
 
-# 📍Emulator Structure (Design)
-`Self Promotion` ... `Multi Threaded NES Emulator!!!`  
-
-- `Main Functuion🧑‍💻`
-  - `CPU Thread🧑‍💻`
-    - `1 Instruction Fetch🔎`
-    - `2 Instruction Decode📑`
-    - `3 Instruction Execute🏃🏃‍♂️🏃‍♀️`
-    - `4 PPU,APU Register Polling🔎💾`
-    - `5 Key Input Polling(SDL2)🔎🖱️⌨`
-  - `PPU Thread🧑‍💻`
-    - `Screen Rendering(SDL2)🎞️📺📺`
-  - `APU Thread🧑‍💻`
-    - `Audio Output(SDL2)🎵🎶🔊`
-  - `Main Functuion Loop🧑‍💻`
-    - (TBD)Emu Stop,Emu Rewinding, etc.
-
 # 📍PJ Status / PJ進捗状況📊
 ## `PJ Status / 進捗率` ... `📊63.158%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file"  width="95%">
 
+# 📍Emulator Structure (Design)
+# 📍CPU🧑‍💻
+```mermaid
+sequenceDiagram
+    participant ROM
+    participant CPU
+    participant WRAM
+    participant PPU
+    participant APU
+
+    loop
+      activate ROM
+      activate CPU
+      activate WRAM
+      activate PPU
+      activate APU
+
+      ROM->>CPU: Fetch
+      CPU->>CPU: Decode
+      CPU->>CPU: Execute
+      CPU-)WRAM:Data
+      CPU-)PPU:Register
+      CPU-)APU:Register
+    end
+
+    deactivate ROM
+    deactivate CPU
+    deactivate WRAM
+    deactivate PPU
+    deactivate APU
+```
+
+# 📍PPU🎞️📺📺
+```mermaid
+sequenceDiagram
+    participant VRAM
+    participant PPU
+    participant CPU
+    participant DMA
+    participant WRAM
+    participant OAM
+
+    loop
+      activate VRAM
+      activate PPU
+      activate CPU
+      activate WRAM
+
+      PPU -) CPU: V-Blank開始
+      CPU->> +DMA: DMA開始($4014に書き込み)
+      CPU-)PPU: レジスタ操作
+      DMA->>WRAM: DMA転送開始
+      Note right of PPU: V-Blank期間
+      WRAM->>OAM: 256Byte 転送
+      OAM-->>WRAM: 
+      WRAM-->>DMA: 
+      DMA-->>CPU: 転送終了
+      deactivate DMA
+
+      PPU->>CPU: Vblank終了通知
+      PPU->>CPU: NMI
+      PPU->>VRAM: 描画データ
+      Note right of PPU: 描画中
+      PPU->>CPU: Vblank開始通知
+    end
+
+    deactivate PPU
+    deactivate CPU
+    deactivate WRAM
+    deactivate VRAM
+```
+
 # 📍Reference🎓📘📖
 下記に参考文献を示す。
 
-## 📍Book Referenc🎓📘📖
+## 📍Book Reference🎓📘📖
 
 `👇This is my NES Bible 🤣👼👼‼`  
 >PCポケットカルチャーシリーズ ファミコンの驚くべき発想力 ―限界を突破する技術に学べ―  
