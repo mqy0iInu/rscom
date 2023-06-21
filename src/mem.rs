@@ -3,14 +3,14 @@ use crate::ppu::*;
 use crate::apu::*;
 use crate::cassette::*;
 
-pub const BIN_BIT_7: u8 = 0x80;            // bit7
-pub const BIN_BIT_6: u8 = 0x40;            // bit6
-pub const BIN_BIT_5: u8 = 0x20;            // bit5
-pub const BIN_BIT_4: u8 = 0x10;            // bit4
-pub const BIN_BIT_3: u8 = 0x08;            // bit3
-pub const BIN_BIT_2: u8 = 0x04;            // bit2
-pub const BIN_BIT_1: u8 = 0x02;            // bit1
-pub const BIN_BIT_0: u8 = 0x01;            // bit0
+pub const BIN_BIT_7: u8 = 0x80;         // bit7
+pub const BIN_BIT_6: u8 = 0x40;         // bit6
+pub const BIN_BIT_5: u8 = 0x20;         // bit5
+pub const BIN_BIT_4: u8 = 0x10;         // bit4
+pub const BIN_BIT_3: u8 = 0x08;         // bit3
+pub const BIN_BIT_2: u8 = 0x04;         // bit2
+pub const BIN_BIT_1: u8 = 0x02;         // bit1
+pub const BIN_BIT_0: u8 = 0x01;         // bit0
 
 pub const ADDR_CHR_ROM: u16 = 0x4020;   // CHR-ROM TOP
 pub const ADDR_PRG_RAM: u16 = 0xFFFE;   // PRG-RAM TOP
@@ -47,7 +47,6 @@ pub const SNAKE_GAME_TBL: [u8; 310] = [
 #[derive(Clone)]
 pub struct Memory {
     pub wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
-
     pub dma_start: u8,
     pub apu_reg: APUReg,          // APUレジスタ
     pub ppu_reg: PPU,             // PPUレジスタ
@@ -119,15 +118,15 @@ impl Memory {
     pub fn dma_start(&mut self)
     {
         let mut start_addr:u16 = self.dma_start as u16;
-        start_addr =  (start_addr << 0x08) as u16;
-        println!("[DEBUG] : DMA Start");
+        start_addr = (start_addr << 8) as u16;
+        println!("[DEBUG] : DMA Start (WRAM ${:04X} to OAM, 256Byte DMA)", start_addr);
 
         cpu_run(false);
         self.ppu_reg.oamdma_run = true;
         // WRAM to OAM (256Byte)
         for i in 0..=DMA_SIZE {
             let mut _data = self.mem_read(start_addr);
-            self.ppu_reg.ppu_oam_write(i, _data);
+            self.ppu_reg.oam[i as usize] =_data;
             start_addr += 1;
         }
         self.ppu_reg.oamdma_run = false;

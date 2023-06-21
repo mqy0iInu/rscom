@@ -39,7 +39,6 @@ const NAME_TABLE_3: u16                          = 0x2C00;
 
 // [PPUMASK Bits]
 const REG_PPUMASK_BIT_BG_COLOR: u8               = 0b11100000; // Bit7-5: 背景色
-
 const REG_PPUMASK_BIT_SPRITE_ENABLE: u8          = 0b00010000; // Bit4: スプライト表示 (0: オフ, 1: オン)
 const REG_PPUMASK_BIT_BACKGROUND_ENABLE: u8      = 0b00001000; // Bit3: 背景表示 (0: オフ, 1: オン)
 const REG_PPUMASK_BIT_SPRITE_LEFT_COLUMN: u8     = 0b00000100; // Bit2: スプライトマスク、画面左8ピクセルを描画しない。(0:描画しない、1:描画)
@@ -91,10 +90,11 @@ pub struct PPU {
 
     pub oamdma_run: bool,
     pub oamdma_done: bool,
-    oam: [u8; PPU_OAM_SIZE],
+    pub oam: [u8; PPU_OAM_SIZE],
     pram: [u8; PPU_PRAM_SIZE],
 
     nmi_gen: bool,
+    master_slave: u8,
     cycle: u16,
 
     vram: [u8; VRAM_SIZE],
@@ -137,6 +137,7 @@ impl PPU {
             pram: [0; PPU_PRAM_SIZE],
 
             nmi_gen: false,
+            master_slave: 0,
             cycle: 0,
 
             vram: [0; VRAM_SIZE],
@@ -234,16 +235,6 @@ impl PPU {
         }
     }
 
-    // pub fn ppu_oam_read(&mut self, addr: u8) -> u8
-    // {
-    //     self.oam[addr as usize]
-    // }
-
-    pub fn ppu_oam_write(&mut self, addr: u8, data: u8)
-    {
-        self.oam[addr as usize] = data;
-    }
-
     fn ppu_mem_read(&mut self, addr: u16) -> u8 {
         match addr {
             // Pattern Table 0 (CHR-ROM)
@@ -328,34 +319,39 @@ fn reg_polling()
             S_PPU.nmi_gen = false;
         }
 
-        // bit 6 ... 1固定
+        // bit 6
+        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT) != 0 {
+            S_PPU.master_slave = 1;
+        }else{
+            S_PPU.master_slave = 0;
+        }
 
         // bit 5
         if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_SIZE) != 0 {
             S_PPU.sprite_size = SPRITE_SIZE_8X16;   // 8x16
         }else{
-            S_PPU.vram_addr_inc = SPRITE_SIZE_8X8; // 8x8
+            S_PPU.vram_addr_inc = SPRITE_SIZE_8X8;  // 8x8
         }
 
         // bit 4
         if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR) != 0 {
             S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_1;   // BG Pattern Tbl 1
         }else{
-            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_0; // BG Pattern Tbl 0
+            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_0;   // BG Pattern Tbl 0
         }
 
         // bit 3
         if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR) != 0 {
             S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_1;   // BG Pattern Tbl 1
         }else{
-            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_0; // BG Pattern Tbl 0
+            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_0;   // BG Pattern Tbl 0
         }
 
         // bit 2
         if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT) != 0 {
             S_PPU.vram_addr_inc = VRAM_INCREMENT_32; // +=32
         }else{
-            S_PPU.vram_addr_inc = VRAM_INCREMENT_1; // +=1
+            S_PPU.vram_addr_inc = VRAM_INCREMENT_1;  // +=1
         }
 
         // bit[1:0]
@@ -413,35 +409,50 @@ fn reg_polling()
         }else{
             S_PPU.grayscale = GRAYSCALE_COLOR;
         }
-        // ==========================================================================
-        // [PPUSTATUS]
-        // ==========================================================================
-        if(S_PPU.ppustatus & REG_PPUSTATUS_BIT_VBLANK) != 0 {
-            if S_PPU.nmi_gen != false {
-                nmi_gen();
-            }
-        }
-
-        if(S_PPU.ppustatus & REG_PPUSTATUS_BIT_SPRITE_0_HIT) != 0 {
-            // TODO :スプライトヒット
-        }
-
-        if(S_PPU.ppustatus & REG_PPUSTATUS_BIT_SPRITE_OVERFLOW) != 0 {
-            // TODO :スプライトオーバーフロー 9個以上
-        }else{
-            // TODO :スプライトオーバーフロー 8個以下
-        }
     }
 }
 
-fn data_set()
+// [341クロックで1ライン描画＆次のライン準備]
+fn data_set(line: u16)
 {
-    // TODO :描画データ準備処理
+    // TODO :1) 最初の256クロックでBGとスプライトの描画
+    for line in 0..32 // 33回実施
+    {
+        // TODO :1-1)ネームテーブルから1バイトフェッチ
+        // TODO :1-2)属性テーブルから1バイトフェッチ
+        // TODO :1-3)パターンテーブルから2バイトフェッチ
+        // TODO :描画データをSDL2に渡して画面描画
+    }
+
+    // TODO :2) 次のスキャンラインで描画されるスプライトの探索
+    for line in 0..7 // 8回実施
+    {
+        // TODO :2-1) スプライトパターンから2バイトのフェッチ
+    }
 }
 
+// [1フレーム(262本のスキャンライン)の描画]
+// ※ 1フレーム = 1/60fps(1/59.94) ≒ 16.668 msec
+// ※ (262 x 341クロック) = 89,342クロック
+// ※ ≒ 16,639,358.727 nsec ≒ 16.639 msec
+// ※T ≒ 186.2434098933431 nsec
 fn display_render()
 {
-    // TODO :描画データをSDL2に渡して画面描画
+    // 最初の240本で画面が描画
+    for line in 0..239
+    {
+        data_set(line);
+    }
+
+    // [V-Blak開始]
+    // 残22本分 -> 垂直回帰時間
+    // ※ = (22 x 341クロック) = 7502クロック ≒ 1,397,198.061 nsec ≒ 1.397 msec
+    // ※ 垂直回帰時間 / CPUクロック = 2,500.667 CPUサイクル?
+    // ※T ≒ 186.2434098933431 nsec
+    // ※1 CPU Clock = 558.7302296800292 nsec
+    unsafe {
+        S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
+    }
 }
 
 fn nmi_gen()
@@ -453,12 +464,16 @@ fn nmi_gen()
 pub fn ppu_reset() -> Box<PPU>
 {
     unsafe {
-        // TODO :PPU Reset
         let ppu_box: Box<PPU> = Box::from_raw(Pin::as_mut(&mut *S_PPU).get_mut());
+        // TODO :PPU Reset
+
+        // V-Blak開始
+        S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
         ppu_box
     }
 }
 
+// NTSC 60FPS（59.94fps）のPPUの処理
 pub fn ppu_main()
 {
     unsafe {
@@ -468,14 +483,10 @@ pub fn ppu_main()
             if S_PPU.nmi_gen != false {
                 nmi_gen(); // NMI
             }
-            // PPUのお仕事（1フレーム）
+            // [PPUのお仕事]
             reg_polling();    // レジスタのポーリング
-            data_set();       // 描画データの準備
             display_render(); // 画面描画(@SDL2)
             S_PPU.oamdma_done = false;
-        }else{
-            // V-Blak開始
-            S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
         }
     }
 }

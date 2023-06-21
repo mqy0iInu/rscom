@@ -107,7 +107,11 @@ fn main()
     // ==================================================================================
     // [Thred Main Loop]
 
-    // CPU Thred @1.79 MHz(558.6 nsec)
+    // 元の周波数 = 21.47727 MHz
+    // クロック分周比 = 12
+    // CPUの周波数 = 1.7897725 MHz
+    // T = 558.7302296800292 nsec
+    // CPU Thred @1.79 MHz(558.55 nsec)
     let _cpu_thread = thread::spawn(|| {
         loop {
             cpu_main();
@@ -117,7 +121,11 @@ fn main()
         }
     });
 
-    // PPU Thred @5.37 MHz(186.4 nsec)
+    // 元の周波数 = 21.47727 MHz
+    // クロック分周比: 4
+    // PPUの周波数 = 5.3693175 MHz
+    // T = 186.2434098933431 nsec
+    // PPU Thred @5.37 MHz(186.41 nsec)
     let _ppu_thread = thread::spawn(|| {
         loop {
             ppu_main();
