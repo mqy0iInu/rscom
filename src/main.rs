@@ -35,6 +35,7 @@ fn color(byte: u8) -> Color {
         _ => sdl2::pixels::Color::CYAN,
     }
 }
+
 fn read_screen_state(cpu_rp2a03: &mut RP2A03, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     let mut frame_idx = 0;
     let mut update = false;

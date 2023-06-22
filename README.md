@@ -121,8 +121,8 @@ sequenceDiagram
     deactivate WRAM
     deactivate OAM
 ```
-# 📍PJ Status / PJ進捗状況📊
-## `PJ Status / 進捗率` ... `📊63.158%📊`  
+# 📍PJ Statu
+## `PJ Status(進捗)` ... `📊63.158%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file"  width="95%">

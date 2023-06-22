@@ -1,6 +1,8 @@
 use crate::mem::*;
+use crate::cassette::*;
 use std::pin::Pin;
 use once_cell::sync::Lazy;
+use std::ops::RangeInclusive;
 
 pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
 pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
@@ -1067,7 +1069,6 @@ impl RP2A03{
         }
         _addr
     }
-
 }
 
 static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
@@ -1102,10 +1103,25 @@ fn cpu_proc() {
     }
 }
 
+
 pub fn chr_rom_read(addr: u16) -> u8
 {
     unsafe {
         S_CPU.nes_mem.mem_read(addr)
+    }
+}
+
+pub fn get_chr_rom_ptr(index: RangeInclusive<usize>) -> &'static [u8]
+{
+    unsafe {
+        &S_CPU.nes_mem.cassette.get_chr_rom_ptr(index)
+    }
+}
+
+pub fn get_chr_rom_mirroring() -> Mirroring
+{
+    unsafe {
+        S_CPU.nes_mem.cassette.screen_mirroring
     }
 }
 
