@@ -23,7 +23,7 @@ use cartridge::load_rom;
 use frame::Frame;
 use gamepad::GamePad;
 use log::{debug, info, log_enabled, trace, Level};
-use mapper::Mapper2;
+use mapper::MapperMMC;
 use ppu::PPU;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -35,7 +35,7 @@ use std::io::Write;
 use std::sync::Mutex;
 
 lazy_static! {
-    pub static ref MAPPER: Mutex<Box<Mapper2>> = Mutex::new(Box::new(Mapper2::new()));
+    pub static ref MAPPER: Mutex<Box<MapperMMC>> = Mutex::new(Box::new(MapperMMC::new()));
 }
 
 fn main() {
@@ -78,7 +78,7 @@ fn main() {
     key_map.insert(Keycode::S, gamepad::Button::BUTTON_B);
 
     // [OK]
-    // [Mapper 0]
+    // [MapperMMC 0]
     // let rom = load_rom("rom/nes/mapper_0/Alter_Ego.nes");
     // let rom = load_rom("rom/nes/mapper_0/BombSweeper.nes");
     // let rom = load_rom("rom/nes/mapper_0/pacman.nes");
@@ -86,11 +86,19 @@ fn main() {
     // let rom = load_rom("rom/nes/mapper_0/popeye.nes");
     // let rom = load_rom("rom/nes/mapper_0/excitebike.nes");
 
-    // [Mapper 2]
-    let rom = load_rom("rom/nes/Dragon Quest 2 (J).nes");
+    // [MapperMMC 1]
+    // let rom = load_rom("rom/nes/Dragon Quest 3 (J).nes");
+    // let rom = load_rom("rom/nes/Dragon Quest 4 (J).nes");
+
+    // [MapperMMC 2]
+    // let rom = load_rom("rom/nes/Dragon Quest 2 (J).nes");
+
+    // [MapperMMC 3]
+    let rom = load_rom("rom/nes/Dragon Quest.nes");
+
 
     // [NG]
-    // [Mapper 0]
+    // [MapperMMC 0]
     // let rom = load_rom("rom/nes/mapper_0/donkeykong.nes");
     // let rom = load_rom("rom/nes/mapper_0/xevious.nes");
     // let rom = load_rom("rom/nes/mapper_0/golf.nes");
@@ -98,6 +106,8 @@ fn main() {
     // let rom = load_rom("rom/nes/mapper_0/mario_bros.nes");
 
     MAPPER.lock().unwrap().prg_rom = rom.prg_rom.clone();
+    MAPPER.lock().unwrap().chr_rom = rom.chr_rom.clone();
+    MAPPER.lock().unwrap().mapper = rom.mapper.clone();
 
     info!(
         "ROM: mapper={}, mirroring={:?} chr_ram={}",

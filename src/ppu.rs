@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use log::{debug, info, trace};
-
+use crate::MAPPER;
 use crate::{cpu::IN_TRACE, rom::Mirroring};
 
 pub struct PPU {
@@ -79,8 +79,13 @@ impl PPU {
             0x0000..=0x1FFF => {
                 // FIXME
                 debug!("write CHR_ROM {:04X} => {:02X}", addr, value);
-                if self.is_chr_ram {
-                    self.chr_rom[addr as usize] = value;
+                let mapper = MAPPER.lock().unwrap().mapper;
+                if mapper == 3 {
+                    MAPPER.lock().unwrap().write(addr, value);
+                }else{
+                    if self.is_chr_ram {
+                        self.chr_rom[addr as usize] = value;
+                    }
                 }
             }
             0x2000..=0x2FFF => {
@@ -247,7 +252,12 @@ impl PPU {
                     self.internal_data_buf
                 } else {
                     let result = self.internal_data_buf;
-                    self.internal_data_buf = self.chr_rom[addr as usize];
+                    let mapper = MAPPER.lock().unwrap().mapper;
+                    if mapper == 3 {
+                        self.internal_data_buf = MAPPER.lock().unwrap().read_chr_rom(mapper, addr);
+                    }else{
+                        self.internal_data_buf = self.chr_rom[addr as usize];
+                    }
                     result
                 }
             }
