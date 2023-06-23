@@ -64,6 +64,60 @@ impl PPU {
         }
     }
 
+
+    pub fn read_data(&mut self) -> u8 {
+        let addr = self.addr.get();
+        if !unsafe { IN_TRACE } {
+            self.increment_vram_addr();
+        }
+        debug!("READ PPU: {:04X}", addr);
+
+        match addr {
+            0..=0x1FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    let mapper = MAPPER.lock().unwrap().mapper;
+                    if mapper == 3 {
+                        self.internal_data_buf = MAPPER.lock().unwrap().read_chr_rom(mapper, addr);
+                    }else{
+                        self.internal_data_buf = self.chr_rom[addr as usize];
+                    }
+                    result
+                }
+            }
+            0x2000..=0x2FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
+                    result
+                }
+            }
+            0x3000..=0x3EFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
+                    result
+                }
+            }
+            0x3F00..=0x3FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    self.internal_data_buf =
+                        self.palette_table[self.mirror_palette_addr(addr) as usize];
+                    self.internal_data_buf
+                }
+            }
+            _ => panic!("unexpected access to mirrored space {}", addr),
+        }
+    }
+
     pub fn write_to_ppu_addr(&mut self, value: u8) {
         self.addr.update(value);
     }
@@ -237,59 +291,6 @@ impl PPU {
 
     fn increment_vram_addr(&mut self) {
         self.addr.increment(self.ctrl.vram_addr_increment());
-    }
-
-    pub fn read_data(&mut self) -> u8 {
-        let addr = self.addr.get();
-        if !unsafe { IN_TRACE } {
-            self.increment_vram_addr();
-        }
-        debug!("READ PPU: {:04X}", addr);
-
-        match addr {
-            0..=0x1FFF => {
-                if unsafe { IN_TRACE } {
-                    self.internal_data_buf
-                } else {
-                    let result = self.internal_data_buf;
-                    let mapper = MAPPER.lock().unwrap().mapper;
-                    if mapper == 3 {
-                        self.internal_data_buf = MAPPER.lock().unwrap().read_chr_rom(mapper, addr);
-                    }else{
-                        self.internal_data_buf = self.chr_rom[addr as usize];
-                    }
-                    result
-                }
-            }
-            0x2000..=0x2FFF => {
-                if unsafe { IN_TRACE } {
-                    self.internal_data_buf
-                } else {
-                    let result = self.internal_data_buf;
-                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
-                    result
-                }
-            }
-            0x3000..=0x3EFF => {
-                if unsafe { IN_TRACE } {
-                    self.internal_data_buf
-                } else {
-                    let result = self.internal_data_buf;
-                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
-                    result
-                }
-            }
-            0x3F00..=0x3FFF => {
-                if unsafe { IN_TRACE } {
-                    self.internal_data_buf
-                } else {
-                    self.internal_data_buf =
-                        self.palette_table[self.mirror_palette_addr(addr) as usize];
-                    self.internal_data_buf
-                }
-            }
-            _ => panic!("unexpected access to mirrored space {}", addr),
-        }
     }
 
     pub fn mirror_vram_addr(&self, addr: u16) -> u16 {
