@@ -78,7 +78,7 @@ fn main()
         // TODO :メインループ(TBD ... エミュレータGUI関連 etc.)
 
         // thread::sleep(Duration::from_nanos(187));
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(999));
         // thread::sleep(Duration::from_millis(2));
     }
     // ==================================================================================

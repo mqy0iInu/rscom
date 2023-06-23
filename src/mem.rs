@@ -50,7 +50,6 @@ pub struct Memory {
     pub wram: [u8; 2048],         // WRAM ... 2KB (For RP2A03)
     pub dma_start: u8,
     pub apu_reg: APUReg,          // APUレジスタ
-    pub ppu_reg: PPU,             // PPUレジスタ
     pub cassette: Cassette,       // カセット
 }
 
@@ -60,7 +59,6 @@ impl Memory {
             wram: [0; 2048],
             dma_start: 0,
             apu_reg: APUReg::new(),
-            ppu_reg: PPU::new(),
             cassette: Cassette::new(),
         }
     }
@@ -68,8 +66,9 @@ impl Memory {
     pub fn mem_reset(&mut self)
     {
         // TODO :MEM Reset
+        // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/Alter_Ego.nes");
         rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/BombSweeper.nes");
-        rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/pacman.nes");
+        // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/pacman.nes");
 
         // (DEBUG) :Snake Game(Only 6502 OP-Code)
         // let start_address = 0x600; // WRAMで実行する
@@ -84,13 +83,13 @@ impl Memory {
         match addr {
             0x0000..=0x07FF => self.wram[addr as usize],
             0x0800..=0x1FFF => self.wram[(addr % 0x0800) as usize],
-            0x2000..=0x2007 => self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_READ, 0),
-            0x2008..=0x3FFF => self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_READ, 0),
+            0x2000..=0x2007 => ppu_reg_ctrl(addr, PPU_REG_READ, 0),
+            0x2008..=0x3FFF => ppu_reg_ctrl(addr, PPU_REG_READ, 0),
             0x4000..=0x4017 => self.apu_reg.apu_reg_ctrl(addr, APU_REG_READ, 0),
             0x4020..=0x5FFF => self.cassette.chr_rom[(addr - 0x4020) as usize],
             // TODO :(DEBUG) PRG-RAM
             // 0x6000..=0x7FFF => self.cassette.chr_ram[(addr - 0x6000) as usize],
-            // TODO :(DEBUG)一旦、PRG-ROMをミラーしとく
+            // TODO :マッパーによるバンク切り(一旦、バンク0をミラーしとく)
             0x8000..=0xBFFF => self.cassette.prg_rom[(addr - 0x8000) as usize],
             0xC000..=0xFFFF => self.cassette.prg_rom[(addr - 0xC000) as usize],
             _ => panic!("Invalid Mem Addr: {:#04X}", addr),
@@ -101,8 +100,8 @@ impl Memory {
         match addr {
             0x0000..=0x07FF => self.wram[addr as usize] = data,
             0x0800..=0x1FFF => self.wram[(addr % 0x0800) as usize] = data,
-            0x2000..=0x2007 => { self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_WRITE, data);},
-            0x2008..=0x3FFF => { self.ppu_reg.ppu_reg_ctrl(addr, PPU_REG_WRITE, data);},
+            0x2000..=0x2007 => { ppu_reg_ctrl(addr, PPU_REG_WRITE, data); },
+            0x2008..=0x3FFF => { ppu_reg_ctrl(addr, PPU_REG_WRITE, data); },
             0x4000..=0x4013 | 0x4015 | 0x4017 => { self.apu_reg.apu_reg_ctrl(addr, APU_REG_WRITE, data);},
             0x4014          => {
                 self.dma_start = data ;
@@ -110,8 +109,8 @@ impl Memory {
             },
             0x4020..=0x5FFF => self.cassette.chr_rom[(addr - 0x4020) as usize] = data,       // CHR ROM ... 8KB or 16KB
             // 0x6000..=0x7FFF => self.cassette.chr_ram[(addr - 0x6000) as usize] = data,       // Ext RAM
+            // TODO :マッパーによるバンク切り(一旦、バンク0をミラーしとく)
             0x8000..=0xBFFF => self.cassette.prg_rom[(addr - 0x8000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
-            // TODO :(DEBUG)一旦、PRG-ROMをミラーしとく
             0xC000..=0xFFFF => self.cassette.prg_rom[(addr - 0xC000) as usize] = data,       // PRG ROM ... 8KB ~ 1MB
             _ => panic!("Invalid Mem Addr: {:#04X}", addr),
         }
@@ -124,15 +123,14 @@ impl Memory {
         println!("[DEBUG] : DMA Start (WRAM ${:04X} to OAM, 256Byte DMA)", start_addr);
 
         cpu_run(false);
-        self.ppu_reg.oamdma_run = true;
+        ppu_oamdma_status(true, false);
         // WRAM to OAM (256Byte)
         for i in 0..=DMA_SIZE {
             let mut _data = self.mem_read(start_addr);
-            self.ppu_reg.oam[i as usize] =_data;
+            ppu_mem_write((0x4000 + i as u16) as u16, _data);
             start_addr += 1;
         }
-        self.ppu_reg.oamdma_run = false;
-        self.ppu_reg.oamdma_done = true;
+        ppu_oamdma_status(false, true);
         cpu_run(true);
     }
 }

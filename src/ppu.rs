@@ -106,6 +106,15 @@ const VRAM_END_ADDR: u16 = 0x3FFF;
 // ==================================================================================
 pub const PPU_REG_READ: u8 = 0x00;
 pub const PPU_REG_WRITE: u8 = 0x01;
+// ==========================================================================
+static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
+    let ppu = Box::pin(PPU::new());
+    ppu
+});
+static mut CANVAS: Option<Canvas<Window>> = None;
+static mut TEXTURE: Option<Box<Texture<'static>>> = None;
+static mut TEXTURE_CREATOR: Option<*mut TextureCreator<WindowContext>> = None;
+// ==========================================================================
 
 #[derive(Clone)]
 pub struct Frame {
@@ -128,39 +137,6 @@ impl Frame {
             self.data[base] = rgb.0;
             self.data[base + 1] = rgb.1;
             self.data[base + 2] = rgb.2;
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RenderData {
-    pub name_val :u8,
-    pub attribute_val :u8,
-    pub bg_pattern: [u8; 2],
-    pub bg_parette_color: u8,
-
-    pub sprite_y: u8,
-    pub sprite_pattern_index :u8,
-    pub sprite_attribute: u8,
-    pub sprite_x: u8,
-    pub sprite_pattern:[u8; 2],
-    pub sprite_parette_color: u8,
-}
-
-impl RenderData {
-    pub fn new() -> Self {
-        RenderData {
-            name_val :0,
-            attribute_val :0,
-            bg_pattern :[0; 2],
-            bg_parette_color: 0,
-
-            sprite_y: 0,
-            sprite_pattern_index :0,
-            sprite_attribute: 0,
-            sprite_x: 0,
-            sprite_pattern :[0; 2],
-            sprite_parette_color: 0,
         }
     }
 }
@@ -199,7 +175,6 @@ pub struct PPU {
     pub oam: [u8; PPU_OAM_SIZE],
     pram: [u8; PPU_PRAM_SIZE],
 
-    pub render_data: RenderData,
     pub sprite_prefetch_buf: [u8; 16], // 2Byte x 8
     nmi_gen: bool,
     master_slave: u8,
@@ -250,9 +225,7 @@ impl PPU {
             oam: [0; PPU_OAM_SIZE],
             pram: [0; PPU_PRAM_SIZE],
 
-            render_data: RenderData::new(),
             sprite_prefetch_buf: [0; 16],
-
             nmi_gen: false,
             master_slave: 0,
             cycle: 0,
@@ -348,12 +321,11 @@ impl PPU {
         }
     }
 
-    pub fn ppu_reg_ctrl(&mut self, addr: u16, wr: u8, data: u8) -> u8
-    {
+    pub fn reg_ctrl(&mut self, addr: u16, wr: u8, data: u8) -> u8 {
         if wr != PPU_REG_WRITE {
             self.ppu_reg_write(addr, data);
             0
-        }else{
+        } else {
             self.ppu_reg_read(addr)
         }
     }
@@ -439,15 +411,6 @@ impl PPU {
         table
     }
 }
-
-
-// ==========================================================================
-static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
-    let ppu = Box::pin(PPU::new());
-    ppu
-});
-
-// ==========================================================================
 
 fn get_reg_config()
 {
@@ -751,10 +714,6 @@ fn nmi_gen()
     print!("[DEBUG]: PPU V-Blank! NMI Generated!");
 }
 
-static mut CANVAS: Option<Canvas<Window>> = None;
-static mut TEXTURE: Option<Box<Texture<'static>>> = None;
-static mut TEXTURE_CREATOR: Option<*mut TextureCreator<WindowContext>> = None;
-
 fn display_render() {
     unsafe {
         if let Some(canvas) = CANVAS.as_mut() {
@@ -796,19 +755,48 @@ fn sdl2_init(sdl_context: Sdl) {
     }
 }
 
+pub fn ppu_mem_read(addr: u16) -> u8 {
+    unsafe {
+        S_PPU.mem_read(addr)
+    }
+}
+
+pub fn ppu_mem_write(addr: u16, data: u8) {
+    unsafe {
+        S_PPU.mem_write(addr, data);
+    }
+}
+
+pub fn ppu_reg_ctrl(addr: u16, wr: u8, data: u8) -> u8 {
+    unsafe {
+        let mut reg_addr = addr;
+
+        // ミラーアドレスを実アドレスに変換
+        if (addr >= 0x2008) && (addr <= 0x3FFF) {
+            reg_addr = 0x2000 + (addr % 8);
+        }
+
+        S_PPU.reg_ctrl(reg_addr, wr, data)
+    }
+}
+
+pub fn ppu_oamdma_status(run: bool, done: bool){
+    unsafe {
+        S_PPU.oamdma_run = run;
+        S_PPU.oamdma_done = done;
+    }
+
+}
+
 pub fn ppu_reset(sdl_context: Sdl) -> Box<PPU>
 {
     unsafe {
         let ppu_box: Box<PPU> = Box::from_raw(Pin::as_mut(&mut *S_PPU).get_mut());
 
         // SDL2 グラフィック関連初期化
+        println!("[PPU] Render(SDL2) Init!!!");
         sdl2_init(sdl_context);
 
-        S_PPU.cycle = 0;
-        S_PPU.scanline = 0;
-
-        // V-Blak開始
-        S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
         ppu_box
     }
 }
@@ -817,9 +805,15 @@ pub fn ppu_reset(sdl_context: Sdl) -> Box<PPU>
 // ※1フレーム = 1/60fps(1/59.94) ≒ 16.668 msec
 pub fn ppu_main()
 {
+
     unsafe {
+        println!("[PPU] Cycle:{:03}, Line:{:03}", S_PPU.cycle, S_PPU.scanline);
+
         if S_PPU.cycle == 0 {
+            S_PPU.cycle = 0;
+            S_PPU.scanline = 0;
             S_PPU.oamdma_done = false;
+            S_PPU.oamdma_run = false;
             get_reg_config(); // レジスタ吸出し
         }
 
@@ -838,6 +832,7 @@ pub fn ppu_main()
         // 垂直回帰時間のCPUクロック = 2,500.667 CPUサイクル?
         // ※1 CPU Clock = 558.7302296800292 nsec
         if S_PPU.scanline == 241 {
+            println!("[PPU] V-Blank Start!");
             S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
             if S_PPU.nmi_gen != false {
                 nmi_gen(); // NMI
@@ -851,6 +846,7 @@ pub fn ppu_main()
 
         // [V-Blank終了]
         if S_PPU.scanline >= 262  {
+            println!("[PPU] V-Blank End");
             S_PPU.ppustatus &= !REG_PPUSTATUS_BIT_VBLANK;
             S_PPU.cycle = 0;
             S_PPU.scanline = 0;

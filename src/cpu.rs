@@ -1092,13 +1092,14 @@ fn cpu_reg_show()
 
 fn cpu_proc() {
     unsafe {
-        if (S_CPU.cpu_run != false) && (S_CPU.cycle == 0) {
+        // if (S_CPU.cpu_run != false) && (S_CPU.cycle == 0)
+        {
             let val = S_CPU.fetch_instruction();
             S_CPU.decode_instruction(val);
             S_CPU.execute_instruction();
-            S_CPU.cycle -= 1;
-        }else{
-            S_CPU.cycle -= 1;
+        //     S_CPU.cycle -= 1;
+        // }else{
+        //     S_CPU.cycle -= 1;
         }
     }
 }
