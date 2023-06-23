@@ -1,403 +1,157 @@
-use std::pin::Pin;
-use std::boxed::Box;
-use lazy_static::lazy_static;
-use once_cell::sync::Lazy;
-use sdl2::Sdl;
-use sdl2::render::Canvas;
-use sdl2::video::{Window, WindowContext};
-use sdl2::render::{Texture, TextureCreator};
-use sdl2::pixels::Color;
-use sdl2::pixels::PixelFormatEnum;
-use std::io::Write;
-use std::sync::Mutex;
+use bitflags::bitflags;
+use log::{debug, info, trace};
 
-// use crate::mem::*;
-use crate::cpu::*;
-use crate::cassette::*;
+use crate::{cpu::IN_TRACE, rom::Mirroring};
 
-const SCREEN_WIDTH : usize = 256;
-const SCREEN_HEIGHT: usize = 240;
-
-#[rustfmt::skip]
-const COLOR_PALLETE: [(u8,u8,u8); 64] = [
-    (0x80, 0x80, 0x80), (0x00, 0x3D, 0xA6), (0x00, 0x12, 0xB0), (0x44, 0x00, 0x96), (0xA1, 0x00, 0x5E), (0xC7, 0x00, 0x28),
-    (0xBA, 0x06, 0x00), (0x8C, 0x17, 0x00), (0x5C, 0x2F, 0x00), (0x10, 0x45, 0x00), (0x05, 0x4A, 0x00), (0x00, 0x47, 0x2E),
-    (0x00, 0x41, 0x66), (0x00, 0x00, 0x00), (0x05, 0x05, 0x05), (0x05, 0x05, 0x05), (0xC7, 0xC7, 0xC7), (0x00, 0x77, 0xFF),
-    (0x21, 0x55, 0xFF), (0x82, 0x37, 0xFA), (0xEB, 0x2F, 0xB5), (0xFF, 0x29, 0x50), (0xFF, 0x22, 0x00), (0xD6, 0x32, 0x00),
-    (0xC4, 0x62, 0x00), (0x35, 0x80, 0x00), (0x05, 0x8F, 0x00), (0x00, 0x8A, 0x55), (0x00, 0x99, 0xCC), (0x21, 0x21, 0x21),
-    (0x09, 0x09, 0x09), (0x09, 0x09, 0x09), (0xFF, 0xFF, 0xFF), (0x0F, 0xD7, 0xFF), (0x69, 0xA2, 0xFF), (0xD4, 0x80, 0xFF),
-    (0xFF, 0x45, 0xF3), (0xFF, 0x61, 0x8B), (0xFF, 0x88, 0x33), (0xFF, 0x9C, 0x12), (0xFA, 0xBC, 0x20), (0x9F, 0xE3, 0x0E),
-    (0x2B, 0xF0, 0x35), (0x0C, 0xF0, 0xA4), (0x05, 0xFB, 0xFF), (0x5E, 0x5E, 0x5E), (0x0D, 0x0D, 0x0D), (0x0D, 0x0D, 0x0D),
-    (0xFF, 0xFF, 0xFF), (0xA6, 0xFC, 0xFF), (0xB3, 0xEC, 0xFF), (0xDA, 0xAB, 0xEB), (0xFF, 0xA8, 0xF9), (0xFF, 0xAB, 0xB3),
-    (0xFF, 0xD2, 0xB0), (0xFF, 0xEF, 0xA6), (0xFF, 0xF7, 0x9C), (0xD7, 0xE8, 0x95), (0xA6, 0xED, 0xAF), (0xA2, 0xF2, 0xDA),
-    (0x99, 0xFF, 0xFC), (0xDD, 0xDD, 0xDD), (0x11, 0x11, 0x11), (0x11, 0x11, 0x11)
-];
-
-// ==================================================================================
-// [PPU Register]
-const PPU_REG_PPUCTRL: u16                       = 0x2000;
-const PPU_REG_PPUMASK: u16                       = 0x2001;
-const PPU_REG_PPUSTATUS: u16                     = 0x2002;
-const PPU_REG_OAMADDR: u16                       = 0x2003;
-const PPU_REG_OAMDATA: u16                       = 0x2004;
-const PPU_REG_PPUSCROLL: u16                     = 0x2005;
-const PPU_REG_PPUADDR: u16                       = 0x2006;
-const PPU_REG_PPUDATA: u16                       = 0x2007;
-// const PPU_REG_OAMDMA: u16                        = 0x4014;
-
-// [PPUCTRL Bits]
-const REG_PPUCTRL_BIT_GENERATE_NMI: u8           = 0b10000000; // Bit7: NMI生成 (0: オフ, 1: オン)
-const REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT: u8    = 0b01000000; // Bit6: マスタ/スレーブ選択(1固定)
-const REG_PPUCTRL_BIT_SPRITE_SIZE: u8            = 0b00100000; // Bit5: スプライトサイズ
-const REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR: u8 = 0b00010000; // Bit4: 背景パターンテーブルアドレス
-const REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR: u8    = 0b00001000; // Bit3: スプライトパターンテーブルアドレス
-const REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT: u8     = 0b00000100; // Bit2: VRAMアドレスインクリメント (0: 1++, 1: 32++)
-const REG_PPUCTRL_BIT_NAMETABLE: u8              = 0b00000011; // Bit[1:0]: 名前テーブル0～3
-
-const SPRITE_SIZE_8X8: u8                        = 0;
-const SPRITE_SIZE_8X16: u8                       = 1;
-const CHR_ROM_BG_PATTERN_TABLE_0: u16            = 0x0000;
-const CHR_ROM_BG_PATTERN_TABLE_1: u16            = 0x1000;
-const CHR_ROM_SPRITE_PATTERN_TABLE_0: u16        = 0x0000;
-const CHR_ROM_SPRITE_PATTERN_TABLE_1: u16        = 0x1000;
-const VRAM_INCREMENT_1: u8                       = 1;
-const VRAM_INCREMENT_32: u8                      = 32;
-const NAME_TABLE_0: u16                          = 0x2000;
-const NAME_TABLE_1: u16                          = 0x2400;
-const NAME_TABLE_2: u16                          = 0x2800;
-const NAME_TABLE_3: u16                          = 0x2C00;
-
-// [PPUMASK Bits]
-const REG_PPUMASK_BIT_BG_COLOR: u8               = 0b11100000; // Bit7-5: 背景色
-const REG_PPUMASK_BIT_SPRITE_ENABLE: u8          = 0b00010000; // Bit4: スプライト表示 (0: オフ, 1: オン)
-const REG_PPUMASK_BIT_BACKGROUND_ENABLE: u8      = 0b00001000; // Bit3: 背景表示 (0: オフ, 1: オン)
-const REG_PPUMASK_BIT_SPRITE_LEFT_COLUMN: u8     = 0b00000100; // Bit2: スプライトマスク、画面左8ピクセルを描画しない。(0:描画しない、1:描画)
-const REG_PPUMASK_BIT_BACKGROUND_LEFT_COLUMN: u8 = 0b00000010; // Bit1: 背景マスク、画面左8ピクセルを描画しない。(0:描画しない、1:描画)
-const REG_PPUMASK_BIT_GRAYSCALE: u8              = 0b00000001; // Bit0: グレースケール (0: カラー, 1: モノクロ)
-
-const BG_COLOR_RED: u8                           = 0b100;      // 背景色 - 赤
-const BG_COLOR_GREEN: u8                         = 0b010;      // 背景色 - 緑
-const BG_COLOR_BLUE: u8                          = 0b001;      // 背景色 - 青
-const BG_COLOR_BLACK: u8                         = 0b000;      // 背景色 - ブラック
-const GRAYSCALE_COLOR: u8                        = 0;          // グレースケール: カラー
-const GRAYSCALE_MONOCHRO: u8                     = 1;          // グレースケール: 白黒
-
-// [PPUSTATUS Bits]
-const REG_PPUSTATUS_BIT_VBLANK: u8               = 0b10000000; // Bit7: VBLANK状態
-const REG_PPUSTATUS_BIT_SPRITE_0_HIT: u8         = 0b01000000; // Bit6: スプライト0ヒット
-const REG_PPUSTATUS_BIT_SPRITE_OVERFLOW: u8      = 0b00100000; // Bit5: スプライトオーバーフロー(0:8個以下、1:9個以上)
-// const REG_PPUSTATUS_BIT_UNUSED: u8               = 0b00011100; // Bit[4:0]: 未使用
-
-// [OAMADDR/OAMDATA/PPUSCROLL/PPUADDR/PPUDATA/OAMDMA Bits]
-// ビット定義なし
-// ==================================================================================
-// [PPU Memory]
-const PPU_OAM_SIZE: usize = 0x0100;
-const PPU_OAM_START_ADDR: u16 = 0x0000;
-const PPU_OAM_END_ADDR: u16 = 0x00FF;
-
-const PPU_PRAM_SIZE: usize = 0x0020;
-const PPU_PRAM_START_ADDR: u16 = 0x3F00;
-const PPU_PRAM_END_ADDR: u16 = 0x3F1F;
-
-const VRAM_SIZE: usize = 2048;
-const VRAM_START_ADDR: u16 = 0x2000;
-const VRAM_END_ADDR: u16 = 0x3FFF;
-// ==================================================================================
-pub const PPU_REG_READ: u8 = 0x00;
-pub const PPU_REG_WRITE: u8 = 0x01;
-// ==========================================================================
-static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
-    let ppu = Box::pin(PPU::new());
-    ppu
-});
-static mut CANVAS: Option<Canvas<Window>> = None;
-static mut TEXTURE: Option<Box<Texture<'static>>> = None;
-static mut TEXTURE_CREATOR: Option<*mut TextureCreator<WindowContext>> = None;
-// ==========================================================================
-
-#[derive(Clone)]
-pub struct Frame {
-    pub data: Vec<u8>,
-}
-
-impl Frame {
-    const WIDTH: usize = 256;
-    const HEIGHT: usize = 240;
-
-    pub fn new() -> Self {
-        Frame {
-            data: vec![0; (Frame::WIDTH) * (Frame::HEIGHT) * 3],
-        }
-    }
-
-    pub fn set_pixel(&mut self, x: usize, y: usize, rgb: (u8, u8, u8)) {
-        let base = y * 3 * Frame::WIDTH + x * 3;
-        if base + 2 < self.data.len() {
-            self.data[base] = rgb.0;
-            self.data[base + 1] = rgb.1;
-            self.data[base + 2] = rgb.2;
-        }
-    }
-}
-
-struct Rect {
-    x1: usize,
-    y1: usize,
-    x2: usize,
-    y2: usize,
-}
-
-impl Rect {
-    fn new(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
-        Rect {
-            x1: x1,
-            y1: y1,
-            x2: x2,
-            y2: y2,
-        }
-    }
-}
-
-#[derive(Clone)]
 pub struct PPU {
-    ppuctrl: u8,
-    ppumask: u8,
-    ppustatus: u8,
-    oamaddr: u8,
-    oamdata: u8,
-    ppuscroll: u8,
-    ppuaddr: u8,
-    ppudata: u8,
+    pub chr_rom: Vec<u8>,
+    pub mirroring: Mirroring,
+    pub is_chr_ram: bool,
 
-    pub oamdma_run: bool,
-    pub oamdma_done: bool,
-    pub oam: [u8; PPU_OAM_SIZE],
-    pram: [u8; PPU_PRAM_SIZE],
+    pub palette_table: [u8; 32],
+    pub vram: [u8; 2048],
 
-    pub sprite_prefetch_buf: [u8; 16], // 2Byte x 8
-    nmi_gen: bool,
-    master_slave: u8,
-    cycle: u16,
+    pub oam_addr: u8,
+    pub oam_data: [u8; 256],
 
-    pub vram: [u8; VRAM_SIZE],
-    vram_addr_inc: u8,
-    vram_addr_write: u8,
-    pub vram_addr: u16,
+    addr: AddrRegister,        // 0x2006 (0x2007)
+    pub ctrl: ControlRegister, // 0x2000
+    internal_data_buf: u8,
 
-    scroll_x: u8,
-    scroll_y: u8,
-    scroll_write: u8,
+    // Mask 0x2001
+    mask: MaskRegister,
 
-    sprite_size: u8,
-    bg_pattern_tbl: u16,
-    sprite_pattern_tbl: u16,
-    name_table: u16,
+    // Status 0x2002
+    status: StatusRegister,
 
-    bg_color: u8,
-    sprite_enable: bool,
-    bg_enable: bool,
-    sprite_left_enable: bool,
-    bg_left_enable: bool,
-    grayscale: u8,
+    // Scroll 0x2005
+    pub scroll: ScrollRegister,
 
-    scanline: u16,
-    scanline_palette_indexes: Vec<usize>,
-    scanline_palette_tables: Vec<[u8; 32]>,
+    cycles: usize,
+    scanline: usize,
+    pub nmi_interrupt: Option<i32>,
+    pub clear_nmi_interrupt: bool,
 
-    freme: Frame,
+    // 描画中にパレットテーブルを書き換えることが可能なので、その対応。
+    // 書き込まれた時点でのscanlineとその時のパレットのスナップショットを持っておき、
+    // レンダリング時に、その履歴を参照して描画することで実現。
+    pub scanline_palette_indexes: Vec<usize>,
+    pub scanline_palette_tables: Vec<[u8; 32]>,
 }
 
 impl PPU {
-    pub fn new() -> Self {
+    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring, is_chr_ram: bool) -> Self {
         PPU {
-            ppuctrl: REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT,
-            ppumask: 0,
-            ppustatus: 0,
-            oamaddr: 0,
-            oamdata: 0,
-            ppuscroll: 0,
-            ppuaddr: 0,
-            ppudata: 0,
-
-            oamdma_run: false,
-            oamdma_done: false,
-            oam: [0; PPU_OAM_SIZE],
-            pram: [0; PPU_PRAM_SIZE],
-
-            sprite_prefetch_buf: [0; 16],
-            nmi_gen: false,
-            master_slave: 0,
-            cycle: 0,
-
-            vram: [0; VRAM_SIZE],
-            vram_addr_inc: VRAM_INCREMENT_1,
-            vram_addr_write: 0,
-            vram_addr: 0x2000,
-
-            scroll_x: 0,
-            scroll_y: 0,
-            scroll_write: 0,
-
-            sprite_size: SPRITE_SIZE_8X8,
-            bg_pattern_tbl: CHR_ROM_BG_PATTERN_TABLE_0,
-            sprite_pattern_tbl: CHR_ROM_SPRITE_PATTERN_TABLE_0,
-            name_table: NAME_TABLE_0,
-
-            bg_color: BG_COLOR_BLACK,
-            sprite_enable: false,
-            bg_enable: false,
-            sprite_left_enable: false,
-            bg_left_enable: false,
-            grayscale: GRAYSCALE_COLOR,
-
+            chr_rom: chr_rom,
+            mirroring: mirroring,
+            is_chr_ram: is_chr_ram,
+            vram: [0; 2048],
+            oam_data: [0; 64 * 4],
+            oam_addr: 0,
+            palette_table: [0; 32],
+            addr: AddrRegister::new(),
+            ctrl: ControlRegister::new(),
+            status: StatusRegister::new(),
+            mask: MaskRegister::new(),
+            scroll: ScrollRegister::new(),
+            internal_data_buf: 0,
+            cycles: 0,
             scanline: 0,
+            nmi_interrupt: None,
+            clear_nmi_interrupt: false,
             scanline_palette_indexes: vec![],
             scanline_palette_tables: vec![],
-
-            freme: Frame::new(),
         }
     }
 
-    fn ppu_reg_read(&mut self, address: u16) -> u8 {
-        match address {
-            PPU_REG_PPUCTRL   => self.ppuctrl,
-            PPU_REG_PPUMASK   => self.ppumask,
-            PPU_REG_PPUSTATUS => self.ppustatus,
-            PPU_REG_OAMADDR   => self.oamaddr,
-            PPU_REG_OAMDATA   => self.oamdata,
-            PPU_REG_PPUSCROLL => self.ppuscroll,
-            PPU_REG_PPUADDR   => self.ppuaddr,
-            PPU_REG_PPUDATA   => {
-                self.ppudata = self.mem_read(self.vram_addr);
-                self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
-                self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
-                self.ppudata
-            },
-            // PPU_REG_OAMDMA    => self.oamdma,
-            _ => panic!("[PPU Read]: Invalid PPU Register Address: 0x{:04X}", address),
-        }
+    pub fn write_to_ppu_addr(&mut self, value: u8) {
+        self.addr.update(value);
     }
 
-    fn ppu_reg_write(&mut self, address: u16, data: u8) {
-        match address {
-            PPU_REG_PPUCTRL   => self.ppuctrl = data | REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT,
-            PPU_REG_PPUMASK   => self.ppumask = data,
-            PPU_REG_PPUSTATUS => self.ppustatus = data,
-            PPU_REG_OAMADDR   => self.oamaddr = data,
-            PPU_REG_OAMDATA   => {
-                self.oamdata = data;
-                self.mem_write(self.oamaddr as u16, self.oamdata);
-                self.oamaddr = self.oamaddr.wrapping_add(1);
-            },
-            PPU_REG_PPUSCROLL => {
-                self.ppuscroll = data;
-                if self.scroll_write == 0 {
-                    self.scroll_x = data;
-                    self.scroll_write += 1;
-                }else{
-                    self.scroll_y = data;
-                    self.scroll_write = 0;
+    pub fn write_to_data(&mut self, value: u8) {
+        let addr = self.addr.get();
+        if !unsafe { IN_TRACE } {
+            self.increment_vram_addr();
+        }
+        debug!("WRITE PPU: {:04X} => {:02X}", addr, value);
+
+        match addr {
+            0x0000..=0x1FFF => {
+                // FIXME
+                debug!("write CHR_ROM {:04X} => {:02X}", addr, value);
+                if self.is_chr_ram {
+                    self.chr_rom[addr as usize] = value;
                 }
-            },
-            PPU_REG_PPUADDR   => {
-                self.ppuaddr = data;
-                if self.vram_addr_write == 0 {
-                    self.vram_addr = (self.ppuaddr as u16) << 8;
-                    self.vram_addr_write += 1;
-                }else{
-                    self.vram_addr |= self.ppuaddr as u16;
-                    self.vram_addr_write = 0;
-                }
-            },
-            PPU_REG_PPUDATA   => {
-                self.ppudata = data;
-                self.mem_write(self.vram_addr, self.ppudata);
-                self.vram_addr = self.vram_addr.wrapping_add(self.vram_addr_inc as u16);
-                self.ppuaddr = (self.vram_addr & 0x00FF) as u8;
-            },
-            // PPU_REG_OAMDMA    => self.oamdma = data,
-            _ => panic!("[PPU Write]: Invalid PPU Register Address: 0x{:04X}", address),
+            }
+            0x2000..=0x2FFF => {
+                trace!(
+                    "WRITE PPU_VRAM {:04X} {:02X} => ({:02X})",
+                    addr,
+                    self.mirror_vram_addr(addr) as usize,
+                    value
+                );
+                self.vram[self.mirror_vram_addr(addr) as usize] = value;
+            }
+            0x3000..=0x3EFF => {
+                trace!(
+                    "WRITE PPU_VRAM MIRROR {:04X} {:02X} => ({:02X})",
+                    addr,
+                    self.mirror_vram_addr(addr) as usize,
+                    value
+                );
+                self.vram[self.mirror_vram_addr(addr) as usize] = value;
+            }
+            0x3F00..=0x3F1F => {
+                debug!(
+                    "WRITE PALATTE {:04X} {:02X} => ({:02X}) SL={}",
+                    addr,
+                    self.mirror_palette_addr(addr) as usize,
+                    value,
+                    self.scanline
+                );
+                self.write_palette_table(addr, value)
+            }
+            0x3F20..=0x3FFF => {
+                debug!(
+                    "WRITE PALATTE MIRROR {:04X} {:02X} => ({:02X}) SL={}",
+                    addr,
+                    self.mirror_palette_addr(addr) as usize,
+                    value,
+                    self.scanline
+                );
+                self.write_palette_table(addr, value)
+            }
+            _ => panic!("unexpected access to mirrored space {}", addr),
         }
     }
 
-    pub fn reg_ctrl(&mut self, addr: u16, wr: u8, data: u8) -> u8 {
-        if wr != PPU_REG_WRITE {
-            self.ppu_reg_write(addr, data);
-            0
+    fn write_palette_table(&mut self, addr: u16, value: u8) {
+        let addr = self.mirror_palette_addr(addr) as usize;
+
+        // palette_tableには最新情報を入れておく。
+        self.palette_table[addr] = value;
+
+        let scanline = self.scanline;
+        let last_scanline = self.scanline_palette_indexes.last().unwrap_or(&0);
+        if *last_scanline != scanline {
+            self.scanline_palette_indexes.push(scanline);
+            self.scanline_palette_tables
+                .push(self.palette_table.clone());
         } else {
-            self.ppu_reg_read(addr)
+            self.scanline_palette_tables.pop();
+            self.scanline_palette_tables
+                .push(self.palette_table.clone());
         }
     }
 
-    fn mem_read(&mut self, addr: u16) -> u8 {
-        match addr {
-            // Pattern Table 0 (CHR-ROM)
-            0x0000..=0x0FFF => chr_rom_read(addr),
-            // Pattern Table 1 (CHR-ROM)
-            0x1000..=0x1FFF => chr_rom_read(addr),
-
-            // VRAM
-            0x2000..=0x2EFF => self.vram[(addr - 0x2000) as usize],
-            // VRAM Mirror
-            0x3000..=0x3EFF => self.vram[(addr - 0x3000) as usize],
-
-            // Palette RAM
-            0x3F00..=0x3F1F => self.pram[(addr - 0x3F00) as usize],
-            // Palette RAM Mirror #1
-            0x3F20..=0x3F3F => self.pram[(addr - 0x3F20) as usize],
-            // Palette RAM Mirror #2
-            0x3F40..=0x3F5F => self.pram[(addr - 0x3F40) as usize],
-            // Palette RAM Mirror #3
-            0x3F60..=0x3F7F => self.pram[(addr - 0x3F60) as usize],
-            // Palette RAM Mirror #4
-            0x3F80..=0x3F9F => self.pram[(addr - 0x3F80) as usize],
-            // Palette RAM Mirror #5
-            0x3FA0..=0x3FBF => self.pram[(addr - 0x3FA0) as usize],
-            // Palette RAM Mirror #6
-            0x3FC0..=0x3FDF => self.pram[(addr - 0x3FC0) as usize],
-            // Palette RAM Mirror #7
-            0x3FE0..=0x3FFF => self.pram[(addr - 0x3FE0) as usize],
-
-            // OAM
-            0x4000..=0x401F => self.oam[(addr - 0x4000) as usize],
-            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
-        }
+    fn clear_palette_table_histories(&mut self) {
+        self.scanline_palette_indexes = vec![];
+        self.scanline_palette_tables = vec![];
     }
 
-    fn mem_write(&mut self, addr: u16, data: u8) {
-        match addr {
-            // VRAM
-            0x2000..=0x2EFF => self.vram[(addr - 0x2000) as usize] = data,
-            // VRAM Mirror
-            0x3000..=0x3EFF => self.vram[(addr - 0x3000) as usize] = data,
-
-            // Palette RAM
-            0x3F00..=0x3F1F => self.pram[(addr - 0x3F00) as usize] = data,
-            // Palette RAM Mirror #1
-            0x3F20..=0x3F3F => self.pram[(addr - 0x3F20) as usize] = data,
-            // Palette RAM Mirror #2
-            0x3F40..=0x3F5F => self.pram[(addr - 0x3F40) as usize] = data,
-            // Palette RAM Mirror #3
-            0x3F60..=0x3F7F => self.pram[(addr - 0x3F60) as usize] = data,
-            // Palette RAM Mirror #4
-            0x3F80..=0x3F9F => self.pram[(addr - 0x3F80) as usize] = data,
-            // Palette RAM Mirror #5
-            0x3FA0..=0x3FBF => self.pram[(addr - 0x3FA0) as usize] = data,
-            // Palette RAM Mirror #6
-            0x3FC0..=0x3FDF => self.pram[(addr - 0x3FC0) as usize] = data,
-            // Palette RAM Mirror #7
-            0x3FE0..=0x3FFF => self.pram[(addr - 0x3FE0) as usize] = data,
-            // OAM
-            0x4000..=0x401F => self.oam[(addr - 0x4000) as usize] = data,
-            _ => panic!("Invalid Mem Addr: {:#04X}", addr),
-        }
-    }
-
-    pub fn read_palette_table(&self, scanline: usize) -> &[u8; 32]
-    {
+    pub fn read_palette_table(&self, scanline: usize) -> &[u8; 32] {
         if self.scanline_palette_indexes.is_empty() {
-            return &self.pram;
+            return &self.palette_table;
         }
 
         let mut index = 0;
@@ -410,457 +164,392 @@ impl PPU {
         let table = &self.scanline_palette_tables[index];
         table
     }
-}
 
-fn get_reg_config()
-{
-    unsafe {
-        // ==========================================================================
-        // [PPUCTRL]
-        // ==========================================================================
-        // bit 7
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_GENERATE_NMI) != 0 {
-            S_PPU.nmi_gen = true;
-        }else{
-            S_PPU.nmi_gen = false;
-        }
-
-        // bit 6
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_MASTER_SLAVE_SELECT) != 0 {
-            S_PPU.master_slave = 1;
-        }else{
-            S_PPU.master_slave = 0;
-        }
-
-        // bit 5
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_SIZE) != 0 {
-            S_PPU.sprite_size = SPRITE_SIZE_8X16;   // 8x16
-        }else{
-            S_PPU.vram_addr_inc = SPRITE_SIZE_8X8;  // 8x8
-        }
-
-        // bit 4
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_BACKROUND_PATTERN_ADDR) != 0 {
-            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_1;   // BG Pattern Tbl 1
-        }else{
-            S_PPU.bg_pattern_tbl = CHR_ROM_BG_PATTERN_TABLE_0;   // BG Pattern Tbl 0
-        }
-
-        // bit 3
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_SPRITE_PATTERN_ADDR) != 0 {
-            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_1;   // BG Pattern Tbl 1
-        }else{
-            S_PPU.sprite_pattern_tbl = CHR_ROM_SPRITE_PATTERN_TABLE_0;   // BG Pattern Tbl 0
-        }
-
-        // bit 2
-        if(S_PPU.ppuctrl & REG_PPUCTRL_BIT_VRAM_ADD_INCREMENT) != 0 {
-            S_PPU.vram_addr_inc = VRAM_INCREMENT_32; // +=32
-        }else{
-            S_PPU.vram_addr_inc = VRAM_INCREMENT_1;  // +=1
-        }
-
-        // bit[1:0]
-        let name_tbl_bit: u8 = S_PPU.ppuctrl & REG_PPUCTRL_BIT_NAMETABLE;
-        match name_tbl_bit {
-            0x03     => S_PPU.name_table = NAME_TABLE_3,
-            0x02     => S_PPU.name_table = NAME_TABLE_2,
-            0x01     => S_PPU.name_table = NAME_TABLE_1,
-            0x00 | _ => S_PPU.name_table = NAME_TABLE_0,
-        }
-
-        // ==========================================================================
-        // [PPUMASK]
-        // ==========================================================================
-        // bit [7:5]
-        let bg_color: u8 = (S_PPU.ppumask & REG_PPUMASK_BIT_BG_COLOR) >> 6;
-        match bg_color {
-            BG_COLOR_RED       => S_PPU.bg_color = BG_COLOR_RED,
-            BG_COLOR_GREEN     => S_PPU.bg_color = BG_COLOR_GREEN,
-            BG_COLOR_BLUE      => S_PPU.bg_color = BG_COLOR_BLUE,
-            BG_COLOR_BLACK | _ => S_PPU.bg_color = BG_COLOR_BLACK,
-        }
-
-        // bit 4
-        if(S_PPU.ppumask & REG_PPUMASK_BIT_SPRITE_ENABLE) != 0 {
-            S_PPU.sprite_enable = true;
-        }else{
-            S_PPU.sprite_enable = false;
-        }
-
-        // bit 3
-        if(S_PPU.ppumask & REG_PPUMASK_BIT_BACKGROUND_ENABLE) != 0 {
-            S_PPU.bg_enable = true;
-        }else{
-            S_PPU.bg_enable = false;
-        }
-
-        // bit 2
-        if(S_PPU.ppumask & REG_PPUMASK_BIT_SPRITE_LEFT_COLUMN) != 0 {
-            S_PPU.sprite_left_enable = true;
-        }else{
-            S_PPU.sprite_left_enable = false;
-        }
-
-        // bit 1
-        if(S_PPU.ppumask & REG_PPUMASK_BIT_BACKGROUND_LEFT_COLUMN) != 0 {
-            S_PPU.bg_left_enable = true;
-        }else{
-            S_PPU.bg_left_enable = false;
-        }
-
-        // bit 0
-        if(S_PPU.ppumask & REG_PPUMASK_BIT_GRAYSCALE) != GRAYSCALE_COLOR {
-            S_PPU.grayscale = GRAYSCALE_MONOCHRO;
-        }else{
-            S_PPU.grayscale = GRAYSCALE_COLOR;
+    fn mirror_palette_addr(&self, addr: u16) -> u16 {
+        // see: https://taotao54321.hatenablog.com/entry/2017/04/11/115205
+        let addr = addr & 0x1F;
+        match addr {
+            0x10 => 0x00,
+            0x14 => 0x04,
+            0x18 => 0x08,
+            0x1C => 0x0C,
+            _ => addr,
         }
     }
-}
 
+    pub fn write_to_ctrl(&mut self, value: u8) {
+        let before_nmi_status = self.ctrl.generate_vblank_nmi();
+        self.ctrl.update(value);
+        if !before_nmi_status && self.ctrl.generate_vblank_nmi() && self.status.is_in_vblank() {
+            self.nmi_interrupt = Some(1);
+        }
+    }
 
-pub fn render(frame: &mut Frame)
-{
-    unsafe {
-        // draw background
-        let scroll_x = (S_PPU.scroll_x) as usize;
-        let scroll_y = (S_PPU.scroll_y) as usize;
+    pub fn read_status(&mut self) -> u8 {
+        // スクロール ($2005)  PPUSTATUSを読み取ってアドレス ラッチをリセットした後
+        if unsafe { IN_TRACE } {
+            self.status.bits()
+        } else {
+            self.scroll.reset();
+            let bits = self.status.bits();
+            self.status.reset_vblank_status();
+            self.clear_nmi_interrupt = true;
+            bits
+        }
+    }
 
-        let (main_name_table, second_name_table) = match (&get_chr_rom_mirroring(), S_PPU.name_table) {
-            (Mirroring::VERTICAL, 0x2000) | (Mirroring::VERTICAL, 0x2800) => {
-                (&S_PPU.vram[0x000..0x400], &S_PPU.vram[0x400..0x800])
-            }
-            (Mirroring::VERTICAL, 0x2400) | (Mirroring::VERTICAL, 0x2C00) => {
-                (&S_PPU.vram[0x400..0x800], &S_PPU.vram[0x000..0x400])
-            }
-            (Mirroring::HORIZONTAL, 0x2000) | (Mirroring::HORIZONTAL, 0x2400) => {
-                (&S_PPU.vram[0x000..0x400], &S_PPU.vram[0x400..0x800])
-            }
-            (Mirroring::HORIZONTAL, 0x2800) | (Mirroring::HORIZONTAL, 0x2C00) => {
-                (&S_PPU.vram[0x400..0x800], &S_PPU.vram[0x000..0x400])
-            }
-            (_, _) => {
-                panic!("Not supported mirroring type {:?}", get_chr_rom_mirroring());
-            }
-        };
+    pub fn write_to_status(&mut self, value: u8) {
+        self.status.update(value);
+    }
 
-        // 左上
-        render_name_table(
-            frame,
-            main_name_table,
-            Rect::new(scroll_x, scroll_y, SCREEN_WIDTH, SCREEN_HEIGHT),
-            -(scroll_x as isize),
-            -(scroll_y as isize),
-        );
+    pub fn write_to_mask(&mut self, value: u8) {
+        self.mask.update(value);
+    }
 
-        // 右下
-        render_name_table(
-            frame,
-            second_name_table,
-            Rect::new(0, 0, scroll_x, scroll_y),
-            (SCREEN_WIDTH - scroll_x) as isize,
-            (SCREEN_HEIGHT - scroll_y) as isize,
-        );
+    pub fn write_to_oam_addr(&mut self, value: u8) {
+        self.oam_addr = value;
+    }
 
-        // 左下
-        render_name_table(
-            frame,
-            main_name_table,
-            Rect::new(scroll_x, 0, SCREEN_WIDTH, scroll_y),
-            -(scroll_x as isize),
-            (SCREEN_HEIGHT - scroll_y) as isize,
-        );
+    pub fn write_to_oam_data(&mut self, value: u8) {
+        debug!("OAM: {:04X} => {:02X}", self.oam_addr, value);
+        self.oam_data[self.oam_addr as usize] = value;
+        self.oam_addr = self.oam_addr.wrapping_add(1)
+    }
 
-        // 右上
-        render_name_table(
-            frame,
-            second_name_table,
-            Rect::new(0, scroll_y, scroll_x, SCREEN_HEIGHT),
-            (SCREEN_WIDTH - scroll_x) as isize,
-            -(scroll_y as isize),
-        );
+    pub fn read_oam_data(&self) -> u8 {
+        self.oam_data[self.oam_addr as usize]
+    }
 
-        // draw sprites
-        // TODO 8x16 mode
-        for i in (0..S_PPU.oam.len()).step_by(4).rev() {
-            let tile_y = S_PPU.oam[i] as usize;
-            let tile_idx = S_PPU.oam[i + 1] as u16;
-            let attr = S_PPU.oam[i + 2];
-            let tile_x = S_PPU.oam[i + 3] as usize;
+    pub fn write_to_oam_dma(&mut self, values: [u8; 256]) {
+        debug!("OAM DMA: ADDR:{:02X}", self.oam_addr);
+        debug!("{:?}", values);
+        self.oam_data = values;
+    }
 
-            let flip_vertical = (attr >> 7 & 1) == 1;
-            let flip_horizontal = (attr >> 6 & 1) == 1;
-            let palette_idx = attr & 0b11;
-            let sprite_palette = sprite_palette(tile_y, palette_idx);
+    pub fn write_to_scroll(&mut self, value: u8) {
+        self.scroll.set(value);
+    }
 
-            let bank: u16 = S_PPU.sprite_pattern_tbl;
+    fn increment_vram_addr(&mut self) {
+        self.addr.increment(self.ctrl.vram_addr_increment());
+    }
 
-            let tile: &[u8] = get_chr_rom_ptr((bank + tile_idx * 16) as usize..=(bank + tile_idx * 16 + 15) as usize);
+    pub fn read_data(&mut self) -> u8 {
+        let addr = self.addr.get();
+        if !unsafe { IN_TRACE } {
+            self.increment_vram_addr();
+        }
+        debug!("READ PPU: {:04X}", addr);
 
-            for y in 0..=7 {
-                let mut upper = tile[y];
-                let mut lower = tile[y + 8];
-                'ololo: for x in (0..=7).rev() {
-                    let value = (1 & lower) << 1 | (1 & upper);
-                    upper = upper >> 1;
-                    lower = lower >> 1;
-                    let rgb = match value {
-                        0 => continue 'ololo, // skip coloring the pixel
-                        1 => COLOR_PALLETE[sprite_palette[1] as usize],
-                        2 => COLOR_PALLETE[sprite_palette[2] as usize],
-                        3 => COLOR_PALLETE[sprite_palette[3] as usize],
-                        _ => panic!("can't be"),
-                    };
-
-                    match (flip_horizontal, flip_vertical) {
-                        (false, false) => frame.set_pixel(tile_x + x, tile_y + y, rgb),
-                        (true, false) => frame.set_pixel(tile_x + 7 - x, tile_y + y, rgb),
-                        (false, true) => frame.set_pixel(tile_x + x, tile_y + 7 - y, rgb),
-                        (true, true) => frame.set_pixel(tile_x + 7 - x, tile_y + 7 - y, rgb),
-                    }
+        match addr {
+            0..=0x1FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    self.internal_data_buf = self.chr_rom[addr as usize];
+                    result
                 }
             }
-        }
-    }
-}
-
-fn bg_pallette(attribute_table: &[u8], tile_column: usize, tile_row: usize,) -> [u8; 4]
-{
-    unsafe {
-        let attr_table_idx = tile_row / 4 * 8 + tile_column / 4;
-        let attr_byte = attribute_table[attr_table_idx];
-
-        let pallet_idx = match (tile_column % 4 / 2, tile_row % 4 / 2) {
-            (0, 0) => attr_byte & 0b11,
-            (1, 0) => (attr_byte >> 2) & 0b11,
-            (0, 1) => (attr_byte >> 4) & 0b11,
-            (1, 1) => (attr_byte >> 6) & 0b11,
-            _ => panic!("should not happen"),
-        };
-
-        let pallette_start: usize = 1 + (pallet_idx as usize) * 4;
-        let p = S_PPU.read_palette_table(tile_row * 8);
-        [
-            p[0],
-            p[pallette_start],
-            p[pallette_start + 1],
-            p[pallette_start + 2],
-        ]
-    }
-}
-
-fn sprite_palette(tile_y: usize, palette_idx: u8) -> [u8; 4]
-{
-    unsafe {
-        let start = 0x11 + (palette_idx * 4) as usize;
-        let p = S_PPU.read_palette_table(tile_y);
-        [0, p[start], p[start + 1], p[start + 2]]
-    }
-}
-
-fn render_name_table(frame: &mut Frame, name_table: &[u8], view_port: Rect, shift_x: isize, shift_y: isize,)
-{
-    unsafe {
-
-        let bank = S_PPU.bg_pattern_tbl;
-        let attribute_table = &name_table[0x03C0..0x0400];
-
-        for i in 0..0x03C0 {
-            let tile_column = i % 32;
-            let tile_row = i / 32;
-            let tile_idx = name_table[i] as u16;
-            let tile: &[u8] =
-                get_chr_rom_ptr((bank + tile_idx * 16) as usize..=(bank + tile_idx * 16 + 15) as usize);
-            let palette = bg_pallette(attribute_table, tile_column, tile_row);
-
-            for y in 0..=7 {
-                let mut upper = tile[y];
-                let mut lower = tile[y + 8];
-
-                for x in (0..=7).rev() {
-                    let value = (1 & lower) << 1 | (1 & upper);
-                    upper = upper >> 1;
-                    lower = lower >> 1;
-                    let rgb = match value {
-                        0 => COLOR_PALLETE[palette[0] as usize],
-                        1 => COLOR_PALLETE[palette[1] as usize],
-                        2 => COLOR_PALLETE[palette[2] as usize],
-                        3 => COLOR_PALLETE[palette[3] as usize],
-                        _ => panic!("can't be"),
-                    };
-
-                    let pixel_x = tile_column * 8 + x;
-                    let pixel_y = tile_row * 8 + y;
-                    if pixel_x >= view_port.x1
-                        && pixel_x < view_port.x2
-                        && pixel_y >= view_port.y1
-                        && pixel_y < view_port.y2
-                    {
-                        frame.set_pixel(
-                            (shift_x + pixel_x as isize) as usize,
-                            (shift_y + pixel_y as isize) as usize,
-                            rgb,
-                        )
-                    }
+            0x2000..=0x2FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
+                    result
                 }
             }
+            0x3000..=0x3EFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    let result = self.internal_data_buf;
+                    self.internal_data_buf = self.vram[self.mirror_vram_addr(addr) as usize];
+                    result
+                }
+            }
+            0x3F00..=0x3FFF => {
+                if unsafe { IN_TRACE } {
+                    self.internal_data_buf
+                } else {
+                    self.internal_data_buf =
+                        self.palette_table[self.mirror_palette_addr(addr) as usize];
+                    self.internal_data_buf
+                }
+            }
+            _ => panic!("unexpected access to mirrored space {}", addr),
         }
     }
-}
 
-fn nmi_gen()
-{
-    cpu_interrupt(InterruptType::NMI);
-    print!("[DEBUG]: PPU V-Blank! NMI Generated!");
-}
+    pub fn mirror_vram_addr(&self, addr: u16) -> u16 {
+        let mirrored_vram = addr & 0b10_1111_1111_1111;
+        let vram_index = mirrored_vram - 0x2000;
+        let name_table = vram_index / 0x400;
+        match (&self.mirroring, name_table) {
+            (Mirroring::VERTICAL, 2) => vram_index - 0x800,
+            (Mirroring::VERTICAL, 3) => vram_index - 0x800,
+            (Mirroring::HORIZONTAL, 2) => vram_index - 0x400,
+            (Mirroring::HORIZONTAL, 1) => vram_index - 0x400,
+            (Mirroring::HORIZONTAL, 3) => vram_index - 0x800,
+            _ => vram_index,
+        }
+    }
 
-fn display_render() {
-    unsafe {
-        if let Some(canvas) = CANVAS.as_mut() {
-            if let Some(texture) = TEXTURE.as_mut() {
-                // 最初の240本(0〜240) で画面が描画
-                // data_set(S_PPU.scanline);
-                render(&mut S_PPU.freme);
+    pub fn tick(&mut self, cycles: u8) -> bool {
+        self.cycles += cycles as usize;
+        if self.cycles >= 341 {
+            if self.is_sprite_zero_hit(self.cycles) {
+                self.status.set_sprite_zero_hit(true);
+            }
 
-                // SDL2
-                texture.update(None, &mut S_PPU.freme.data, 256 * 3).unwrap();
-                canvas.copy(&texture, None, None).unwrap();
-                canvas.present();
+            self.cycles = self.cycles - 341;
+            self.scanline += 1;
+
+            if self.scanline == 241 {
+                self.status.set_vblank_status(true);
+                self.status.set_sprite_zero_hit(false);
+                if self.ctrl.generate_vblank_nmi() {
+                    // self.status.set_vblank_status(true);
+                    self.nmi_interrupt = Some(1);
+                }
+            }
+
+            if self.scanline >= 262 {
+                self.scanline = 0;
+                self.status.set_sprite_zero_hit(false);
+                self.status.reset_vblank_status();
+                self.nmi_interrupt = None;
+                self.clear_palette_table_histories();
+                return true;
+            }
+
+            if self.scanline == 257 {
+                // OAMADDR は、プリレンダリングおよび表示可能なスキャンラインのティック 257 ～ 320 (スプライト タイルの読み込み間隔) のそれぞれの間に 0 に設定されます。
+                self.oam_addr = 0;
             }
         }
+        return false;
+    }
+
+    fn is_sprite_zero_hit(&self, cycle: usize) -> bool {
+        let y = self.oam_data[0] as usize;
+        let x = self.oam_data[3] as usize;
+        (y == self.scanline as usize) && x <= cycle && self.mask.show_sprites()
     }
 }
 
-fn sdl2_init(sdl_context: Sdl) {
-    let video_subsystem = sdl_context.video().unwrap();
-    let window = video_subsystem
-        .window("Rust NES Emulator", (256.0 * 2.0) as u32, (240.0 * 2.0) as u32)
-        .position_centered()
-        .build()
-        .unwrap();
-    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
-    canvas.set_scale(2.0, 2.0).unwrap();
-
-    let creator: *mut TextureCreator<WindowContext> = Box::into_raw(Box::new(canvas.texture_creator()));
-    let texture = Box::new(
-        unsafe {
-            (*creator).create_texture_target(PixelFormatEnum::RGB24, 256, 240).unwrap()
-        },
-    );
-
-    unsafe {
-        CANVAS = Some(canvas);
-        TEXTURE = Some(texture);
-        TEXTURE_CREATOR = Some(creator);
-    }
+pub struct AddrRegister {
+    value: (u8, u8),
+    hi_ptr: bool,
 }
 
-pub fn ppu_mem_read(addr: u16) -> u8 {
-    unsafe {
-        S_PPU.mem_read(addr)
-    }
-}
-
-pub fn ppu_mem_write(addr: u16, data: u8) {
-    unsafe {
-        S_PPU.mem_write(addr, data);
-    }
-}
-
-pub fn ppu_reg_ctrl(addr: u16, wr: u8, data: u8) -> u8 {
-    unsafe {
-        let mut reg_addr = addr;
-
-        // ミラーアドレスを実アドレスに変換
-        if (addr >= 0x2008) && (addr <= 0x3FFF) {
-            reg_addr = 0x2000 + (addr % 8);
-        }
-
-        S_PPU.reg_ctrl(reg_addr, wr, data)
-    }
-}
-
-pub fn ppu_oamdma_status(run: bool, done: bool){
-    unsafe {
-        S_PPU.oamdma_run = run;
-        S_PPU.oamdma_done = done;
-    }
-
-}
-
-pub fn ppu_reset(sdl_context: Sdl) -> Box<PPU>
-{
-    unsafe {
-        let ppu_box: Box<PPU> = Box::from_raw(Pin::as_mut(&mut *S_PPU).get_mut());
-
-        // SDL2 グラフィック関連初期化
-        println!("[PPU] Render(SDL2) Init!!!");
-        sdl2_init(sdl_context);
-
-        ppu_box
-    }
-}
-
-// NTSC 60FPS（59.94FPS）のPPU処理
-// ※1フレーム = 1/60fps(1/59.94) ≒ 16.668 msec
-pub fn ppu_main()
-{
-
-    unsafe {
-        println!("[PPU] Cycle:{:03}, Line:{:03}", S_PPU.cycle, S_PPU.scanline);
-
-        if S_PPU.cycle == 0 {
-            S_PPU.cycle = 0;
-            S_PPU.scanline = 0;
-            S_PPU.oamdma_done = false;
-            S_PPU.oamdma_run = false;
-            get_reg_config(); // レジスタ吸出し
-        }
-
-        // [240ライン描画]
-        // (240 x 341クロック) = 81,840クロック
-        // ≒ 15,242,160.6656712 nsec ≒ 15.242 msec
-        // ※T ≒ 186.2434098933431 nsec
-        if S_PPU.scanline < 241 {
-            display_render(); // 画面描画(@SDL2)
-        }
-
-        // [V-Blank開始]
-        // 残22本分(241〜262) -> 垂直回帰時間
-        // = (22 x 341クロック) = 7502クロック ≒ 1,397,198.061 nsec ≒ 1.397 msec
-        // ※T ≒ 186.2434098933431 nsec
-        // 垂直回帰時間のCPUクロック = 2,500.667 CPUサイクル?
-        // ※1 CPU Clock = 558.7302296800292 nsec
-        if S_PPU.scanline == 241 {
-            println!("[PPU] V-Blank Start!");
-            S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
-            if S_PPU.nmi_gen != false {
-                nmi_gen(); // NMI
-            }
-        }
-
-        S_PPU.cycle += 1;
-        if (S_PPU.cycle % 341) == 0 {
-            S_PPU.scanline += 1;
-        }
-
-        // [V-Blank終了]
-        if S_PPU.scanline >= 262  {
-            println!("[PPU] V-Blank End");
-            S_PPU.ppustatus &= !REG_PPUSTATUS_BIT_VBLANK;
-            S_PPU.cycle = 0;
-            S_PPU.scanline = 0;
+impl AddrRegister {
+    pub fn new() -> Self {
+        AddrRegister {
+            value: (0, 0),
+            hi_ptr: true,
         }
     }
-}
 
-// ====================================== TEST ======================================
-#[cfg(test)]
-mod ppu_test {
+    fn set(&mut self, data: u16) {
+        self.value.0 = (data >> 8) as u8;
+        self.value.1 = (data & 0xFF) as u8;
+    }
 
-    #[test]
-    fn ppu_test() {
-        // TODO : PPU Test
+    pub fn update(&mut self, data: u8) {
+        if self.hi_ptr {
+            self.value.0 = data;
+        } else {
+            self.value.1 = data;
+        }
+
+        if self.get() > 0x3FFF {
+            self.set(self.get() & 0b11_1111_1111_1111);
+        }
+        self.hi_ptr = !self.hi_ptr;
+    }
+
+    pub fn increment(&mut self, inc: u8) {
+        let lo = self.value.1;
+        self.value.1 = self.value.1.wrapping_add(inc);
+        if lo > self.value.1 {
+            self.value.0 = self.value.0.wrapping_add(1);
+        }
+        if self.get() > 0x3FFF {
+            self.set(self.get() & 0b11_1111_1111_1111);
+        }
+    }
+
+    pub fn reset_latch(&mut self) {
+        self.hi_ptr = true;
+    }
+
+    pub fn get(&self) -> u16 {
+        ((self.value.0 as u16) << 8) | (self.value.1 as u16)
     }
 }
-// ==================================================================================
+
+bitflags! {
+    pub struct ControlRegister: u8 {
+        const NAMETABLE1               = 0b0000_0001;
+        const NAMETABLE2               = 0b0000_0010;
+        const VRAM_ADD_INCREMENT       = 0b0000_0100;
+        const SPRITE_PATTERN_ADDR      = 0b0000_1000;
+        const BACKGROUND_PATTERN_ADDR  = 0b0001_0000;
+        const SPRITE_SIZE              = 0b0010_0000;
+        const MASTER_SLAVE_SELECT      = 0b0100_0000;
+        const GENERATE_NMI             = 0b1000_0000;
+    }
+}
+
+impl ControlRegister {
+    pub fn new() -> Self {
+        ControlRegister::from_bits_truncate(0b0000_0000)
+    }
+
+    pub fn vram_addr_increment(&self) -> u8 {
+        if !self.contains(ControlRegister::VRAM_ADD_INCREMENT) {
+            1
+        } else {
+            32
+        }
+    }
+
+    pub fn update(&mut self, data: u8) {
+        *self.0.bits_mut() = data;
+    }
+
+    pub fn generate_vblank_nmi(&mut self) -> bool {
+        self.contains(ControlRegister::GENERATE_NMI)
+    }
+
+    pub fn background_pattern_addr(&self) -> u16 {
+        if !self.contains(ControlRegister::BACKGROUND_PATTERN_ADDR) {
+            0x0000
+        } else {
+            0x1000
+        }
+    }
+
+    pub fn is_sprite_8x16_mode(&self) -> bool {
+        self.contains(ControlRegister::SPRITE_SIZE)
+    }
+
+    pub fn sprite_pattern_addr(&self) -> u16 {
+        // ignored in 8x16 mode
+
+        if !self.contains(ControlRegister::SPRITE_PATTERN_ADDR) {
+            0x0000
+        } else {
+            0x1000
+        }
+    }
+
+    pub fn nametable_addr(&self) -> u16 {
+        match (
+            self.contains(ControlRegister::NAMETABLE2),
+            self.contains(ControlRegister::NAMETABLE1),
+        ) {
+            (false, false) => 0x2000,
+            (false, true) => 0x2400,
+            (true, false) => 0x2800,
+            (true, true) => 0x2C00,
+        }
+    }
+}
+
+bitflags! {
+    pub struct StatusRegister: u8 {
+        const PPU_OPEN_BUS1       = 0b0000_0001;
+        const PPU_OPEN_BUS2       = 0b0000_0010;
+        const PPU_OPEN_BUS3       = 0b0000_0100;
+        const PPU_OPEN_BUS4       = 0b0000_1000;
+        const PPU_OPEN_BUS5       = 0b0001_0000; // VRAM状態
+        const SPRITE_OVERFLOW     = 0b0010_0000;
+        const SPRITE_ZERO_HIT     = 0b0100_0000;
+        const VBLANK_HAS_STARTED  = 0b1000_0000;
+    }
+}
+
+impl StatusRegister {
+    pub fn new() -> Self {
+        StatusRegister::from_bits_truncate(0b0001_0000)
+    }
+
+    pub fn is_in_vblank(&mut self) -> bool {
+        self.contains(StatusRegister::VBLANK_HAS_STARTED)
+    }
+
+    pub fn set_vblank_status(&mut self, value: bool) {
+        self.set(StatusRegister::VBLANK_HAS_STARTED, value)
+    }
+
+    pub fn reset_vblank_status(&mut self) {
+        self.set_vblank_status(false)
+    }
+
+    pub fn set_sprite_zero_hit(&mut self, value: bool) {
+        self.set(StatusRegister::SPRITE_ZERO_HIT, value)
+    }
+
+    pub fn update(&mut self, data: u8) {
+        *self.0.bits_mut() = data;
+    }
+}
+
+bitflags! {
+    pub struct MaskRegister: u8 {
+        const GREYSCALE               = 0b0000_0001;
+        const SHOW_BACKGROUND_IN_LEFT = 0b0000_0010;
+        const SHOW_SPRITES_IN_LEFT    = 0b0000_0100;
+        const SHOW_BACKGROUND         = 0b0000_1000;
+        const SHOW_SPRITES            = 0b0001_0000;
+        const EMPHASIZE_RED           = 0b0010_0000;
+        const EMPHASIZE_GREEN         = 0b0100_0000;
+        const EMPHASIZE_BLUE          = 0b1000_0000;
+    }
+}
+
+impl MaskRegister {
+    pub fn new() -> Self {
+        MaskRegister::from_bits_truncate(0b0000_0000)
+    }
+
+    pub fn show_sprites(&self) -> bool {
+        self.contains(MaskRegister::SHOW_SPRITES)
+    }
+
+    pub fn update(&mut self, data: u8) {
+        *self.0.bits_mut() = data;
+    }
+}
+
+pub struct ScrollRegister {
+    pub scroll_x: u8,
+    pub scroll_y: u8,
+    write_x: bool,
+}
+
+impl ScrollRegister {
+    pub fn new() -> Self {
+        ScrollRegister {
+            scroll_x: 0,
+            scroll_y: 0,
+            write_x: true,
+        }
+    }
+
+    fn set(&mut self, data: u8) {
+        if self.write_x {
+            self.scroll_x = data;
+        } else {
+            self.scroll_y = data;
+        }
+        self.write_x = !self.write_x;
+    }
+
+    pub fn reset(&mut self) {
+        self.write_x = true;
+    }
+}

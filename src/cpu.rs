@@ -1,1171 +1,1170 @@
-use crate::mem::*;
-use crate::cassette::*;
-use std::pin::Pin;
-use once_cell::sync::Lazy;
-use std::ops::RangeInclusive;
+use log::{debug, info, trace};
+use crate::opcode::{call, CPU_OPS_CODES};
+use crate::bus::{Bus, Mem};
 
-pub const NEGATIVE_FLG: u8 = 0b1000_0000;           // bit7: N Flag. ネガティブフラグ。演算の結果が負の場合にセットされる。
-pub const OVERFLOW_FLG: u8 = 0b0100_0000;           // bit6: V Flag. オーバーフローフラグ。符号付き演算の結果がオーバーフローした場合にセットされる。
-pub const R_FLG: u8 = 0b0010_0000;                  // bit5: R Flag. Reaerved.予約済 (常に1固定)
-pub const BREAK_COMMAND_FLG: u8 = 0b0001_0000;      // bit4: B Flag. ブレークコマンドフラグ。BRK命令が実行されたときにセットされる。
-pub const DECIMAL_MODE_FLG: u8 = 0b0000_1000;       // bit3: D Flag. 10進モードフラグ。BCD（Binary-Coded Decimal）演算のためのアドレッシングモードを制御する。
-pub const INTERRUPT_DISABLE_FLG: u8 = 0b0000_0100;  // bit2: I Flag. 割り込み無効フラグ (0 ... IRQ許可, 1 ... IRQをマスク)
-pub const ZERO_FLG: u8 = 0b0000_0010;               // bit1: Z Flag. ゼロフラグ。演算の結果がゼロの場合にセットされる。
-pub const CARRY_FLG: u8 = 0b0000_0001;              // bit0: C Flag. キャリーフラグ。算術演算でのキャリーや借りがある場合にセットされる。
+const FLAG_CARRY: u8 = 1 << 0;
+const FLAG_ZERO: u8 = 1 << 1;
+const FLAG_INTERRRUPT: u8 = 1 << 2;
+const FLAG_DECIMAL: u8 = 1 << 3;
+const FLAG_BREAK: u8 = 1 << 4;
+const FLAG_BREAK2: u8 = 1 << 5; // 5 は未使用。
+const FLAG_OVERFLOW: u8 = 1 << 6;
+const FLAG_NEGATIVE: u8 = 1 << 7;
 
-pub const ADDR_VEC_TBL_RST: u16 = 0xFFFC;  // RESET Vector Table
-pub const ADDR_VEC_TBL_NMI: u16 = 0xFFFA;  // NMI Vector Table
-pub const ADDR_VEC_TBL_IRQ: u16 = 0xFFFE;  // IRQ Vector Table
+const SIGN_BIT: u8 = 1 << 7;
 
-pub const OVF_ADD: bool = false;
-pub const OVF_SUB: bool = true;
-
-#[derive(Clone)]
-pub enum InterruptType {
-    RST,
-    NMI,
-    IRQ,
-    BRK,
+#[derive(Debug, Clone, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum AddressingMode {
+    Accumulator,
+    Immediate,
+    ZeroPage,
+    ZeroPage_X,
+    ZeroPage_Y,
+    Absolute,
+    Absolute_X,
+    Absolute_Y,
+    Indirect,
+    Indirect_X,
+    Indirect_Y,
+    Relative,
+    Implied,
+    NoneAddressing,
 }
 
-#[derive(Clone)]
-pub enum OpCode {
-    // Load/Store Operations
-    LDA, LDX, LDY, STA, STX, STY,
-    // Register Transfer Operations
-    TAX, TAY, TXA, TYA,
-    // Stack Operations
-    TSX, TXS, PHA, PHP, PLA, PLP,
-    // Logical Operations
-    AND, ORA, EOR,
-    // Arithmetic Operations
-    ADC, SBC, CMP, CPX, CPY, INC, INX, INY, DEC, DEX, DEY,
-    // Shift and Rotate Operations
-    ASL, LSR, ROL, ROR,
-    // Jump and Call Operations
-    JMP, JSR, RTS,
-    // Branch Operations
-    BCC, BCS, BNE, BEQ, BPL, BMI, BVC, BVS,
-    // Status Flag Operations
-    BIT, CLC, CLD, CLI, CLV, SEC, SED, SEI,
-    // Interrupt Operations
-    RTI, BRK,
-    // Other
-    NOP, STP,
-    // Undefined OP
-    UNK,
+#[derive(Debug, Clone, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum CycleCalcMode {
+    None,
+    Page,
+    Branch,
 }
 
-#[derive(Clone)]
-pub enum Addressing {
-    ACC,IMM,
-    ZPG,ZpgX,ZpgY,
-    ABS,AbsX,AbsY,
-    IND,IndX,IndY,
-    REL,IMPL,
+#[derive(Debug, Clone)]
+pub struct OpCode {
+    pub code: u8,
+    pub name: String,
+    pub bytes: u16,
+    pub cycles: u8,
+    pub cycle_calc_mode: CycleCalcMode,
+    pub addressing_mode: AddressingMode,
 }
 
-#[derive(Clone)]
-pub struct RP2A03
-{
-    pub reg_a: u8,
-    pub reg_x: u8,
-    pub reg_y: u8,
-    pub reg_p: u8,
-    pub reg_sp: u8,
-    pub reg_pc: u16,
-
-    pub op_code: OpCode,
-    pub op_rand: [u8; 2],
-    pub cycle: u8,
-    pub addr_mode: Addressing,
-
-    pub rst: bool,
-    pub nmi: bool,
-    pub irq: bool,
-
-    pub nes_mem: Memory,
-    pub cpu_run: bool,
+impl OpCode {
+    pub fn new(
+        code: u8,
+        name: &str,
+        bytes: u16,
+        cycles: u8,
+        cycle_calc_mode: CycleCalcMode,
+        addressing_mode: AddressingMode,
+    ) -> Self {
+        OpCode {
+            code: code,
+            name: String::from(name),
+            bytes: bytes,
+            cycles: cycles,
+            cycle_calc_mode: cycle_calc_mode,
+            addressing_mode: addressing_mode,
+        }
+    }
 }
 
+pub struct CPU<'a> {
+    pub register_a: u8,
+    pub register_x: u8,
+    pub register_y: u8,
+    pub status: u8,
+    pub program_counter: u16,
+    pub stack_pointer: u8,
+    // pub memory: [u8; 0x10000], // 0xFFFF
+    pub bus: Bus<'a>,
 
-impl RP2A03{
-    pub fn new() -> Self {
-        RP2A03 {
-            reg_a: 0,
-            reg_x: 0,
-            reg_y: 0,
-            reg_p: R_FLG, // ビット5: Reaerved.予約済 (常に1固定)
-            reg_sp: 0xFF,
-            reg_pc: ADDR_VEC_TBL_RST,
+    add_cycles: u8,
+}
 
-            op_code: OpCode::NOP,
-            op_rand: [0; 2],
-            cycle: 0,
-            addr_mode: Addressing::IMPL,
+pub static mut IN_TRACE: bool = false;
 
-            rst: false,
-            nmi: false,
-            irq: false,
-            nes_mem: Memory::new(),
+impl Mem for CPU<'_> {
+    fn mem_read(&mut self, addr: u16) -> u8 {
+        self.bus.mem_read(addr)
+    }
 
-            cpu_run: false,
+    fn mem_write(&mut self, addr: u16, data: u8) {
+        self.bus.mem_write(addr, data)
+    }
+}
+
+impl<'a> CPU<'a> {
+    pub fn new(bus: Bus<'a>) -> CPU<'a> {
+        CPU {
+            register_a: 0,
+            register_x: 0,
+            register_y: 0,
+            status: FLAG_INTERRRUPT | FLAG_BREAK2, // FIXME あってる？
+            program_counter: 0,
+            stack_pointer: 0xFD, // FIXME あってる？
+            // memory: [0x00; 0x10000],
+            bus: bus,
+            add_cycles: 0,
         }
     }
 
-    fn cls_status_flg(&mut self, flg: u8) {
-        self.reg_p &= !flg;
-    }
+    fn get_operand_address(&mut self, _mode: &AddressingMode) -> u16 {
+        match _mode {
+            AddressingMode::Implied => {
+                panic!("AddressingMode::Implied");
+            }
+            AddressingMode::Accumulator => {
+                panic!("AddressingMode::Accumulator");
+            }
+            // LDA #$44 => a9 44
+            AddressingMode::Immediate => self.program_counter,
 
-    fn set_status_flg(&mut self, flg: u8) {
-        self.reg_p |= flg;
-    }
+            // LDA $44 => a5 44
+            AddressingMode::ZeroPage => self.mem_read(self.program_counter) as u16,
 
-    fn get_status_flg(&self, flg: u8) -> bool {
-        (self.reg_p & flg) != 0
-    }
+            // LDA $4400 => ad 00 44
+            AddressingMode::Absolute => self.mem_read_u16(self.program_counter),
 
-    fn nz_flg_update(&mut self, val: u8) {
-        if val == 0{
-            self.set_status_flg(ZERO_FLG);
-        }else{
-            self.cls_status_flg(ZERO_FLG);
+            // LDA $44,X => b5 44
+            AddressingMode::ZeroPage_X => {
+                let pos = self.mem_read(self.program_counter);
+                let addr = pos.wrapping_add(self.register_x) as u16;
+                addr
+            }
+
+            // LDX $44,Y => b6 44
+            AddressingMode::ZeroPage_Y => {
+                let pos = self.mem_read(self.program_counter);
+                let addr = pos.wrapping_add(self.register_y) as u16;
+                addr
+            }
+
+            // LDA $4400,X => bd 00 44
+            AddressingMode::Absolute_X => {
+                let base = self.mem_read_u16(self.program_counter);
+                let addr = base.wrapping_add(self.register_x as u16);
+                // (+1 if page crossed)
+                if base & 0xFF00 != addr & 0xFF00 {
+                    self.add_cycles += 1;
+                }
+                addr
+            }
+
+            // LDA $4400,Y => b9 00 44
+            AddressingMode::Absolute_Y => {
+                let base = self.mem_read_u16(self.program_counter);
+                let addr = base.wrapping_add(self.register_y as u16);
+                // (+1 if page crossed)
+                if base & 0xFF00 != addr & 0xFF00 {
+                    self.add_cycles += 1;
+                }
+                addr
+            }
+            // JMP -> same Absolute
+            AddressingMode::Indirect => {
+                let base = self.mem_read_u16(self.program_counter);
+                let addr = self.mem_read_u16(base);
+                addr
+            }
+
+            // LDA ($44,X) => a1 44
+            AddressingMode::Indirect_X => {
+                let base = self.mem_read(self.program_counter);
+                let ptr: u8 = (base as u8).wrapping_add(self.register_x);
+                let addr = self.mem_read_u16(ptr as u16);
+                addr
+            }
+
+            // LDA ($44),Y => b1 44
+            AddressingMode::Indirect_Y => {
+                let base = self.mem_read(self.program_counter);
+                let deref_base = self.mem_read_u16(base as u16);
+                let deref = deref_base.wrapping_add(self.register_y as u16);
+                // (+1 if page crossed)
+                if deref_base & 0xFF00 != deref & 0xFF00 {
+                    self.add_cycles += 1;
+                }
+                deref
+            }
+
+            // BCC *+4 => 90 04
+            AddressingMode::Relative => {
+                let base = self.mem_read(self.program_counter);
+                let np = (base as i8) as i32 + self.program_counter as i32;
+                return np as u16;
+            }
+
+            AddressingMode::NoneAddressing => {
+                panic!("_mode {:?} is not supported", _mode);
+            }
         }
-
-        if (val & BIN_BIT_7) != 0 {
-            self.set_status_flg(NEGATIVE_FLG);
-        }else{
-            self.cls_status_flg(NEGATIVE_FLG);
-        }
     }
 
-    fn nz_flg_update_sub(&mut self, val_a: u8,  val_b: u8) -> u8{
-        let ret: u8 = val_a.wrapping_sub(val_b);
-        if val_a == val_b {
-            self.set_status_flg(ZERO_FLG);
-            0
-        } else if (ret & BIN_BIT_7) != 0 {
-            self.set_status_flg(NEGATIVE_FLG);
-            ret
-        } else{
-            self.cls_status_flg(ZERO_FLG);
-            self.cls_status_flg(NEGATIVE_FLG);
-            ret
+    pub fn mem_read_u16(&mut self, pos: u16) -> u16 {
+        // FIXME
+        if pos == 0x00FF || pos == 0x02FF {
+            debug!("mem_read_u16 page boundary. {:04X}", pos);
+            let lo = self.mem_read(pos) as u16;
+            let hi = self.mem_read(pos & 0xFF00) as u16;
+            return (hi << 8) | (lo as u16);
         }
+        let lo = self.mem_read(pos) as u16;
+        let hi = self.mem_read(pos + 1) as u16;
+        (hi << 8) | (lo as u16)
     }
 
-    fn c_flg_update_l_shit(&mut self, val: u8) -> u8{
-        let mut ret: u8 = val;
-
-        if (ret & BIN_BIT_7) != 0 {
-            self.set_status_flg(CARRY_FLG);
-        }else {
-            self.cls_status_flg(CARRY_FLG);
-        }
-        ret = ret.wrapping_shl(1);
-        ret
+    pub fn mem_write_u16(&mut self, pos: u16, data: u16) {
+        let hi = (data >> 8) as u8;
+        let lo = (data & 0x00FF) as u8;
+        self.mem_write(pos, lo);
+        self.mem_write(pos + 1, hi);
     }
 
-    fn c_flg_update_r_shit(&mut self, val: u8) -> u8{
-        let mut ret: u8 = val;
-
-        if (ret & BIN_BIT_0) != 0 {
-            self.set_status_flg(CARRY_FLG);
-        }else {
-            self.cls_status_flg(CARRY_FLG);
-        }
-        ret = ret.wrapping_shr(1);
-        ret
+    fn load_and_run(&mut self, program: Vec<u8>) {
+        self.load();
+        self.reset();
+        self.run();
     }
 
-    fn cnz_cmp(&mut self, reg: u8, val: u8,)
+    pub fn reset(&mut self) {
+        self.register_a = 0;
+        self.register_x = 0;
+        self.register_y = 0;
+        // FIXME あってる？
+        self.status = FLAG_INTERRRUPT | FLAG_BREAK2;
+        self.stack_pointer = 0xFD;
+
+        self.program_counter = self.mem_read_u16(0xFFFC);
+    }
+
+    pub fn load(&mut self) {
+        // self.mem_write_u16(0xFFFC, 0x8000);
+    }
+
+    pub fn run(&mut self) {
+        self.run_with_callback(|_| {});
+    }
+
+    pub fn run_with_callback<F>(&mut self, mut callback: F)
+    where
+        F: FnMut(&mut CPU),
     {
-        if reg >= val {
-            self.set_status_flg(CARRY_FLG);
-        }else{
-            self.cls_status_flg(CARRY_FLG);
-        }
-
-        if reg == val {
-            self.set_status_flg(ZERO_FLG);
-        }else{
-            self.cls_status_flg(ZERO_FLG);
-        }
-
-        let sub: u8 = reg.wrapping_sub(val);
-        if (sub & BIN_BIT_7) != 0 {
-            self.set_status_flg(NEGATIVE_FLG);
-        }else{
-            self.cls_status_flg(NEGATIVE_FLG);
-        }
-    }
-
-    fn reset(&mut self)
-    {
-        // TODO :Reset Func
-        self.interrupt_proc(InterruptType::RST);
-    }
-
-    fn interrupt_proc(&mut self, int_type :InterruptType)
-    {
-        let mut _vet_tbl_addr: u16 = 0x0000;
-        match int_type {
-            InterruptType::RST => {
-                self.reg_a = 0;
-                self.reg_x = 0;
-                self.reg_y = 0;
-                self.reg_p = R_FLG;
-                self.reg_sp = 0xFF;
-                self.cpu_run = true;
-                self.reg_p |= INTERRUPT_DISABLE_FLG;
-                _vet_tbl_addr = ADDR_VEC_TBL_RST;
-            },
-            InterruptType::NMI => {
-                self.reg_p &= !BREAK_COMMAND_FLG;
-                self.push_stack((self.reg_pc & 0x00FF) as u8);
-                self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
-                self.push_stack(self.reg_p);
-                self.reg_p |= INTERRUPT_DISABLE_FLG;
-                _vet_tbl_addr = ADDR_VEC_TBL_NMI;
-            },
-            InterruptType::IRQ => {
-                if self.get_status_flg(BREAK_COMMAND_FLG) != true {
-                    self.reg_p &= !BREAK_COMMAND_FLG;
-                    self.push_stack((self.reg_pc & 0x00FF) as u8);
-                    self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
-                    self.push_stack(self.reg_p);
-                    self.reg_p |= INTERRUPT_DISABLE_FLG;
-                    _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
-                }
-            },
-            InterruptType::BRK => {
-                if self.get_status_flg(BREAK_COMMAND_FLG) != true {
-                    self.reg_p |= BREAK_COMMAND_FLG;
-                    self.reg_pc += 1;
-                    self.push_stack((self.reg_pc & 0x00FF) as u8);
-                    self.push_stack(((self.reg_pc & 0xFF00) >> 0x0008) as u8);
-                    self.push_stack(self.reg_p);
-                    self.reg_p |= INTERRUPT_DISABLE_FLG;
-                    _vet_tbl_addr = ADDR_VEC_TBL_IRQ;
-                }
-            },
-        }
-
-        let addr_l: u16 = self.read(_vet_tbl_addr) as u16;
-        let addr_u: u16 = self.read(_vet_tbl_addr + 1) as u16;
-        self.reg_pc = (addr_u << 8) | addr_l;
-    }
-
-    fn read(&mut self, address: u16) -> u8
-    {
-        self.nes_mem.mem_read(address)
-    }
-
-    fn write(&mut self, address: u16, data: u8)
-    {
-        self.nes_mem.mem_write(address, data);
-    }
-
-    fn push_stack(&mut self, data: u8) {
-        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
-        self.write(address, data);
-        self.reg_sp -= 1;
-    }
-
-    fn pop_stack(&mut self) -> u8 {
-        self.reg_sp += 1;
-        let address: u16 = 0x0100u16.wrapping_add(self.reg_sp as u16);
-        self.read(address)
-    }
-
-    fn fetch_instruction(&mut self) -> u8 {
-        let op_code = self.read(self.reg_pc);
-        op_code
-    }
-
-    fn decode_instruction(&mut self, op_code: u8) {
-        match op_code.into() {
-            0x00 => { self.op_code = OpCode::BRK; self.addr_mode = Addressing::IMPL; self.cycle = 7; },
-            0x01 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IndX; self.cycle = 2; },
-            0x05 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ZPG; self.cycle = 2; },
-            0x06 => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0x08 => { self.op_code = OpCode::PHP; self.addr_mode = Addressing::IMPL; self.cycle = 3; },
-            0x09 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0x0A => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ACC; self.cycle = 2; },
-            0x0D => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ABS; self.cycle = 3; },
-            0x0E => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ABS; self.cycle = 5; },
-            0x10 => { self.op_code = OpCode::BPL; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0x11 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0x15 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x16 => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::ZpgX; self.cycle = 6; },
-            0x18 => { self.op_code = OpCode::CLC; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x19 => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0x1D => { self.op_code = OpCode::ORA; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0x1E => { self.op_code = OpCode::ASL; self.addr_mode = Addressing::AbsX; self.cycle = 6; },
-            0x20 => { self.op_code = OpCode::JSR; self.addr_mode = Addressing::ABS; self.cycle = 6; },
-            0x21 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IndX; self.cycle = 4; },
-            0x24 => { self.op_code = OpCode::BIT; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x25 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x26 => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0x28 => { self.op_code = OpCode::PLP; self.addr_mode = Addressing::IMPL; self.cycle = 4; },
-            0x29 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0x2A => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ACC; self.cycle = 2; },
-            0x2C => { self.op_code = OpCode::BIT; self.addr_mode = Addressing::ABS; self.cycle = 3; },
-            0x2D => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ABS; self.cycle = 3; },
-            0x2E => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ABS; self.cycle = 5; },
-            0x30 => { self.op_code = OpCode::BMI; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0x31 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0x35 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x36 => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::ZpgX; self.cycle = 5; },
-            0x38 => { self.op_code = OpCode::SEC; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x39 => { self.op_code = OpCode::AND; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0x3D => { self.op_code = OpCode::AND; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0x3E => { self.op_code = OpCode::ROL; self.addr_mode = Addressing::AbsX; self.cycle = 7; },
-            0x40 => { self.op_code = OpCode::RTI; self.addr_mode = Addressing::IMPL; self.cycle = 6; },
-            0x41 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IndX; self.cycle = 6; },
-            0x45 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x46 => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0x48 => { self.op_code = OpCode::PHA; self.addr_mode = Addressing::IMPL; self.cycle = 3; },
-            0x49 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0x4A => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ACC; self.cycle = 2; },
-            0x4C => { self.op_code = OpCode::JMP; self.addr_mode = Addressing::ABS; self.cycle = 3; },
-            0x4D => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0x4E => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ABS; self.cycle = 6; },
-            0x50 => { self.op_code = OpCode::BVC; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0x51 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0x55 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x56 => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::ZpgX; self.cycle = 6; },
-            0x58 => { self.op_code = OpCode::CLI; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x59 => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0x5D => { self.op_code = OpCode::EOR; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0x5E => { self.op_code = OpCode::LSR; self.addr_mode = Addressing::AbsX; self.cycle = 7; },
-            0x60 => { self.op_code = OpCode::RTS; self.addr_mode = Addressing::IMPL; self.cycle = 6; },
-            0x61 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IndX; self.cycle = 6; },
-            0x65 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x66 => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0x68 => { self.op_code = OpCode::PLA; self.addr_mode = Addressing::IMPL; self.cycle = 4; },
-            0x69 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0x6A => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ACC; self.cycle = 2; },
-            0x6C => { self.op_code = OpCode::JMP; self.addr_mode = Addressing::IND; self.cycle = 5; },
-            0x6D => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0x6E => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ABS; self.cycle = 6; },
-            0x70 => { self.op_code = OpCode::BVS; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0x71 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0x75 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x76 => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::ZpgX; self.cycle = 6; },
-            0x78 => { self.op_code = OpCode::SEI; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x79 => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0x7D => { self.op_code = OpCode::ADC; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0x7E => { self.op_code = OpCode::ROR; self.addr_mode = Addressing::AbsX; self.cycle = 7; },
-            0x81 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::IndX; self.cycle = 6; },
-            0x84 => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x85 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x86 => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0x88 => { self.op_code = OpCode::DEY; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x8A => { self.op_code = OpCode::TXA; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x8C => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0x8D => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0x8E => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0x90 => { self.op_code = OpCode::BCC; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0x91 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::IndY; self.cycle = 6; },
-            0x94 => { self.op_code = OpCode::STY; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x95 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0x96 => { self.op_code = OpCode::STX; self.addr_mode = Addressing::ZpgY; self.cycle = 4; },
-            0x98 => { self.op_code = OpCode::TYA; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x99 => { self.op_code = OpCode::STA; self.addr_mode = Addressing::AbsY; self.cycle = 5; },
-            0x9A => { self.op_code = OpCode::TXS; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x9D => { self.op_code = OpCode::STA; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0xA0 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xA1 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IndX; self.cycle = 6; },
-            0xA2 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xA4 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xA5 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xA6 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xA8 => { self.op_code = OpCode::TAY; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xA9 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xAA => { self.op_code = OpCode::TAX; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xAC => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xAD => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xAE => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xB0 => { self.op_code = OpCode::BCS; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0xB1 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0xB4 => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0xB5 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0xB6 => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::ZpgY; self.cycle = 4; },
-            0xB8 => { self.op_code = OpCode::CLV; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xB9 => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0xBA => { self.op_code = OpCode::TSX; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xBC => { self.op_code = OpCode::LDY; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0xBD => { self.op_code = OpCode::LDA; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0xBE => { self.op_code = OpCode::LDX; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0xC0 => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xC1 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IndX; self.cycle = 6; },
-            0xC4 => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xC5 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xC6 => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0xC8 => { self.op_code = OpCode::INY; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xC9 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xCA => { self.op_code = OpCode::DEX; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xCC => { self.op_code = OpCode::CPY; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xCD => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xCE => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ABS; self.cycle = 6; },
-            0xD0 => { self.op_code = OpCode::BNE; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0xD1 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0xD5 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0xD6 => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::ZpgX; self.cycle = 6; },
-            0xD8 => { self.op_code = OpCode::CLD; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xD9 => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0xDD => { self.op_code = OpCode::CMP; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0xDE => { self.op_code = OpCode::DEC; self.addr_mode = Addressing::AbsX; self.cycle = 7; },
-            0xE0 => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xE1 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IndX; self.cycle = 5; },
-            0xE4 => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xE5 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ZPG; self.cycle = 3; },
-            0xE6 => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ZPG; self.cycle = 5; },
-            0xE8 => { self.op_code = OpCode::INX; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xE9 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0xEC => { self.op_code = OpCode::CPX; self.addr_mode = Addressing::ABS; self.cycle = 4 },
-            0xED => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ABS; self.cycle = 4; },
-            0xEE => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ABS; self.cycle = 6; },
-            0xF0 => { self.op_code = OpCode::BEQ; self.addr_mode = Addressing::REL; self.cycle = 3; },
-            0xF1 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::IndY; self.cycle = 5; },
-            0xF5 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::ZpgX; self.cycle = 4; },
-            0xF6 => { self.op_code = OpCode::INC; self.addr_mode = Addressing::ZpgX; self.cycle = 6; },
-            0xF8 => { self.op_code = OpCode::SED; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0xF9 => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::AbsY; self.cycle = 4; },
-            0xFD => { self.op_code = OpCode::SBC; self.addr_mode = Addressing::AbsX; self.cycle = 4; },
-            0xFE => { self.op_code = OpCode::INC; self.addr_mode = Addressing::AbsX; self.cycle = 6; },
-
-            // NOP
-            0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xEA | 0xFA => {
-                self.op_code = OpCode::NOP; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-            0x80 | 0x82 | 0x89 | 0xC2 | 0xE2 => {
-                self.op_code = OpCode::NOP; self.addr_mode = Addressing::IMM; self.cycle = 2; },
-            0x04 | 0x44 | 0x64 => {
-                self.op_code = OpCode::NOP; self.addr_mode = Addressing::ZPG; self.cycle = 2; },
-            0x14 | 0x34 | 0x54 | 0x74| 0xD4| 0xF4 => {
-                self.op_code = OpCode::NOP; self.addr_mode = Addressing::ZpgX; self.cycle = 2; },
-            0x0C => { self.op_code = OpCode::NOP; self.addr_mode = Addressing::ABS; self.cycle = 2; },
-            0x1C | 0x3C | 0x5C | 0x7C| 0xDC| 0xFC => {
-                self.op_code = OpCode::NOP; self.addr_mode = Addressing::AbsX; self.cycle = 2; },
-
-            // STP
-            0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xB2 | 0xD2 | 0xF2  => {
-                self.op_code = OpCode::STP; self.addr_mode = Addressing::IMPL; self.cycle = 2; },
-
-            _ => { self.op_code = OpCode::UNK; self.addr_mode = Addressing::IMPL; self.cycle = 2; }
-        };
-    }
-
-    fn execute_instruction(&mut self) {
-        let (operand,operand_second,dbg_str) = self.read_operand();
-        let mut jmp_flg: bool = false;
-
-        match self.op_code {
-            OpCode::NOP => {
-                // No operation, do nothing
-                println!("{}",format!("[DEBUG]: NOP {}",dbg_str));
+        loop {
+            if let Some(_nmi) = self.bus.poll_nmi_status() {
+                self.interrupt_nmi();
             }
 
-            // // Logical Operations / 論理演算命令
-            OpCode::AND => {
-                println!("{}", format!("[DEBUG]: AND {}", dbg_str));
-                self.reg_a = self.reg_a & self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::ORA => {
-                println!("{}", format!("[DEBUG]: ORA {}", dbg_str));
-                self.reg_a = self.reg_a | self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::EOR => {
-                println!("{}", format!("[DEBUG]: EOR {}", dbg_str));
-                self.reg_a = self.reg_a ^ self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_a);
+            if self.bus.poll_apu_irq() {
+                self.apu_irq();
             }
 
-            // Arithmetic Operations / 算術倫理演算
-            OpCode::ADC => {
-                println!("{}",format!("[DEBUG]: ADC {}",dbg_str));
-                let mut _val: u8 = self.operand_val(operand,operand_second);
-                let carry: u8 = self.reg_p & CARRY_FLG;
-                let (mut _ret1, _ovf1) = self.reg_a.overflowing_add(carry);
-                let (mut _ret2, _ovf2) = _ret1.overflowing_add(_val);
-                self.reg_a = _ret2;
+            let opscode = self.mem_read(self.program_counter);
+            self.program_counter += 1;
 
-                if _ovf1 || _ovf2 {
-                    self.set_status_flg(CARRY_FLG);
-                }else{
-                    self.cls_status_flg(CARRY_FLG);
-                }
+            let op = self.find_ops(opscode);
+            match op {
+                Some(op) => {
+                    self.add_cycles = 0;
 
-                if (((self.reg_a ^ _ret2) & 0x80) != 0) && (((self.reg_a ^ _ret2) & 0x80) != 0){
-                    self.set_status_flg(OVERFLOW_FLG);
-                }else{
-                    self.cls_status_flg(OVERFLOW_FLG);
-                }
+                    callback(self);
+                    call(self, &op);
 
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::SBC => {
-                println!("{}",format!("[DEBUG]: SBC {}",dbg_str));
-                let mut _val: u8 = self.operand_val(operand,operand_second);
-                let carry: u8 = !(self.reg_p & CARRY_FLG) & 0x01;
-                let (mut _ret1, _ovf1) = self.reg_a.overflowing_sub(carry);
-                let (mut _ret2, _ovf2) = _ret1.overflowing_sub(_val);
-                self.reg_a = _ret2;
-
-                if !(_ovf1 || _ovf2) {
-                    self.set_status_flg(CARRY_FLG);
-                }else{
-                    self.cls_status_flg(CARRY_FLG);
-                }
-
-                if (((self.reg_a ^ _val) & 0x80) != 0) && (((self.reg_a ^ _ret2) & 0x80) != 0)
-                {
-                    self.set_status_flg(OVERFLOW_FLG);
-                }else{
-                    self.cls_status_flg(OVERFLOW_FLG);
-                }
-
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::CMP => {
-                println!("{}",format!("[DEBUG]: CMP {}",dbg_str));
-                let mut _ret: u8 = self.operand_val(operand,operand_second);
-                self.cnz_cmp(self.reg_a, _ret);
-            }
-            OpCode::CPX => {
-                println!("{}",format!("[DEBUG]: CPX {}",dbg_str));
-                let mut _ret: u8 = self.operand_val(operand,operand_second);
-                self.cnz_cmp(self.reg_x, _ret);
-            }
-            OpCode::CPY => {
-                println!("{}",format!("[DEBUG]: CPY {}",dbg_str));
-                let mut _ret: u8 = self.operand_val(operand,operand_second);
-                self.cnz_cmp(self.reg_y, _ret);
-            }
-            OpCode::INC => {
-                println!("{}",format!("[DEBUG]: INC {}",dbg_str));
-                let _addr: u16 = self.operand_addr(operand,operand_second);
-                let mut _ret: u8 = self.operand_val(operand,operand_second);
-                _ret = _ret.wrapping_add(1);
-                self.nz_flg_update(_ret as u8);
-                self.write(_addr, _ret);
-            }
-            OpCode::INX => {
-                println!("{}",format!("[DEBUG]: INX {}",dbg_str));
-                self.reg_x = self.reg_x.wrapping_add(1);
-                self.nz_flg_update(self.reg_x );
-            }
-            OpCode::INY => {
-                println!("{}",format!("[DEBUG]: INY {}",dbg_str));
-                self.reg_y = self.reg_y.wrapping_add(1);
-                self.nz_flg_update(self.reg_y );
-            }
-            OpCode::DEC => {
-                println!("{}",format!("[DEBUG]: DEC {}",dbg_str));
-                let _addr: u16 = self.operand_addr(operand,operand_second);
-                let mem: u8 = self.operand_val(operand,operand_second);
-                let _ret: u8 = self.nz_flg_update_sub(mem, 0x01);
-                self.write(_addr, _ret);
-            }
-            OpCode::DEX => {
-                println!("{}",format!("[DEBUG]: DEX {}",dbg_str));
-                self.reg_x = self.nz_flg_update_sub(self.reg_x, 1);
-            }
-            OpCode::DEY => {
-                println!("{}",format!("[DEBUG]: DEY {}",dbg_str));
-                self.reg_y = self.nz_flg_update_sub(self.reg_y, 1);
-            }
-
-            // Shift and Rotate Operations
-            OpCode::ASL => {
-                println!("{}",format!("[DEBUG]: ASL {}",dbg_str));
-                match self.addr_mode {
-                    Addressing::ACC => {
-                        let mut _ret: u8 = self.c_flg_update_l_shit(self.reg_a);
-                        _ret = _ret & 0xFE; // bit0, clear
-                        self.nz_flg_update(_ret);
-                        self.reg_a = _ret;
-                    },
-                    _ => {
-                        let addr: u16 =  self.operand_addr(operand,operand_second);
-                        let val: u8 =  self.operand_val(operand,operand_second);
-                        let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
-                        _ret = _ret & 0xFE; // bit0, clear
-                        self.nz_flg_update(_ret);
-                        self.write(addr, _ret);
+                    match op.cycle_calc_mode {
+                        CycleCalcMode::None => {
+                            self.add_cycles = 0;
+                        }
+                        CycleCalcMode::Page => {
+                            if self.add_cycles > 1 {
+                                panic!(
+                                    "Unexpected cycle_calc. {} {:?} => {}",
+                                    op.name, op.addressing_mode, self.add_cycles
+                                )
+                            }
+                        }
+                        _ => {}
                     }
-                }
-            }
-            OpCode::LSR => {
-                println!("{}",format!("[DEBUG]: LSR {}",dbg_str));
-                match self.addr_mode {
-                    Addressing::ACC => {
-                        let mut _ret: u8 = self.c_flg_update_r_shit(self.reg_a);
-                        _ret = _ret & 0x7F; // bit7, clear
-                        self.nz_flg_update(_ret);
-                        self.reg_a = _ret;
-                    },
-                    _ => {
-                        let addr: u16 =  self.operand_addr(operand,operand_second);
-                        let val: u8 =  self.operand_val(operand,operand_second);
-                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
-                        _ret = _ret & 0x7F; // bit7, clear
-                        self.nz_flg_update(_ret);
-                        self.write(addr, _ret);
-                    }
-                }
-            }
-            OpCode::ROL => {
-                println!("{}",format!("[DEBUG]: ROL {}",dbg_str));
-                match self.addr_mode {
-                    Addressing::ACC => {
-                        let mut _ret: u8 = self.c_flg_update_l_shit(self.reg_a);
-                        _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
-                        self.nz_flg_update(_ret);
-                        self.reg_a = _ret;
-                    },
-                    _ => {
-                        let addr: u16 =  self.operand_addr(operand,operand_second);
-                        let val: u8 =  self.operand_val(operand,operand_second);
-                        let mut _ret: u8 = self.c_flg_update_l_shit(val as u8);
-                        _ret = _ret | (self.reg_p & CARRY_FLG); // bit0, Set C
-                        self.nz_flg_update(_ret);
-                        self.write(addr, _ret);
-                    }
-                }
-            }
-            OpCode::ROR => {
-                println!("{}",format!("[DEBUG]: ROR {}",dbg_str));
-                match self.addr_mode {
-                    Addressing::ACC => {
-                        let mut _ret: u8 = self.c_flg_update_r_shit(self.reg_a);
-                        _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
-                        self.nz_flg_update(_ret);
-                        self.reg_a = _ret;
-                    },
-                    _ => {
-                        let addr: u16 =  self.operand_addr(operand,operand_second);
-                        let val: u8 =  self.operand_val(operand,operand_second);
-                        let mut _ret: u8 = self.c_flg_update_r_shit(val as u8);
-                        _ret = _ret | ((self.reg_p & CARRY_FLG) << 7); // bit7, Set C
-                        self.nz_flg_update(_ret);
-                        self.write(addr, _ret);
-                    }
-                }
-            }
 
-            // Load/Store Operations
-            OpCode::LDA => {
-                println!("{}",format!("[DEBUG]: LDA {}",dbg_str));
-                self.reg_a = self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::LDX => {
-                println!("{}",format!("[DEBUG]: LDX {}",dbg_str));
-                self.reg_x = self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_x);
-            }
-            OpCode::LDY => {
-                println!("{}",format!("[DEBUG]: LDY {}",dbg_str));
-                self.reg_y = self.operand_val(operand,operand_second);
-                self.nz_flg_update(self.reg_y);
-            }
-            OpCode::STA => {
-                println!("{}",format!("[DEBUG]: STA {}",dbg_str));
-                let addr: u16 = self.operand_addr(operand,operand_second);
-                self.write(addr, self.reg_a);
-            }
-            OpCode::STX => {
-                println!("{}",format!("[DEBUG]: STX {}",dbg_str));
-                let addr: u16 = self.operand_addr(operand,operand_second);
-                self.write(addr, self.reg_x);
-            }
-            OpCode::STY => {
-                println!("{}",format!("[DEBUG]: STY {}",dbg_str));
-                let addr: u16 = self.operand_addr(operand,operand_second);
-                self.write(addr, self.reg_y);
-            }
+                    self.bus.tick(op.cycles + self.add_cycles);
 
-            // Register Transfer Operations/レジスタ転送関連の命令
-            OpCode::TAX => {
-                println!("{}",format!("[DEBUG]: TAX {}",dbg_str));
-                self.reg_x = self.reg_a;
-                self.nz_flg_update(self.reg_x);
-            }
-            OpCode::TAY => {
-                println!("{}",format!("[DEBUG]: TAY {}",dbg_str));
-                self.reg_y = self.reg_a;
-                self.nz_flg_update(self.reg_y);
-            }
-            OpCode::TXA => {
-                println!("{}",format!("[DEBUG]: TXA {}",dbg_str));
-                self.reg_a = self.reg_x;
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::TYA => {
-                println!("{}",format!("[DEBUG]: TYA {}",dbg_str));
-                self.reg_a = self.reg_y;
-                self.nz_flg_update(self.reg_a);
-            }
-
-            // Stack Operations / スタック関連の命令
-            OpCode::TSX => {
-                println!("{}",format!("[DEBUG]: TSX {}",dbg_str));
-                self.reg_x = self.reg_sp;
-                self.nz_flg_update(self.reg_x);
-            }
-            OpCode::TXS => {
-                println!("{}",format!("[DEBUG]: TXS {}",dbg_str));
-                self.reg_sp = self.reg_x;
-            }
-            OpCode::PHA => {
-                println!("{}",format!("[DEBUG]: PHA {}",dbg_str));
-                self.push_stack(self.reg_a);
-            }
-            OpCode::PHP => {
-                println!("{}",format!("[DEBUG]: PHP {}",dbg_str));
-                self.push_stack(self.reg_p);
-            }
-            OpCode::PLA => {
-                println!("{}",format!("[DEBUG]: PLA {}",dbg_str));
-                let value = self.pop_stack();
-                self.reg_a = value;
-                self.nz_flg_update(self.reg_a);
-            }
-            OpCode::PLP => {
-                println!("{}",format!("[DEBUG]: PLP {}",dbg_str));
-                self.reg_p = self.pop_stack();
-            }
-
-            // Status Flag Operations / ステータスフラグ関連の命令
-            OpCode::BIT => {
-                println!("{}",format!("[DEBUG]: BIT {}",dbg_str));
-                let _addr: u16 = self.operand_addr(operand,operand_second);
-                let ret: u8 = self.operand_val(operand,operand_second);
-                let result = self.reg_a & ret;
-                if result == 0 {
-                    self.set_status_flg(ZERO_FLG);
-                }else{
-                    self.cls_status_flg(ZERO_FLG);
+                    // if program_conter_state == self.program_counter {
+                    //   self.program_counter += (op.len - 1) as u16
+                    // }
                 }
-                if (ret & BIN_BIT_6) != 0 {
-                    self.set_status_flg(OVERFLOW_FLG);
-                }else {
-                    self.cls_status_flg(OVERFLOW_FLG);
-                }
-                if (ret & BIN_BIT_7) != 0 {
-                    self.set_status_flg(NEGATIVE_FLG);
-                }else{
-                    self.cls_status_flg(NEGATIVE_FLG);
-                }
-            }
-            OpCode::CLC => {
-                self.cls_status_flg(CARRY_FLG);
-                println!("{}",format!("[DEBUG]: CLC {}",dbg_str));
-            }
-            OpCode::CLD => {
-                self.cls_status_flg(DECIMAL_MODE_FLG);
-                println!("{}",format!("[DEBUG]: CLD {}",dbg_str));
-            }
-            OpCode::CLI => {
-                self.cls_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("{}",format!("[DEBUG]: CLI {}",dbg_str));
-            }
-            OpCode::CLV => {
-                self.cls_status_flg(OVERFLOW_FLG);
-                println!("{}",format!("[DEBUG]: CLV {}",dbg_str));
-            }
-            OpCode::SEC => {
-                self.set_status_flg(CARRY_FLG);
-                println!("{}",format!("[DEBUG]: SEC {}",dbg_str));
-            }
-            OpCode::SED => {
-                self.set_status_flg(DECIMAL_MODE_FLG);
-                println!("{}",format!("[DEBUG]: SED {}",dbg_str));
-            }
-            OpCode::SEI => {
-                self.set_status_flg(INTERRUPT_DISABLE_FLG);
-                println!("{}",format!("[DEBUG]: SEI {}",dbg_str));
-            }
-
-            // Branch Operations / 分岐命令
-            OpCode::BCC => {
-                println!("{}",format!("[DEBUG]: BCC {}",dbg_str));
-                if self.get_status_flg(CARRY_FLG) != true {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BCS => {
-                println!("{}",format!("[DEBUG]: BCS {}",dbg_str));
-                if self.get_status_flg(CARRY_FLG) != false {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BEQ => {
-                println!("{}",format!("[DEBUG]: BEQ {}",dbg_str));
-                if self.get_status_flg(ZERO_FLG) != false {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BNE => {
-                println!("{}",format!("[DEBUG]: BNE {}",dbg_str));
-                if self.get_status_flg(ZERO_FLG) != true {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BVC => {
-                println!("{}",format!("[DEBUG]: BVC {}",dbg_str));
-                if self.get_status_flg(OVERFLOW_FLG) != true {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BVS => {
-                println!("{}",format!("[DEBUG]: BVS {}",dbg_str));
-                if self.get_status_flg(OVERFLOW_FLG) != false {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BPL => {
-                println!("{}",format!("[DEBUG]: BPL {}",dbg_str));
-                if self.get_status_flg(NEGATIVE_FLG) != true {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-            OpCode::BMI => {
-                println!("{}",format!("[DEBUG]: BMI {}",dbg_str));
-                if self.get_status_flg(NEGATIVE_FLG) != false {
-                    let branch_addr: u16 = self.operand_addr(operand,operand_second);
-                    self.reg_pc = branch_addr;
-                    jmp_flg = true;
-                }
-            }
-
-            // Jump and Call Operations
-            OpCode::JMP => {
-                println!("{}",format!("[DEBUG]: JMP {}",dbg_str));
-                let jmp_addr: u16 = self.operand_addr(operand,operand_second);
-                self.reg_pc = jmp_addr;
-                jmp_flg = true;
-            }
-            OpCode::JSR => {
-                println!("{}",format!("[DEBUG]: JSR {}",dbg_str));
-                let return_addr: u16 = self.reg_pc;
-                // let return_addr: u16 = self.reg_pc + 1;
-                self.push_stack((return_addr & 0x00FF) as u8);
-                self.push_stack(((return_addr & 0xFF00) >> 0x0008) as u8);
-
-                let jmp_addr: u16 = self.operand_addr(operand,operand_second);
-                self.reg_pc = jmp_addr;
-                jmp_flg = true;
-            }
-            OpCode::RTS => {
-                println!("{}",format!("[DEBUG]: RTS {}",dbg_str));
-                let addr_u: u8 = self.pop_stack();
-                let addr_l: u8 = self.pop_stack();
-                let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;
-                self.reg_pc = return_addr + 1;
-                jmp_flg = true;
-            }
-
-            // Intrrupt Operations / 割込み関連
-            OpCode::RTI => {
-                println!("{}",format!("[DEBUG]: RTI {}",dbg_str));
-                self.reg_p = self.pop_stack();
-                let addr_u: u8 = self.pop_stack();
-                let addr_l: u8 = self.pop_stack();
-                let return_addr: u16 =(addr_u as u16) << 8 | addr_l as u16;
-                self.reg_pc = return_addr;
-                jmp_flg = true;
-            }
-            OpCode::BRK => {
-                println!("{}",format!("[DEBUG]: BRK {}",dbg_str));
-                // self.interrupt_proc(InterruptType::BRK);
-                // jmp_flg = true;
-                panic!("[ERR]: BRK Call!")
-            }
-
-            // Other
-            OpCode::STP | _ => {
-                // TODO STPと未定義命令をどうするか
-                // println!("[DEBUG]: Undefined Instruction!");
-                panic!("[ERR]: Undefined Instruction!");
-            }
-        }
-
-        // pc ++
-        if (operand != None) & (jmp_flg != true)
-        {
-            self.reg_pc += 1;
-        }
-    }
-
-    fn read_operand(&mut self) -> (Option<u8>, Option<u8>, String)
-    {
-        self.reg_pc += 1;
-        let oprand:u8 = self.read(self.reg_pc);
-
-        match self.addr_mode {
-            Addressing::ACC => {
-                (None, None,format!("(ACC)"))
-            }
-            Addressing::IMM => {
-                (Some(self.read(self.reg_pc)),
-                None,
-                format!("#${:02X} (IMM)",oprand))
-            }
-            Addressing::IMPL => { // Implied Addressing
-                (None, None,format!("(IMPL)"))
-            }
-            Addressing::ZPG => {
-                (Some(self.read(self.reg_pc)),
-                Some(0),
-                format!("${:02X} (ZPG: ZPG = ${:02X}, Val = #{:02X})",oprand, oprand, self.read(oprand as u16)))
-            }
-            Addressing::ZpgX => {
-                let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_x);
-                (Some(addr_l),
-                Some(0),
-                format!("${:02X},X (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
-            }
-            Addressing::ZpgY => {
-                let addr_l: u8 = self.read(self.reg_pc).wrapping_add(self.reg_y);
-                (Some(addr_l),
-                Some(0),
-                format!("${:02X},Y (ZpgX: ZPG = ${:02X}, Val = #{:02X})",oprand, addr_l as u8, self.read(oprand as u16)))
-            }
-            Addressing::ABS => {
-                let addr_l:u8 = self.read(self.reg_pc);
-                self.reg_pc += 1;
-                let addr_u:u8 = self.read(self.reg_pc);
-                let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                (Some(addr_l),
-                Some(addr_u),
-                format!("${:04X} (ABS: Addr = ${:04X}, Val = #{:02X})",_addr, _addr, self.read(_addr)))
-            }
-            Addressing::AbsX => {
-                let mut addr_l: u8 = self.read(self.reg_pc);
-                self.reg_pc += 1;
-                let mut addr_u: u8 = self.read(self.reg_pc);
-                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                _addr |= self.reg_x as u16;
-                addr_l = (_addr & 0x00FF) as u8;
-                addr_u = ((_addr & 0xFF00) >> 8) as u8;
-                (Some(addr_l),
-                Some(addr_u),
-                format!("${:02X} ${:02X},X (AbsX: Addr = ${:04X}, Val = #{:02X})",addr_l, addr_u, _addr, self.read(_addr)))
-            }
-            Addressing::AbsY => {
-                let mut addr_l: u8 = self.read(self.reg_pc);
-                self.reg_pc += 1;
-                let mut addr_u: u8 = self.read(self.reg_pc);
-                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                _addr |= self.reg_y as u16;
-                addr_l = (_addr & 0x00FF) as u8;
-                addr_u = ((_addr & 0xFF00) >> 8) as u8;
-                (Some(addr_l),
-                Some(addr_u),
-                format!("${:02X} ${:02X},Y (AbsY: Addr = ${:04X}, Val = #{:02X})",addr_l, addr_u, _addr, self.read(_addr)))
-            }
-            Addressing::IND => { // Indirect Indexed
-                let b1: u16 = self.read(self.reg_pc) as u16;
-                self.reg_pc += 1;
-                let b2: u16 = self.read(self.reg_pc) as u16;
-                let m: u16 = (b2 << 8) | b1;
-                let addr_l: u8 = self.read(m as u16);
-                let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
-                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                (Some((_addr & 0x00FF) as u8),
-                Some(((_addr & 0xFF00) >> 8) as u8),
-                format!("${:02X} (IND: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, m, _addr, self.read(_addr)))
-            }
-            Addressing::IndX => { // Indexed Indirect
-                let b1:u8 = self.read(self.reg_pc);
-                let m: u8 = b1.wrapping_add(self.reg_x);
-                let addr_l: u8 = self.read(m as u16);
-                let addr_u: u8 = self.read(m.wrapping_add(1) as u16);
-                let _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                (Some((_addr & 0x00FF) as u8),
-                Some(((_addr & 0xFF00) >> 8) as u8),
-                format!("(${:02X},X) (IndX: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, m, _addr, self.read(_addr)))
-            }
-            Addressing::IndY => { // Indirect Indexed
-                let b1:u8 = self.read(self.reg_pc);
-                let addr_l: u8 = self.read(b1 as u16);
-                let addr_u: u8 = self.read(b1.wrapping_add(1) as u16);
-                let mut _addr: u16 = ((addr_u as u16) << 8) | (addr_l as u16);
-                _addr = _addr.wrapping_add(self.reg_y as u16);
-                (Some((_addr & 0x00FF) as u8),
-                Some(((_addr & 0xFF00) >> 8) as u8),
-                format!("(${:02X}),Y (IndY: ZPG = ${:02X}, Addr = ${:04X}, Val = #{:02X})",oprand, b1, _addr, self.read(_addr)))
-            }
-            Addressing::REL => { // Relative Addressing(相対アドレッシング)
-                let offset: u8 = self.read(self.reg_pc);
-                let s_offset: i8 = offset as i8;
-                let addr: u16 = (1 + self.reg_pc as i16).wrapping_add(s_offset as i16) as u16;
-                let addr_l: u8 = addr as u8;
-                let addr_u: u8 = (addr >> 8) as u8;
-                (Some(addr_l as u8),
-                Some(addr_u as u8),
-                format!("${:04X} (REL)(Offset: #{:02X}({}))", addr, s_offset, s_offset))
+                _ => {} // panic!("no implementation {:<02X}", opscode),
             }
         }
     }
 
-    fn read_operand_mem(&mut self, addr: u16) -> u8
-    {
-        match self.addr_mode {
-            Addressing::ACC => {
-                self.reg_a
-            },
-            Addressing::IMM => {
-                addr as u8
-            },
-            Addressing::ZPG | Addressing::ZpgX | Addressing::ZpgY |
-            Addressing::ABS | Addressing::AbsX | Addressing::AbsY |
-            Addressing::IND | Addressing::IndX | Addressing::IndY |
-            _ => {
-                self.read(addr)
-            },
-        }
+    fn interrupt_nmi(&mut self) {
+        debug!("** INTERRUPT_NMI **");
+        self._push_u16(self.program_counter);
+        let mut status = self.status;
+        status &= !FLAG_BREAK;
+        status |= FLAG_BREAK2;
+        self._push(status);
+
+        self.status |= FLAG_INTERRRUPT;
+        self.bus.tick(2);
+        self.program_counter = self.mem_read_u16(0xFFFA);
     }
 
-    fn operand_val(&mut self, operand_1: Option<u8>, operand_2: Option<u8>,) -> u8
-    {
-        let mut _ret: u8 = 0;
-        if let Some(val) = operand_1 {
-            _ret = self.read_operand_mem(val as u16);
-            if let Some(val2) = operand_2 {
-                _ret = self.read_operand_mem(((val2 as u16) << 8) | val as u16);
+    fn apu_irq(&mut self) {
+        info!("** APU_IRQ **");
+
+        if self.status & FLAG_INTERRRUPT != 0 {
+            return;
+        }
+        info!("  => CALL");
+
+        self._push_u16(self.program_counter);
+        self._push(self.status);
+        self.program_counter = self.mem_read_u16(0xFFFE);
+        self.status |= FLAG_BREAK;
+    }
+
+    fn find_ops(&mut self, opscode: u8) -> Option<OpCode> {
+        for op in CPU_OPS_CODES.iter() {
+            if op.code == opscode {
+                return Some(op.clone());
             }
         }
-        _ret
+        return None;
     }
 
-    fn operand_addr(&mut self, operand_1: Option<u8>, operand_2: Option<u8>,) -> u16
-    {
-        let mut _addr: u16 = 0;
-        if let Some(val) = operand_1 {
-            _addr = val as u16;
-            if let Some(val2) = operand_2 {
-                _addr = (val2 as u16) << 8 | val as u16;
-            }
-        }
-        _addr
+    pub fn anc(&mut self, _mode: &AddressingMode) {
+        todo!("anc")
     }
-}
-
-static mut S_CPU: Lazy<Pin<Box<RP2A03>>> = Lazy::new(|| {
-    let cpu = Box::pin(RP2A03::new());
-    cpu
-});
-
-fn cpu_reg_show()
-{
-    unsafe {
-        let cpu = Pin::into_inner_unchecked(Pin::clone(&*S_CPU));
-        println!("[DEBUG]: A:0x{:02X},X:0x{:02X},Y:0x{:02X},S:0x{:02X},P:{:08b},PC:0x{:04X}",
-        cpu.reg_a,
-        cpu.reg_x,
-        cpu.reg_y,
-        cpu.reg_sp,
-        cpu.reg_p,
-        cpu.reg_pc);
+    pub fn arr(&mut self, _mode: &AddressingMode) {
+        todo!("arr")
     }
-}
-
-fn cpu_proc() {
-    unsafe {
-        // if (S_CPU.cpu_run != false) && (S_CPU.cycle == 0)
-        {
-            let val = S_CPU.fetch_instruction();
-            S_CPU.decode_instruction(val);
-            S_CPU.execute_instruction();
-        //     S_CPU.cycle -= 1;
-        // }else{
-        //     S_CPU.cycle -= 1;
-        }
+    pub fn asr(&mut self, _mode: &AddressingMode) {
+        todo!("asr")
     }
-}
-
-
-pub fn chr_rom_read(addr: u16) -> u8
-{
-    unsafe {
-        S_CPU.nes_mem.mem_read(addr)
+    pub fn lxa(&mut self, _mode: &AddressingMode) {
+        todo!("lxa")
     }
-}
-
-pub fn get_chr_rom_ptr(index: RangeInclusive<usize>) -> &'static [u8]
-{
-    unsafe {
-        &S_CPU.nes_mem.cassette.get_chr_rom_ptr(index)
+    pub fn sha(&mut self, _mode: &AddressingMode) {
+        todo!("sha")
     }
-}
+    pub fn sbx(&mut self, _mode: &AddressingMode) {
+        //  A&X minus #{imm} into X
+        // AND X register with accumulator and store result in X regis-ter, then
+        // subtract byte from X register (without borrow).
+        // Status flags: N,Z,C
 
-pub fn get_chr_rom_mirroring() -> Mirroring
-{
-    unsafe {
-        S_CPU.nes_mem.cassette.screen_mirroring
-    }
-}
-
-pub fn cpu_interrupt(int_type: InterruptType)
-{
-    unsafe {
-        S_CPU.interrupt_proc(int_type);
-    }
-}
-
-pub fn cpu_run(flg: bool) {
-    unsafe {
-        if flg {
-            S_CPU.as_mut().cpu_run = true;
+        // AND X をアキュムレータに登録し、結果を X レジスタに格納します。 X レジスタからバイトを減算します (ボローなし)。 ステータスフラグ：N、Z、C
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        let (v, overflow) = (self.register_a & self.register_x).overflowing_sub(value);
+        self.register_x = v;
+        self.update_zero_and_negative_flags(self.register_x);
+        self.status = if overflow {
+            self.status & FLAG_OVERFLOW
         } else {
-            println!("[DEBUG]: CPU Stop");
-            S_CPU.as_mut().cpu_run = false;
+            self.status | FLAG_OVERFLOW
+        };
+        todo!("sbx")
+    }
+
+    pub fn jam(&mut self, _mode: &AddressingMode) {
+        // Stop program counter (processor lock up).
+        self.program_counter -= 1;
+        panic!("CALL JAM operation.");
+    }
+
+    pub fn lae(&mut self, _mode: &AddressingMode) {
+        // stores {adr}&S into A, X and S
+
+        // AND memory with stack pointer, transfer result to accu-mulator, X
+        // register and stack pointer.
+        // Status flags: N,Z
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        let s = self._pop();
+        self.register_a = value & s;
+        self.register_x = self.register_a;
+        self._push(self.register_a);
+        self.update_zero_and_negative_flags(self.register_a);
+        todo!("lae")
+    }
+
+    pub fn shx(&mut self, _mode: &AddressingMode) {
+        // M =3D X AND HIGH(arg) + 1
+        let addr = self.get_operand_address(_mode);
+        let h = ((addr & 0xFF00) >> 8) as u8;
+        self.mem_write(addr, (self.register_x & h).wrapping_add(1));
+        todo!("shx")
+    }
+
+    pub fn shy(&mut self, _mode: &AddressingMode) {
+        // Y&H into {adr}
+        // AND Y register with the high byte of the target address of the argument
+        // + 1. Store the result in memory.
+        let addr = self.get_operand_address(_mode);
+        let h = ((addr & 0xFF00) >> 8) as u8;
+        self.mem_write(addr, (self.register_y & h).wrapping_add(1));
+        todo!("shy")
+    }
+
+    pub fn ane(&mut self, _mode: &AddressingMode) {
+        // TXA + AND #{imm}
+        self.txa(_mode);
+        self.and(_mode);
+        todo!("ane")
+    }
+
+    pub fn shs(&mut self, _mode: &AddressingMode) {
+        // stores A&X into S and A&X&H into {adr}
+        // アキュムレータと X レジスタを AND 演算し、結果をスタック ポインタに格納します。次に、スタック ポインタと引数 1 のターゲット アドレスの上位バイトを AND 演算します。結果をメモリに格納します。
+        self._push(self.register_a & self.register_x);
+        let addr = self.get_operand_address(_mode);
+        let h = ((addr & 0xFF00) >> 8) as u8;
+        self.mem_write(addr, self.register_a & self.register_x & h);
+        todo!("shs")
+    }
+
+    pub fn rra(&mut self, _mode: &AddressingMode) {
+        self.ror(_mode);
+        self.adc(_mode);
+    }
+
+    pub fn sre(&mut self, _mode: &AddressingMode) {
+        self.lsr(_mode);
+        self.eor(_mode);
+    }
+
+    pub fn rla(&mut self, _mode: &AddressingMode) {
+        self.rol(_mode);
+        self.and(_mode);
+    }
+
+    pub fn slo(&mut self, _mode: &AddressingMode) {
+        self.asl(_mode);
+        self.ora(_mode);
+    }
+
+    pub fn isb(&mut self, _mode: &AddressingMode) {
+        // = ISC
+        self.inc(_mode);
+        self.sbc(_mode);
+    }
+
+    pub fn dcp(&mut self, _mode: &AddressingMode) {
+        self.dec(_mode);
+        self.cmp(_mode);
+    }
+
+    pub fn sax(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self.mem_write(addr, self.register_a & self.register_x);
+    }
+
+    pub fn lax(&mut self, _mode: &AddressingMode) {
+        self.lda(_mode);
+        self.tax(_mode);
+    }
+
+    pub fn txs(&mut self, _mode: &AddressingMode) {
+        self.stack_pointer = self.register_x;
+    }
+
+    pub fn tsx(&mut self, _mode: &AddressingMode) {
+        self.register_x = self.stack_pointer;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    pub fn tya(&mut self, _mode: &AddressingMode) {
+        self.register_a = self.register_y;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn tay(&mut self, _mode: &AddressingMode) {
+        self.register_y = self.register_a;
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    pub fn txa(&mut self, _mode: &AddressingMode) {
+        self.register_a = self.register_x;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn tax(&mut self, _mode: &AddressingMode) {
+        self.register_x = self.register_a;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    pub fn sty(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self.mem_write(addr, self.register_y);
+    }
+
+    pub fn stx(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self.mem_write(addr, self.register_x);
+    }
+
+    pub fn sta(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self.mem_write(addr, self.register_a);
+    }
+
+    pub fn rti(&mut self, _mode: &AddressingMode) {
+        // スタックからプロセッサ フラグをプルし、続いてプログラム カウンタをプルします。
+        self.status = self._pop() & !FLAG_BREAK | FLAG_BREAK2;
+        self.program_counter = self._pop_u16();
+    }
+
+    pub fn plp(&mut self, _mode: &AddressingMode) {
+        self.status = self._pop() & !FLAG_BREAK | FLAG_BREAK2;
+    }
+
+    pub fn php(&mut self, _mode: &AddressingMode) {
+        self._push(self.status | FLAG_BREAK | FLAG_BREAK2);
+    }
+
+    pub fn pla(&mut self, _mode: &AddressingMode) {
+        self.register_a = self._pop();
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn pha(&mut self, _mode: &AddressingMode) {
+        self._push(self.register_a);
+    }
+
+    pub fn nop(&mut self, _mode: &AddressingMode) {
+        // なにもしない
+    }
+
+    pub fn ldy(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_y = value;
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    pub fn ldx(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_x = value;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    pub fn lda(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_a = value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn rts(&mut self, _mode: &AddressingMode) {
+        let value = self._pop_u16() + 1;
+        self.program_counter = value;
+    }
+
+    pub fn jsr(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self._push_u16(self.program_counter + 2 - 1);
+        self.program_counter = addr;
+        // 後で+2するので整合性のため-2しておく
+        self.program_counter -= 2;
+    }
+
+    pub fn _push(&mut self, value: u8) {
+        let addr = 0x0100 + self.stack_pointer as u16;
+        trace!("STACK PUSH: {:04X} => {:02X}", self.stack_pointer, value);
+        self.mem_write(addr, value);
+        self.stack_pointer = self.stack_pointer.wrapping_sub(1);
+    }
+
+    pub fn _pop(&mut self) -> u8 {
+        self.stack_pointer = self.stack_pointer.wrapping_add(1);
+        let addr = 0x0100 + self.stack_pointer as u16;
+        trace!("STACK POP: {:02X}", self.stack_pointer);
+        self.mem_read(addr)
+    }
+
+    pub fn _push_u16(&mut self, value: u16) {
+        self._push((value >> 8) as u8);
+        self._push((value & 0x00FF) as u8);
+    }
+
+    pub fn _pop_u16(&mut self) -> u16 {
+        let lo = self._pop();
+        let hi = self._pop();
+        ((hi as u16) << 8) | lo as u16
+    }
+
+    pub fn jmp(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        self.program_counter = addr;
+        // 後で+2するので整合性のため-2しておく
+        self.program_counter -= 2;
+        // TODO
+        // オリジナルの 6502 は、間接ベクトルがページ境界にある場合、
+        // ターゲット アドレスを正しくフェッチしません (たとえば、$xxFF で、xx は $00 から $FF までの任意の値です)。
+        // この場合、予想どおり $xxFF から LSB を取得しますが、$xx00 から MSB を取得します。
+        // これは、65SC02 などの最近のチップで修正されているため、互換性のために、間接ベクトルがページの最後にないことを常に確認してください。
+    }
+
+    pub fn iny(&mut self, _mode: &AddressingMode) {
+        self.register_y = self.register_y.wrapping_add(1);
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    pub fn inx(&mut self, _mode: &AddressingMode) {
+        self.register_x = self.register_x.wrapping_add(1);
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    pub fn inc(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr).wrapping_add(1);
+        self.mem_write(addr, value);
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn dey(&mut self, _mode: &AddressingMode) {
+        self.register_y = self.register_y.wrapping_sub(1);
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    pub fn dex(&mut self, _mode: &AddressingMode) {
+        self.register_x = self.register_x.wrapping_sub(1);
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    pub fn dec(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr).wrapping_sub(1);
+        self.mem_write(addr, value);
+        self.update_zero_and_negative_flags(value);
+    }
+
+    fn _cmp(&mut self, target: u8, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        if target >= value {
+            self.sec(&AddressingMode::Implied);
+        } else {
+            self.clc(&AddressingMode::Implied);
+        }
+        let value = target.wrapping_sub(value);
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn cpy(&mut self, _mode: &AddressingMode) {
+        self._cmp(self.register_y, _mode);
+    }
+
+    pub fn cpx(&mut self, _mode: &AddressingMode) {
+        self._cmp(self.register_x, _mode);
+    }
+
+    pub fn cmp(&mut self, _mode: &AddressingMode) {
+        self._cmp(self.register_a, _mode);
+    }
+
+    pub fn clv(&mut self, _mode: &AddressingMode) {
+        self.status = self.status & !FLAG_OVERFLOW;
+    }
+
+    pub fn sei(&mut self, _mode: &AddressingMode) {
+        self.status = self.status | FLAG_INTERRRUPT;
+    }
+
+    pub fn cli(&mut self, _mode: &AddressingMode) {
+        self.status = self.status & !FLAG_INTERRRUPT;
+    }
+
+    pub fn sed(&mut self, _mode: &AddressingMode) {
+        self.status = self.status | FLAG_DECIMAL;
+    }
+
+    pub fn cld(&mut self, _mode: &AddressingMode) {
+        self.status = self.status & !FLAG_DECIMAL;
+    }
+
+    pub fn sec(&mut self, _mode: &AddressingMode) {
+        self.status = self.status | FLAG_CARRY;
+    }
+
+    pub fn clc(&mut self, _mode: &AddressingMode) {
+        self.status = self.status & !FLAG_CARRY;
+    }
+
+    pub fn bvs(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_OVERFLOW, true);
+    }
+
+    pub fn bvc(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_OVERFLOW, false);
+    }
+
+    fn _branch(&mut self, _mode: &AddressingMode, flag: u8, nonzero: bool) {
+        let addr = self.get_operand_address(_mode);
+        if nonzero {
+            if self.status & flag != 0 {
+                // (+1 if branch succeeds
+                //  +2 if to a new page)
+                //    => new pageの場合は、+1っぽい。
+                //     https://pgate1.at-ninja.jp/NES_on_FPGA/nes_cpu.htm#clock
+                self.add_cycles += 1;
+                if (self.program_counter & 0xFF00) != (addr & 0xFF00) {
+                    self.add_cycles += 1;
+                }
+                self.program_counter = addr
+            }
+        } else {
+            if self.status & flag == 0 {
+                // (+1 if branch succeeds
+                //  +2 if to a new page)
+                self.add_cycles += 1;
+                if (self.program_counter & 0xFF00) != (addr & 0xFF00) {
+                    self.add_cycles += 1;
+                }
+                self.program_counter = addr
+            }
+        }
+    }
+
+    pub fn brk(&mut self, _mode: &AddressingMode) {
+        // FLAG_INTERRRUPTが立っている場合は
+        if self.status & FLAG_INTERRRUPT != 0 {
+            return;
+        }
+
+        // プログラム カウンターとプロセッサ ステータスがスタックにプッシュされ、
+        self._push_u16(self.program_counter);
+        self._push(self.status);
+
+        // $FFFE/F の IRQ 割り込みベクトルが PC にロードされ、ステータスのブレーク フラグが 1 に設定されます。
+        self.program_counter = self.mem_read_u16(0xFFFE);
+        self.status = self.status | FLAG_BREAK;
+    }
+
+    pub fn bpl(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_NEGATIVE, false);
+    }
+
+    pub fn bmi(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_NEGATIVE, true);
+    }
+
+    pub fn bit(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+
+        let zero = self.register_a & value;
+        if zero == 0 {
+            self.status = self.status | FLAG_ZERO;
+        } else {
+            self.status = self.status & !FLAG_ZERO;
+        }
+        let flags = FLAG_NEGATIVE | FLAG_OVERFLOW;
+        self.status = (self.status & !flags) | (value & flags);
+    }
+
+    pub fn bne(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_ZERO, false);
+    }
+
+    pub fn beq(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_ZERO, true);
+    }
+
+    pub fn bcc(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_CARRY, false);
+    }
+
+    pub fn bcs(&mut self, _mode: &AddressingMode) {
+        self._branch(_mode, FLAG_CARRY, true);
+    }
+
+    pub fn ror(&mut self, _mode: &AddressingMode) {
+        let (value, carry) = if _mode == &AddressingMode::Accumulator {
+            let carry = self.register_a & 0x01;
+            self.register_a = self.register_a / 2;
+            self.register_a = self.register_a | ((self.status & FLAG_CARRY) << 7);
+            (self.register_a, carry)
+        } else {
+            let addr = self.get_operand_address(_mode);
+            let value = self.mem_read(addr);
+            let carry = value & 0x01;
+            let value = value / 2;
+            let value = value | ((self.status & FLAG_CARRY) << 7);
+            self.mem_write(addr, value);
+            (value, carry)
+        };
+
+        self.status = if carry == 1 {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn rol(&mut self, _mode: &AddressingMode) {
+        let (value, carry) = if _mode == &AddressingMode::Accumulator {
+            let (value, carry) = self.register_a.overflowing_mul(2);
+            self.register_a = value | (self.status & FLAG_CARRY);
+            (self.register_a, carry)
+        } else {
+            let addr = self.get_operand_address(_mode);
+            let value = self.mem_read(addr);
+            let (value, carry) = value.overflowing_mul(2);
+            let value = value | (self.status & FLAG_CARRY);
+            self.mem_write(addr, value);
+            (value, carry)
+        };
+
+        self.status = if carry {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn lsr(&mut self, _mode: &AddressingMode) {
+        let (value, carry) = if _mode == &AddressingMode::Accumulator {
+            let carry = self.register_a & 0x01;
+            self.register_a = self.register_a / 2;
+            (self.register_a, carry)
+        } else {
+            let addr = self.get_operand_address(_mode);
+            let value = self.mem_read(addr);
+            let carry = value & 0x01;
+            let value = value / 2;
+            self.mem_write(addr, value);
+            (value, carry)
+        };
+
+        self.status = if carry == 1 {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn asl(&mut self, _mode: &AddressingMode) {
+        let (value, carry) = if _mode == &AddressingMode::Accumulator {
+            let (value, carry) = self.register_a.overflowing_mul(2);
+            self.register_a = value;
+            (value, carry)
+        } else {
+            let addr = self.get_operand_address(_mode);
+            let value = self.mem_read(addr);
+            let (value, carry) = value.overflowing_mul(2);
+            self.mem_write(addr, value);
+            (value, carry)
+        };
+
+        self.status = if carry {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.update_zero_and_negative_flags(value);
+    }
+
+    pub fn ora(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_a = self.register_a | value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn eor(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_a = self.register_a ^ value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn and(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+        self.register_a = self.register_a & value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    pub fn sbc(&mut self, _mode: &AddressingMode) {
+        // A-M-(1-C)
+        // キャリーかどうかの判定が逆
+        // キャリーの引き算(1-C)
+        // overflowの判定が逆 = m,p, p,m
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+
+        let carry = self.status & FLAG_CARRY;
+        let (v1, carry_flag1) = self.register_a.overflowing_sub(value);
+        let (n, carry_flag2) = v1.overflowing_sub(1 - carry);
+
+        let overflow = (self.register_a & SIGN_BIT) != (value & SIGN_BIT)
+            && (self.register_a & SIGN_BIT) != (n & SIGN_BIT);
+
+        self.register_a = n;
+
+        self.status = if !carry_flag1 && !carry_flag2 {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.status = if overflow {
+            self.status | FLAG_OVERFLOW
+        } else {
+            self.status & !FLAG_OVERFLOW
+        };
+
+        self.update_zero_and_negative_flags(self.register_a)
+    }
+
+    pub fn adc(&mut self, _mode: &AddressingMode) {
+        let addr = self.get_operand_address(_mode);
+        let value = self.mem_read(addr);
+
+        let carry = self.status & FLAG_CARRY;
+        let (rhs, carry_flag1) = value.overflowing_add(carry);
+        let (n, carry_flag2) = self.register_a.overflowing_add(rhs);
+
+        let overflow = (self.register_a & SIGN_BIT) == (value & SIGN_BIT)
+            && (value & SIGN_BIT) != (n & SIGN_BIT);
+
+        self.register_a = n;
+
+        self.status = if carry_flag1 || carry_flag2 {
+            self.status | FLAG_CARRY
+        } else {
+            self.status & !FLAG_CARRY
+        };
+        self.status = if overflow {
+            self.status | FLAG_OVERFLOW
+        } else {
+            self.status & !FLAG_OVERFLOW
+        };
+
+        self.update_zero_and_negative_flags(self.register_a)
+    }
+
+    fn update_zero_and_negative_flags(&mut self, result: u8) {
+        self.status = if result == 0 {
+            self.status | FLAG_ZERO
+        } else {
+            self.status & !FLAG_ZERO
+        };
+
+        self.status = if result & 0x80 != 0 {
+            self.status | FLAG_NEGATIVE
+        } else {
+            self.status & !FLAG_NEGATIVE
         }
     }
 }
 
-pub fn cpu_reset() -> Box<RP2A03> {
-    unsafe {
-        S_CPU.nes_mem.mem_reset();
-        S_CPU.reset();
-        cpu_run(true);
-        let cpu_box: Box<RP2A03> = Box::from_raw(Pin::as_mut(&mut *S_CPU).get_mut());
-        cpu_box
+pub fn trace(cpu: &mut CPU) -> String {
+    // 0064  A2 01     LDX #$01                        A:01 X:02 Y:03 P:24 SP:FD
+    // OK 0064 => program_counter
+    // OK A2 01 => binary code
+    // OK LDX #$01 => asm code
+    // "0400 @ 0400 = AA" => memory access
+    // OK A:01 X:02 Y:03 P:24 SP:FD => register, status, stack_pointer
+    unsafe { IN_TRACE = true };
+
+    let program_counter = cpu.program_counter - 1;
+    let pc = format!("{:<04X}", program_counter);
+    let op = cpu.mem_read(program_counter);
+    let ops = cpu.find_ops(op).unwrap();
+    let mut args: Vec<u8> = vec![];
+    for n in 1..ops.bytes {
+        let arg = cpu.mem_read(program_counter + n);
+        args.push(arg);
+    }
+    let bin = binary(op, &args);
+    let asm = disasm(program_counter, &ops, &args);
+    let memacc = memory_access(cpu, &ops, &args);
+    let status = cpu2str(cpu);
+
+    let log = format!(
+        "{:<6}{:<9}{:<33}{}",
+        pc,
+        bin,
+        vec![asm, memacc].join(" "),
+        status
+    );
+
+    trace!("{}", log);
+
+    unsafe { IN_TRACE = false };
+
+    log
+}
+
+fn binary(op: u8, args: &Vec<u8>) -> String {
+    let mut list: Vec<String> = vec![];
+    list.push(format!("{:<02X}", op));
+    for v in args {
+        list.push(format!("{:<02X}", v));
+    }
+    list.join(" ")
+}
+
+fn disasm(program_counter: u16, ops: &OpCode, args: &Vec<u8>) -> String {
+    let prefix = if ops.name.starts_with("*") { "" } else { " " };
+    format!(
+        "{}{} {}",
+        prefix,
+        ops.name,
+        address(program_counter, &ops, args)
+    )
+}
+
+fn address(program_counter: u16, ops: &OpCode, args: &Vec<u8>) -> String {
+    match ops.addressing_mode {
+        AddressingMode::Implied => {
+            format!("")
+        }
+        AddressingMode::Accumulator => {
+            format!("A")
+        }
+        // LDA #$44 => a9 44
+        AddressingMode::Immediate => {
+            format!("#${:<02X}", args[0])
+        }
+
+        // LDA $44 => a5 44
+        AddressingMode::ZeroPage => {
+            format!("${:<02X}", args[0])
+        }
+
+        // LDA $4400 => ad 00 44
+        AddressingMode::Absolute => {
+            format!("${:<02X}{:<02X}", args[1], args[0])
+        }
+        // LDA $44,X => b5 44
+        AddressingMode::ZeroPage_X => {
+            format!("${:<02X},X", args[0])
+        }
+
+        // LDX $44,Y => b6 44
+        AddressingMode::ZeroPage_Y => {
+            format!("${:<02X},Y", args[0])
+        }
+
+        // LDA $4400,X => bd 00 44
+        AddressingMode::Absolute_X => {
+            format!("${:<02X}{:<02X},X", args[1], args[0])
+        }
+
+        // LDA $4400,Y => b9 00 44
+        AddressingMode::Absolute_Y => {
+            format!("${:<02X}{:<02X},Y", args[1], args[0])
+        }
+        // JMP
+        AddressingMode::Indirect => {
+            format!("(${:<02X}{:<02X})", args[1], args[0])
+        }
+
+        // LDA ($44,X) => a1 44
+        AddressingMode::Indirect_X => {
+            format!("(${:<02X},X)", args[0])
+        }
+
+        // LDA ($44),Y => b1 44
+        AddressingMode::Indirect_Y => {
+            format!("(${:<02X}),Y", args[0])
+        }
+
+        // BCC *+4 => 90 04
+        AddressingMode::Relative => {
+            format!(
+                "${:<04X}",
+                (program_counter as i32 + (args[0] as i8) as i32) as u16 + 2
+            )
+        }
+
+        AddressingMode::NoneAddressing => {
+            panic!("_mode {:?} is not supported", ops.addressing_mode);
+        }
     }
 }
 
-pub fn cpu_main() {
-    cpu_reg_show();
-    cpu_proc();
-}
+fn memory_access(cpu: &mut CPU, ops: &OpCode, args: &Vec<u8>) -> String {
+    if ops.name.starts_with("J") {
+        if ops.addressing_mode == AddressingMode::Indirect {
+            let hi = args[1] as u16;
+            let lo = args[0] as u16;
+            let addr = hi << 8 | lo;
+            let value = cpu.mem_read_u16(addr);
+            return format!("= {:<04X}", value);
+        }
+        return format!("");
+    }
 
-// ====================================== TEST ======================================
-#[cfg(test)]
-mod cpu_test {
-
-    #[test]
-    fn cpu_test() {
-        // TODO :CPU Test
+    match ops.addressing_mode {
+        AddressingMode::ZeroPage => {
+            let value = cpu.mem_read(args[0] as u16);
+            format!("= {:<02X}", value)
+        }
+        AddressingMode::ZeroPage_X => {
+            let addr = args[0].wrapping_add(cpu.register_x) as u16;
+            let value = cpu.mem_read(addr);
+            format!("@ {:<02X} = {:<02X}", addr, value)
+        }
+        AddressingMode::ZeroPage_Y => {
+            let addr = args[0].wrapping_add(cpu.register_y) as u16;
+            let value = cpu.mem_read(addr);
+            format!("@ {:<02X} = {:<02X}", addr, value)
+        }
+        AddressingMode::Absolute => {
+            let hi = args[1] as u16;
+            let lo = args[0] as u16;
+            let addr = hi << 8 | lo;
+            let value = cpu.mem_read(addr);
+            format!("= {:<02X}", value)
+        }
+        AddressingMode::Absolute_X => {
+            let hi = args[1] as u16;
+            let lo = args[0] as u16;
+            let base = hi << 8 | lo;
+            let addr = base.wrapping_add(cpu.register_x as u16);
+            let value = cpu.mem_read(addr);
+            format!("@ {:<04X} = {:<02X}", addr, value)
+        }
+        AddressingMode::Absolute_Y => {
+            let hi = args[1] as u16;
+            let lo = args[0] as u16;
+            let base = hi << 8 | lo;
+            let addr = base.wrapping_add(cpu.register_y as u16);
+            let value = cpu.mem_read(addr);
+            format!("@ {:<04X} = {:<02X}", addr, value)
+        }
+        AddressingMode::Indirect_X => {
+            let base = args[0];
+            let ptr: u8 = (base as u8).wrapping_add(cpu.register_x);
+            let addr = cpu.mem_read_u16(ptr as u16);
+            let value = cpu.mem_read(addr);
+            format!("@ {:<02X} = {:<04X} = {:<02X}", ptr, addr, value)
+        }
+        AddressingMode::Indirect_Y => {
+            let base = args[0];
+            let deref_base = cpu.mem_read_u16(base as u16);
+            let deref = deref_base.wrapping_add(cpu.register_y as u16);
+            let value = cpu.mem_read(deref);
+            format!("= {:<04X} @ {:<04X} = {:<02X}", deref_base, deref, value)
+        }
+        _ => {
+            format!("")
+        }
     }
 }
-// ==================================================================================
+
+fn cpu2str(cpu: &CPU) -> String {
+    format!(
+        "A:{:<02X} X:{:<02X} Y:{:<02X} P:{:<02X} SP:{:<02X}",
+        cpu.register_a, cpu.register_x, cpu.register_y, cpu.status, cpu.stack_pointer,
+    )
+}

@@ -122,7 +122,7 @@ sequenceDiagram
     deactivate OAM
 ```
 # 📍PJ Statu
-## `PJ Status(進捗)` ... `📊63.158%📊`  
+## `PJ Status(進捗)` ... `📊78.974%📊`  
 `Sorry for Japanese 🙇`  
 
 <img src="dev/pj_status.png" alt="file"  width="95%">
