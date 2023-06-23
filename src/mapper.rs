@@ -1,3 +1,14 @@
+use crate::rom::Mirroring;
+
+const BIT_0: u8 = 0x01;
+const BIT_1: u8 = 0x02;
+const BIT_2: u8 = 0x04;
+const BIT_3: u8 = 0x08;
+const BIT_4: u8 = 0x10;
+const BIT_5: u8 = 0x20;
+const BIT_6: u8 = 0x40;
+const BIT_7: u8 = 0x80;
+
 pub const MMC_0: u8 = 0;
 pub const MMC_1: u8 = 1;
 pub const MMC_2: u8 = 2;
@@ -10,12 +21,21 @@ const CHR_RAM: u8 = 1;
 const PRG_ROM: u8 = 2;
 
 // [For MMC1]
-const  MMC_1_CLEAR_BIT: u8       = 0x80;
-const  MMC_1_SERIAL_DATA_BIT: u8 = 0x00;
 // 初期値のbit5は5回シフトしてデータを転送する際の検知用（詳細は↓）
 // https://www.nesdev.org/wiki/MMC1#SNROM
 // http://www43.tok2.com/home/cmpslv/Famic/Fcmp1.htm
 const SHFT_REG_INIT_VAL: u8 = 0b0001_0000;
+const DISPLAY_TYPE_1: u8 = 0;
+const DISPLAY_TYPE_4: u8 = 1;
+const CHR_BANK_17: u8 = 17;
+const CHR_BANK_16: u8 = 16;
+const CHR_BANK_15: u8 = 15;
+const CHR_BANK_14: u8 = 14;
+const CHR_BANK_13: u8 = 13;
+const CHR_BANK_12: u8 = 12;
+const PGR_RAM_BANK_1: u8 = 1;
+const PGR_MEM_ROM: u8 = 0;
+const PGR_MEM_RAM: u8 = 1;
 
 pub struct Mmc1Reg {
     sp_reg :u8,        // SP（シリアル・パラレル）レジスタ
@@ -27,11 +47,11 @@ pub struct Mmc1Reg {
     ctrl_reg_r3 :u8,   //       〃               R3
 
     // R0 (V-RAMコントロール)
-    chr_bank_size :u8,  // CHRバンク(4K or 8KB)
+    chr_bank_size :u16, // CHRバンク(4K or 8KB)
     prg_bank_size :u16, // PGRバンクサイズ(16K or 32KB)
     prg_bank_even :u16, // 固定PRGバンク($8000 or $C000)
     display_type: u8,   // 画面(1 or 4画面)
-    scroll_mode: u8,    // スクロールモード(H or V)
+    scroll_mode: Mirroring, // スクロールモード(H or V)
 
     // R1 (CHRバンク0)
     chr_bank_0: u8,
@@ -40,6 +60,7 @@ pub struct Mmc1Reg {
     chr_bank_1: u8,
 
     // R3 (CHRバンク1)
+    prg_mem_type: u8,
     prg_bank: u8,
 }
 
@@ -57,11 +78,12 @@ impl Mmc1Reg {
             chr_bank_size: 0,
             prg_bank_size: 0,
             prg_bank_even: 0,
-            display_type: 0,
-            scroll_mode: 0,
+            display_type: DISPLAY_TYPE_1,
+            scroll_mode: Mirroring::VERTICAL,
 
             chr_bank_0: 0,
             chr_bank_1: 0,
+            prg_mem_type: PGR_MEM_ROM,
             prg_bank: 0,
         }
     }
@@ -72,32 +94,122 @@ impl Mmc1Reg {
             // コントロールレジスタ0 (V-RAMコントロール)
             0x8000..=0x9FFF => {
                 self.ctrl_reg_r0 = val & 0x1F;
-                // TODO :V-RAMコントロール
+
+                if(val & BIT_4) != 0 {
+                    self.chr_bank_size = 4 * 1024;
+                }else{
+                    self.chr_bank_size = 8 * 1024;
+                }
+
+                if(val & BIT_3) != 0 {
+                    self.prg_bank_size = 16 * 1024;
+                }else{
+                    self.prg_bank_size = 32 * 1024;
+                }
+
+                if(val & BIT_2) != 0 {
+                    self.prg_bank_even = 0x8000;
+                }else{
+                    self.prg_bank_even = 0xC000;
+                }
+
+                if(val & BIT_1) != 0 {
+                    self.display_type = DISPLAY_TYPE_4;
+                }else{
+                    self.display_type = DISPLAY_TYPE_1;
+                }
+
+                if(val & BIT_0) != 0 {
+                    self.scroll_mode = Mirroring::HORIZONTAL;
+                }else{
+                    self.scroll_mode = Mirroring::VERTICAL;
+                }
             },
             // コントロールレジスタ1 (CHRバンク0)
             0xA000..=0xBFFF => {
                 self.ctrl_reg_r1 = val & 0x1F;
-                // TODO :CHRバンク0
+
+                if(val & BIT_4) != 0 {
+                    self.chr_bank_0 = CHR_BANK_16;
+                }
+                if(val & BIT_3) != 0 {
+                    self.chr_bank_0 = CHR_BANK_15;
+                }
+                if(val & BIT_2) != 0 {
+                    self.chr_bank_0 = CHR_BANK_14;
+                }
+                if(val & BIT_1) != 0 {
+                    self.chr_bank_0 = CHR_BANK_13;
+                }
+                if(val & BIT_0) != 0 {
+                    if(self.ctrl_reg_r0 & BIT_4) != 0 {
+                        self.chr_bank_0 = CHR_BANK_12;
+                    }
+                }
             },
             // コントロールレジスタ2 (CHRバンク1)
             0xC000..=0xDFFF => {
                 self.ctrl_reg_r2 = val & 0x1F;
-                // TODO :CHRバンク1
+
+                if(val & BIT_4) != 0 {
+                    self.chr_bank_1 = CHR_BANK_16;
+                }
+
+                if(val & BIT_3) != 0 {
+                    self.chr_bank_1 = CHR_BANK_15;
+                }
+
+                if(val & BIT_2) != 0 {
+                    self.chr_bank_1 = CHR_BANK_14;
+                }
+
+                if(val & BIT_1) != 0 {
+                    self.chr_bank_1 = CHR_BANK_13;
+                }
+
+                if(val & BIT_0) != 0 {
+                    self.chr_bank_1 = CHR_BANK_13;
+                }
             },
             // コントロールレジスタ3 (PRGバンク)
             0xE000..=0xFFFF => {
                 self.ctrl_reg_r3 = val & 0x1F;
-                // TODO PRGバンク
+
+                if(val & BIT_4) != 0 {
+                    self.prg_mem_type = PGR_MEM_RAM;
+                }else{
+                    self.prg_mem_type = PGR_MEM_ROM;
+                }
+
+                if(val & BIT_3) != 0 {
+                    if self.prg_mem_type != PGR_MEM_ROM {
+                        self.prg_bank = CHR_BANK_17;
+                    }else{
+                        self.prg_bank = PGR_RAM_BANK_1;
+                    }
+                }
+
+                if(val & BIT_2) != 0 {
+                    self.prg_bank = CHR_BANK_16;
+                }
+
+                if(val & BIT_1) != 0 {
+                    self.prg_bank = CHR_BANK_15;
+                }
+
+                if ((val & BIT_0) != 0) && ((self.ctrl_reg_r0 & BIT_3) != 0) {
+                    self.prg_bank = CHR_BANK_14;
+                }
             },
             _ => panic!("[ERR] Invalid Addr of MMC1 Ctrl Reg!!!")
         }
     }
 
     fn shift_reg_proc(&mut self, addr: u16, data :u8){
-        self.sp_reg = data & (MMC_1_CLEAR_BIT | MMC_1_SERIAL_DATA_BIT);
+        self.sp_reg = data & (BIT_7 | BIT_0);
 
         // bit7のクリアビットが1 = 初期化
-        if (self.sp_reg & MMC_1_CLEAR_BIT) != 0 {
+        if (self.sp_reg & BIT_7) != 0 {
             self.sp_reg = 0;
             self.shft_reg = SHFT_REG_INIT_VAL;
         } else {
