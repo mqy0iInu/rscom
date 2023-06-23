@@ -27,12 +27,15 @@ const PRG_ROM: u8 = 2;
 const SHFT_REG_INIT_VAL: u8 = 0b0001_0000;
 const DISPLAY_TYPE_1: u8 = 0;
 const DISPLAY_TYPE_4: u8 = 1;
-const CHR_BANK_17: u8 = 17;
-const CHR_BANK_16: u8 = 16;
-const CHR_BANK_15: u8 = 15;
-const CHR_BANK_14: u8 = 14;
-const CHR_BANK_13: u8 = 13;
-const CHR_BANK_12: u8 = 12;
+const PRG_A_17: u8 = 17;
+const PRG_A_16: u8 = 16;
+const PRG_A_15: u8 = 15;
+const PRG_A_14: u8 = 14;
+const CHR_A_16: u8 = 16;
+const CHR_A_15: u8 = 15;
+const CHR_A_14: u8 = 14;
+const CHR_A_13: u8 = 13;
+const CHR_A_12: u8 = 12;
 const PGR_RAM_BANK_1: u8 = 1;
 const PGR_MEM_ROM: u8 = 0;
 const PGR_MEM_RAM: u8 = 1;
@@ -95,31 +98,34 @@ impl Mmc1Reg {
             0x8000..=0x9FFF => {
                 self.ctrl_reg_r0 = val & 0x1F;
 
-                if(val & BIT_4) != 0 {
+                if(self.ctrl_reg_r0 & BIT_4) != 0 {
                     self.chr_bank_size = 4 * 1024;
                 }else{
                     self.chr_bank_size = 8 * 1024;
                 }
 
-                if(val & BIT_3) != 0 {
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
                     self.prg_bank_size = 16 * 1024;
                 }else{
                     self.prg_bank_size = 32 * 1024;
                 }
 
-                if(val & BIT_2) != 0 {
-                    self.prg_bank_even = 0x8000;
-                }else{
-                    self.prg_bank_even = 0xC000;
+                // PGRバンクサイズが16KBの時のみ
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
+                    if(self.ctrl_reg_r0 & BIT_2) != 0 {
+                        self.prg_bank_even = 0x8000;
+                    }else{
+                        self.prg_bank_even = 0xC000;
+                    }
                 }
 
-                if(val & BIT_1) != 0 {
+                if(self.ctrl_reg_r0 & BIT_1) != 0 {
                     self.display_type = DISPLAY_TYPE_4;
                 }else{
                     self.display_type = DISPLAY_TYPE_1;
                 }
 
-                if(val & BIT_0) != 0 {
+                if(self.ctrl_reg_r0 & BIT_0) != 0 {
                     self.scroll_mode = Mirroring::HORIZONTAL;
                 }else{
                     self.scroll_mode = Mirroring::VERTICAL;
@@ -129,21 +135,21 @@ impl Mmc1Reg {
             0xA000..=0xBFFF => {
                 self.ctrl_reg_r1 = val & 0x1F;
 
-                if(val & BIT_4) != 0 {
-                    self.chr_bank_0 = CHR_BANK_16;
+                if(self.ctrl_reg_r1 & BIT_4) != 0 {
+                    self.chr_bank_0 = CHR_A_16;
                 }
-                if(val & BIT_3) != 0 {
-                    self.chr_bank_0 = CHR_BANK_15;
+                if(self.ctrl_reg_r1 & BIT_3) != 0 {
+                    self.chr_bank_0 = CHR_A_15;
                 }
-                if(val & BIT_2) != 0 {
-                    self.chr_bank_0 = CHR_BANK_14;
+                if(self.ctrl_reg_r1 & BIT_2) != 0 {
+                    self.chr_bank_0 = CHR_A_14;
                 }
-                if(val & BIT_1) != 0 {
-                    self.chr_bank_0 = CHR_BANK_13;
+                if(self.ctrl_reg_r1 & BIT_1) != 0 {
+                    self.chr_bank_0 = CHR_A_13;
                 }
-                if(val & BIT_0) != 0 {
+                if(self.ctrl_reg_r1 & BIT_0) != 0 {
                     if(self.ctrl_reg_r0 & BIT_4) != 0 {
-                        self.chr_bank_0 = CHR_BANK_12;
+                        self.chr_bank_0 = CHR_A_12;
                     }
                 }
             },
@@ -151,54 +157,57 @@ impl Mmc1Reg {
             0xC000..=0xDFFF => {
                 self.ctrl_reg_r2 = val & 0x1F;
 
-                if(val & BIT_4) != 0 {
-                    self.chr_bank_1 = CHR_BANK_16;
+                if(self.ctrl_reg_r2 & BIT_4) != 0 {
+                    self.chr_bank_1 = CHR_A_16;
                 }
 
-                if(val & BIT_3) != 0 {
-                    self.chr_bank_1 = CHR_BANK_15;
+                if(self.ctrl_reg_r2 & BIT_3) != 0 {
+                    self.chr_bank_1 = CHR_A_15;
                 }
 
-                if(val & BIT_2) != 0 {
-                    self.chr_bank_1 = CHR_BANK_14;
+                if(self.ctrl_reg_r2 & BIT_2) != 0 {
+                    self.chr_bank_1 = CHR_A_14;
                 }
 
-                if(val & BIT_1) != 0 {
-                    self.chr_bank_1 = CHR_BANK_13;
+                if(self.ctrl_reg_r2 & BIT_1) != 0 {
+                    self.chr_bank_1 = CHR_A_13;
                 }
 
-                if(val & BIT_0) != 0 {
-                    self.chr_bank_1 = CHR_BANK_13;
+                if(self.ctrl_reg_r2 & BIT_0) != 0 {
+                    self.chr_bank_1 = CHR_A_13;
                 }
             },
             // コントロールレジスタ3 (PRGバンク)
             0xE000..=0xFFFF => {
                 self.ctrl_reg_r3 = val & 0x1F;
 
-                if(val & BIT_4) != 0 {
+                if(self.ctrl_reg_r3 & BIT_4) != 0 {
                     self.prg_mem_type = PGR_MEM_RAM;
                 }else{
                     self.prg_mem_type = PGR_MEM_ROM;
                 }
 
-                if(val & BIT_3) != 0 {
+                if(self.ctrl_reg_r3 & BIT_3) != 0 {
                     if self.prg_mem_type != PGR_MEM_ROM {
-                        self.prg_bank = CHR_BANK_17;
+                        self.prg_bank = PRG_A_17;
                     }else{
                         self.prg_bank = PGR_RAM_BANK_1;
                     }
                 }
 
-                if(val & BIT_2) != 0 {
-                    self.prg_bank = CHR_BANK_16;
+                if(self.ctrl_reg_r3 & BIT_2) != 0 {
+                    self.prg_bank = PRG_A_16;
                 }
 
-                if(val & BIT_1) != 0 {
-                    self.prg_bank = CHR_BANK_15;
+                if(self.ctrl_reg_r3 & BIT_1) != 0 {
+                    self.prg_bank = PRG_A_15;
                 }
 
-                if ((val & BIT_0) != 0) && ((self.ctrl_reg_r0 & BIT_3) != 0) {
-                    self.prg_bank = CHR_BANK_14;
+                // R0のbit3 = 0(PRGバンクサイズ = 32KB)でない時
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
+                    if(self.ctrl_reg_r3 & BIT_0) != 0 {
+                        self.prg_bank = PRG_A_14;
+                    }
                 }
             },
             _ => panic!("[ERR] Invalid Addr of MMC1 Ctrl Reg!!!")
@@ -217,7 +226,7 @@ impl Mmc1Reg {
             if self.shift < 5 {
                 self.shft_reg = val >> self.shift;
                 self.shift += 1;
-            // 5右シフトするとき、指定アドレスに値を転送する
+            // 5回右シフトするとき、指定アドレスのレジスタに値を転送
             }else {
                 self.shft_reg = val.wrapping_shr(1);
                 self.control_reg_write(addr, self.shft_reg);
