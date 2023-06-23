@@ -68,14 +68,15 @@ impl Memory {
     pub fn mem_reset(&mut self)
     {
         // TODO :MEM Reset
-        // rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/BombSweeper.nes");
+        rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/BombSweeper.nes");
+        rom_loader(&mut self.cassette, "test_rom/nes/mapper_0/pacman.nes");
 
         // (DEBUG) :Snake Game(Only 6502 OP-Code)
-        let start_address = 0x600; // WRAMで実行する
-        let end_address = start_address + SNAKE_GAME_TBL.len();
-        self.wram[start_address..end_address].copy_from_slice(&SNAKE_GAME_TBL);
-        self.mem_write(ADDR_VEC_TBL_RST, 0x00);
-        self.mem_write(ADDR_VEC_TBL_RST + 1, 0x06);
+        // let start_address = 0x600; // WRAMで実行する
+        // let end_address = start_address + SNAKE_GAME_TBL.len();
+        // self.wram[start_address..end_address].copy_from_slice(&SNAKE_GAME_TBL);
+        // self.mem_write(ADDR_VEC_TBL_RST, 0x00);
+        // self.mem_write(ADDR_VEC_TBL_RST + 1, 0x06);
         // =================================
     }
 

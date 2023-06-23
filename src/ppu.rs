@@ -2,6 +2,15 @@ use std::pin::Pin;
 use std::boxed::Box;
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
+use sdl2::Sdl;
+use sdl2::render::Canvas;
+use sdl2::video::{Window, WindowContext};
+use sdl2::render::{Texture, TextureCreator};
+use sdl2::pixels::Color;
+use sdl2::pixels::PixelFormatEnum;
+use std::io::Write;
+use std::sync::Mutex;
+
 // use crate::mem::*;
 use crate::cpu::*;
 use crate::cassette::*;
@@ -99,6 +108,82 @@ pub const PPU_REG_READ: u8 = 0x00;
 pub const PPU_REG_WRITE: u8 = 0x01;
 
 #[derive(Clone)]
+pub struct Frame {
+    pub data: Vec<u8>,
+}
+
+impl Frame {
+    const WIDTH: usize = 256;
+    const HEIGHT: usize = 240;
+
+    pub fn new() -> Self {
+        Frame {
+            data: vec![0; (Frame::WIDTH) * (Frame::HEIGHT) * 3],
+        }
+    }
+
+    pub fn set_pixel(&mut self, x: usize, y: usize, rgb: (u8, u8, u8)) {
+        let base = y * 3 * Frame::WIDTH + x * 3;
+        if base + 2 < self.data.len() {
+            self.data[base] = rgb.0;
+            self.data[base + 1] = rgb.1;
+            self.data[base + 2] = rgb.2;
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct RenderData {
+    pub name_val :u8,
+    pub attribute_val :u8,
+    pub bg_pattern: [u8; 2],
+    pub bg_parette_color: u8,
+
+    pub sprite_y: u8,
+    pub sprite_pattern_index :u8,
+    pub sprite_attribute: u8,
+    pub sprite_x: u8,
+    pub sprite_pattern:[u8; 2],
+    pub sprite_parette_color: u8,
+}
+
+impl RenderData {
+    pub fn new() -> Self {
+        RenderData {
+            name_val :0,
+            attribute_val :0,
+            bg_pattern :[0; 2],
+            bg_parette_color: 0,
+
+            sprite_y: 0,
+            sprite_pattern_index :0,
+            sprite_attribute: 0,
+            sprite_x: 0,
+            sprite_pattern :[0; 2],
+            sprite_parette_color: 0,
+        }
+    }
+}
+
+struct Rect {
+    x1: usize,
+    y1: usize,
+    x2: usize,
+    y2: usize,
+}
+
+impl Rect {
+    fn new(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
+        Rect {
+            x1: x1,
+            y1: y1,
+            x2: x2,
+            y2: y2,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct PPU {
     ppuctrl: u8,
     ppumask: u8,
@@ -125,24 +210,27 @@ pub struct PPU {
     vram_addr_write: u8,
     pub vram_addr: u16,
 
-    pub scroll_x: u8,
-    pub scroll_y: u8,
+    scroll_x: u8,
+    scroll_y: u8,
     scroll_write: u8,
 
-    pub sprite_size: u8,
-    pub bg_pattern_tbl: u16,
-    pub sprite_pattern_tbl: u16,
-    pub name_table: u16,
+    sprite_size: u8,
+    bg_pattern_tbl: u16,
+    sprite_pattern_tbl: u16,
+    name_table: u16,
 
-    pub bg_color: u8,
-    pub sprite_enable: bool,
-    pub bg_enable: bool,
-    pub sprite_left_enable: bool,
-    pub bg_left_enable: bool,
-    pub grayscale: u8,
+    bg_color: u8,
+    sprite_enable: bool,
+    bg_enable: bool,
+    sprite_left_enable: bool,
+    bg_left_enable: bool,
+    grayscale: u8,
 
-    pub scanline_palette_indexes: Vec<usize>,
-    pub scanline_palette_tables: Vec<[u8; 32]>,
+    scanline: u16,
+    scanline_palette_indexes: Vec<usize>,
+    scanline_palette_tables: Vec<[u8; 32]>,
+
+    freme: Frame,
 }
 
 impl PPU {
@@ -190,8 +278,11 @@ impl PPU {
             bg_left_enable: false,
             grayscale: GRAYSCALE_COLOR,
 
+            scanline: 0,
             scanline_palette_indexes: vec![],
             scanline_palette_tables: vec![],
+
+            freme: Frame::new(),
         }
     }
 
@@ -350,10 +441,13 @@ impl PPU {
 }
 
 
+// ==========================================================================
 static mut S_PPU: Lazy<Pin<Box<PPU>>> = Lazy::new(|| {
     let ppu = Box::pin(PPU::new());
     ppu
 });
+
+// ==========================================================================
 
 fn get_reg_config()
 {
@@ -461,134 +555,6 @@ fn get_reg_config()
     }
 }
 
-// [341クロックで1ライン描画＆次のライン準備]
-fn data_set(line: u16)
-{
-    unsafe {
-    // TODO :1) 最初の256クロックでBGとスプライトの描画
-    for line in 0..32 // 33回実施
-    {
-        // 1-1)ネームテーブルから1バイトフェッチ
-        // 1-2)属性テーブルから1バイトフェッチ
-        match S_PPU.name_table {
-            NAME_TABLE_3 => {
-                S_PPU.render_data.name_val = S_PPU.vram[(0xC00 + line) as usize];
-                S_PPU.render_data.attribute_val = S_PPU.vram[(0xFC0 + line) as usize];
-            },
-            NAME_TABLE_2 => {
-                S_PPU.render_data.name_val = S_PPU.vram[(0x800 + line) as usize];
-                S_PPU.render_data.attribute_val = S_PPU.vram[(0xBC0 + line) as usize];
-            },
-            NAME_TABLE_1 => {
-                S_PPU.render_data.name_val = S_PPU.vram[(0x400 + line) as usize];
-                S_PPU.render_data.attribute_val = S_PPU.vram[(0x7C0 + line) as usize];
-            },
-            NAME_TABLE_0 | _ => {
-                S_PPU.render_data.name_val = S_PPU.vram[line as usize];
-                S_PPU.render_data.attribute_val = S_PPU.vram[(0x3C0 + line) as usize];
-            },
-        }
-
-        // 1-3)BGパターンテーブル(CHR-ROM)から2バイトフェッチ
-        let mut _addr: u16 = 0;
-        match S_PPU.bg_pattern_tbl{
-            CHR_ROM_BG_PATTERN_TABLE_1 => {
-                _addr = CHR_ROM_BG_PATTERN_TABLE_1 + (line as u16);
-            },
-            CHR_ROM_BG_PATTERN_TABLE_0 | _ => {
-                _addr = CHR_ROM_BG_PATTERN_TABLE_0 + (line as u16);
-            },
-        }
-        S_PPU.render_data.bg_pattern[0] = S_PPU.mem_read(_addr);
-        S_PPU.render_data.bg_pattern[1] = S_PPU.mem_read(_addr + 1);
-
-        // TODO :BG、スプライトを画面描画(SDL2)
-    }
-
-    // TODO :2) 次のスキャンラインで描画されるスプライトの探索
-    for line in 0..7 // 8回実施
-    {
-        // TODO :2-1) スプライトをパターンテーブルから2バイトのフェッチ
-    }
-    }
-}
-
-
-#[derive(Clone)]
-pub struct Frame {
-    pub data: Vec<u8>,
-}
-
-impl Frame {
-    const WIDTH: usize = 256;
-    const HEIGHT: usize = 240;
-
-    pub fn new() -> Self {
-        Frame {
-            data: vec![0; (Frame::WIDTH) * (Frame::HEIGHT) * 3],
-        }
-    }
-
-    pub fn set_pixel(&mut self, x: usize, y: usize, rgb: (u8, u8, u8)) {
-        let base = y * 3 * Frame::WIDTH + x * 3;
-        if base + 2 < self.data.len() {
-            self.data[base] = rgb.0;
-            self.data[base + 1] = rgb.1;
-            self.data[base + 2] = rgb.2;
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RenderData {
-    pub name_val :u8,
-    pub attribute_val :u8,
-    pub bg_pattern: [u8; 2],
-    pub bg_parette_color: u8,
-
-    pub sprite_y: u8,
-    pub sprite_pattern_index :u8,
-    pub sprite_attribute: u8,
-    pub sprite_x: u8,
-    pub sprite_pattern:[u8; 2],
-    pub sprite_parette_color: u8,
-}
-
-impl RenderData {
-    pub fn new() -> Self {
-        RenderData {
-            name_val :0,
-            attribute_val :0,
-            bg_pattern :[0; 2],
-            bg_parette_color: 0,
-
-            sprite_y: 0,
-            sprite_pattern_index :0,
-            sprite_attribute: 0,
-            sprite_x: 0,
-            sprite_pattern :[0; 2],
-            sprite_parette_color: 0,
-        }
-    }
-}
-
-struct Rect {
-    x1: usize,
-    y1: usize,
-    x2: usize,
-    y2: usize,
-}
-
-impl Rect {
-    fn new(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
-        Rect {
-            x1: x1,
-            y1: y1,
-            x2: x2,
-            y2: y2,
-        }
-    }
-}
 
 pub fn render(frame: &mut Frame)
 {
@@ -779,66 +745,115 @@ fn render_name_table(frame: &mut Frame, name_table: &[u8], view_port: Rect, shif
     }
 }
 
-// [1フレーム(262本のスキャンライン)の描画]
-// 1フレーム = 1/60fps(1/59.94) ≒ 16.668 msec
-// (262 x 341クロック) = 89,342クロック
-// ≒ 16,639,358.727 nsec ≒ 16.639 msec
-// ※T ≒ 186.2434098933431 nsec
-fn display_render()
-{
-    // 最初の240本(0〜240) で画面が描画
-    for line in 0..239
-    {
-        data_set(line);
-    }
-
-    // [V-Blank開始]
-    // 残22本分(241〜262) -> 垂直回帰時間
-    // = (22 x 341クロック) = 7502クロック ≒ 1,397,198.061 nsec ≒ 1.397 msec
-    // 垂直回帰時間 / CPUクロック = 2,500.667 CPUサイクル?
-    // ※T ≒ 186.2434098933431 nsec
-    // ※1 CPU Clock = 558.7302296800292 nsec
-    unsafe {
-        S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
-    }
-
-    // TODO :VBlankの待ち時間
-}
-
 fn nmi_gen()
 {
     cpu_interrupt(InterruptType::NMI);
     print!("[DEBUG]: PPU V-Blank! NMI Generated!");
 }
 
-pub fn ppu_reset() -> Box<PPU>
+static mut CANVAS: Option<Canvas<Window>> = None;
+static mut TEXTURE: Option<Box<Texture<'static>>> = None;
+static mut TEXTURE_CREATOR: Option<*mut TextureCreator<WindowContext>> = None;
+
+fn display_render() {
+    unsafe {
+        if let Some(canvas) = CANVAS.as_mut() {
+            if let Some(texture) = TEXTURE.as_mut() {
+                // 最初の240本(0〜240) で画面が描画
+                // data_set(S_PPU.scanline);
+                render(&mut S_PPU.freme);
+
+                // SDL2
+                texture.update(None, &mut S_PPU.freme.data, 256 * 3).unwrap();
+                canvas.copy(&texture, None, None).unwrap();
+                canvas.present();
+            }
+        }
+    }
+}
+
+fn sdl2_init(sdl_context: Sdl) {
+    let video_subsystem = sdl_context.video().unwrap();
+    let window = video_subsystem
+        .window("Rust NES Emulator", (256.0 * 2.0) as u32, (240.0 * 2.0) as u32)
+        .position_centered()
+        .build()
+        .unwrap();
+    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+    canvas.set_scale(2.0, 2.0).unwrap();
+
+    let creator: *mut TextureCreator<WindowContext> = Box::into_raw(Box::new(canvas.texture_creator()));
+    let texture = Box::new(
+        unsafe {
+            (*creator).create_texture_target(PixelFormatEnum::RGB24, 256, 240).unwrap()
+        },
+    );
+
+    unsafe {
+        CANVAS = Some(canvas);
+        TEXTURE = Some(texture);
+        TEXTURE_CREATOR = Some(creator);
+    }
+}
+
+pub fn ppu_reset(sdl_context: Sdl) -> Box<PPU>
 {
     unsafe {
         let ppu_box: Box<PPU> = Box::from_raw(Pin::as_mut(&mut *S_PPU).get_mut());
-        // TODO :PPU Reset（SDL2関連初期化）
+
+        // SDL2 グラフィック関連初期化
+        sdl2_init(sdl_context);
+
+        S_PPU.cycle = 0;
+        S_PPU.scanline = 0;
 
         // V-Blak開始
         S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
-
         ppu_box
     }
 }
 
 // NTSC 60FPS（59.94FPS）のPPU処理
+// ※1フレーム = 1/60fps(1/59.94) ≒ 16.668 msec
 pub fn ppu_main()
 {
     unsafe {
-        if (S_PPU.oamdma_run != true) && (S_PPU.oamdma_done != false) {
-            // V-Blak終了
-            S_PPU.ppustatus &= !REG_PPUSTATUS_BIT_VBLANK;
+        if S_PPU.cycle == 0 {
+            S_PPU.oamdma_done = false;
+            get_reg_config(); // レジスタ吸出し
+        }
+
+        // [240ライン描画]
+        // (240 x 341クロック) = 81,840クロック
+        // ≒ 15,242,160.6656712 nsec ≒ 15.242 msec
+        // ※T ≒ 186.2434098933431 nsec
+        if S_PPU.scanline < 241 {
+            display_render(); // 画面描画(@SDL2)
+        }
+
+        // [V-Blank開始]
+        // 残22本分(241〜262) -> 垂直回帰時間
+        // = (22 x 341クロック) = 7502クロック ≒ 1,397,198.061 nsec ≒ 1.397 msec
+        // ※T ≒ 186.2434098933431 nsec
+        // 垂直回帰時間のCPUクロック = 2,500.667 CPUサイクル?
+        // ※1 CPU Clock = 558.7302296800292 nsec
+        if S_PPU.scanline == 241 {
+            S_PPU.ppustatus |= REG_PPUSTATUS_BIT_VBLANK;
             if S_PPU.nmi_gen != false {
                 nmi_gen(); // NMI
             }
-            S_PPU.oamdma_done = false;
+        }
 
-            // [PPUのお仕事]
-            get_reg_config(); // レジスタ吸出し
-            display_render(); // 画面描画(@SDL2)
+        S_PPU.cycle += 1;
+        if (S_PPU.cycle % 341) == 0 {
+            S_PPU.scanline += 1;
+        }
+
+        // [V-Blank終了]
+        if S_PPU.scanline >= 262  {
+            S_PPU.ppustatus &= !REG_PPUSTATUS_BIT_VBLANK;
+            S_PPU.cycle = 0;
+            S_PPU.scanline = 0;
         }
     }
 }

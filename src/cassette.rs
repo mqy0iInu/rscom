@@ -4,7 +4,7 @@ use std::io::Read;
 use std::ops::RangeInclusive;
 
 // [Mapper 0]
-pub const ROM_MAPPER_0_ROM_TBL: [&str; 16] = [
+pub const ROM_MAPPER_0_ROM_TBL: [&str; 17] = [
     "test_rom/nes/mapper_0/1942.nes",
     "test_rom/nes/mapper_0/Alter_Ego.nes",
     "test_rom/nes/mapper_0/BombSweeper.nes",
@@ -18,6 +18,7 @@ pub const ROM_MAPPER_0_ROM_TBL: [&str; 16] = [
     "test_rom/nes/mapper_0/mario_bros.nes",
     "test_rom/nes/mapper_0/mappy.nes",
     "test_rom/nes/mapper_0/popeye.nes",
+    "test_rom/nes/mapper_0/pacman.nes",
     "test_rom/nes/mapper_0/sky_destroyer.nes",
     "test_rom/nes/mapper_0/tower_of_druaga.nes",
     "test_rom/nes/mapper_0/xevious.nes",
