@@ -1,12 +1,30 @@
+<<<<<<< HEAD
 use crate::common;
 use common::*;
 use crate::rom::Mirroring;
 
+=======
+use crate::rom::Mirroring;
+
+const BIT_0: u8 = 0x01;
+const BIT_1: u8 = 0x02;
+const BIT_2: u8 = 0x04;
+const BIT_3: u8 = 0x08;
+const BIT_4: u8 = 0x10;
+const BIT_5: u8 = 0x20;
+const BIT_6: u8 = 0x40;
+const BIT_7: u8 = 0x80;
+
+>>>>>>> remotes/origin/master
 pub const MMC_0: u8 = 0;
 pub const MMC_1: u8 = 1;
 pub const MMC_2: u8 = 2;
 pub const MMC_3: u8 = 3;
+<<<<<<< HEAD
 
+=======
+const MAPPER_1_PRG_ROM_BANK_SIZE: usize = 16 * 1024;
+>>>>>>> remotes/origin/master
 const MAPPER_2_PRG_ROM_BANK_SIZE: usize = 16 * 1024;
 const MAPPER_3_CHR_ROM_BANK_SIZE: usize = 8 * 1024;
 const CHR_ROM: u8 = 0;
@@ -91,34 +109,55 @@ impl Mmc1Reg {
             0x8000..=0x9FFF => {
                 self.ctrl_reg_r0 = val & 0x1F;
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_4) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_4) != 0 {
+>>>>>>> remotes/origin/master
                     self.chr_bank_size = 4 * 1024;
                 }else{
                     self.chr_bank_size = 8 * 1024;
                 }
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_3) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
+>>>>>>> remotes/origin/master
                     self.prg_bank_size = 16 * 1024;
                 }else{
                     self.prg_bank_size = 32 * 1024;
                 }
 
                 // PGRバンクサイズが16KBの時のみ
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_3) != 0 {
                     if(self.ctrl_reg_r0 & _BIT_2) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
+                    if(self.ctrl_reg_r0 & BIT_2) != 0 {
+>>>>>>> remotes/origin/master
                         self.prg_bank_even = 0x8000;
                     }else{
                         self.prg_bank_even = 0xC000;
                     }
                 }
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_1) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_1) != 0 {
+>>>>>>> remotes/origin/master
                     self.display_type = DISPLAY_TYPE_4;
                 }else{
                     self.display_type = DISPLAY_TYPE_1;
                 }
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_0) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_0) != 0 {
+>>>>>>> remotes/origin/master
                     self.scroll_mode = Mirroring::HORIZONTAL;
                 }else{
                     self.scroll_mode = Mirroring::VERTICAL;
@@ -128,6 +167,7 @@ impl Mmc1Reg {
             0xA000..=0xBFFF => {
                 self.ctrl_reg_r1 = val & 0x1F;
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r1 & _BIT_4) != 0 {
                     self.chr_bank_0 = CHR_A_16;
                 }
@@ -146,6 +186,22 @@ impl Mmc1Reg {
 
                 if(self.ctrl_reg_r0 & _BIT_4) != 0 {
                     if(self.ctrl_reg_r1 & _BIT_0) != 0 {
+=======
+                if(self.ctrl_reg_r1 & BIT_4) != 0 {
+                    self.chr_bank_0 = CHR_A_16;
+                }
+                if(self.ctrl_reg_r1 & BIT_3) != 0 {
+                    self.chr_bank_0 = CHR_A_15;
+                }
+                if(self.ctrl_reg_r1 & BIT_2) != 0 {
+                    self.chr_bank_0 = CHR_A_14;
+                }
+                if(self.ctrl_reg_r1 & BIT_1) != 0 {
+                    self.chr_bank_0 = CHR_A_13;
+                }
+                if(self.ctrl_reg_r1 & BIT_0) != 0 {
+                    if(self.ctrl_reg_r0 & BIT_4) != 0 {
+>>>>>>> remotes/origin/master
                         self.chr_bank_0 = CHR_A_12;
                     }
                 }
@@ -154,6 +210,7 @@ impl Mmc1Reg {
             0xC000..=0xDFFF => {
                 self.ctrl_reg_r2 = val & 0x1F;
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r2 & _BIT_4) != 0 {
                     self.chr_bank_1 = CHR_A_16;
                 }
@@ -171,6 +228,25 @@ impl Mmc1Reg {
                 }
 
                 if(self.ctrl_reg_r2 & _BIT_0) != 0 {
+=======
+                if(self.ctrl_reg_r2 & BIT_4) != 0 {
+                    self.chr_bank_1 = CHR_A_16;
+                }
+
+                if(self.ctrl_reg_r2 & BIT_3) != 0 {
+                    self.chr_bank_1 = CHR_A_15;
+                }
+
+                if(self.ctrl_reg_r2 & BIT_2) != 0 {
+                    self.chr_bank_1 = CHR_A_14;
+                }
+
+                if(self.ctrl_reg_r2 & BIT_1) != 0 {
+                    self.chr_bank_1 = CHR_A_13;
+                }
+
+                if(self.ctrl_reg_r2 & BIT_0) != 0 {
+>>>>>>> remotes/origin/master
                     self.chr_bank_1 = CHR_A_13;
                 }
             },
@@ -178,13 +254,21 @@ impl Mmc1Reg {
             0xE000..=0xFFFF => {
                 self.ctrl_reg_r3 = val & 0x1F;
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r3 & _BIT_4) != 0 {
+=======
+                if(self.ctrl_reg_r3 & BIT_4) != 0 {
+>>>>>>> remotes/origin/master
                     self.prg_mem_type = PGR_MEM_RAM;
                 }else{
                     self.prg_mem_type = PGR_MEM_ROM;
                 }
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r3 & _BIT_3) != 0 {
+=======
+                if(self.ctrl_reg_r3 & BIT_3) != 0 {
+>>>>>>> remotes/origin/master
                     if self.prg_mem_type != PGR_MEM_ROM {
                         self.prg_bank = PRG_A_17;
                     }else{
@@ -192,17 +276,30 @@ impl Mmc1Reg {
                     }
                 }
 
+<<<<<<< HEAD
                 if(self.ctrl_reg_r3 & _BIT_2) != 0 {
                     self.prg_bank = PRG_A_16;
                 }
 
                 if(self.ctrl_reg_r3 & _BIT_1) != 0 {
+=======
+                if(self.ctrl_reg_r3 & BIT_2) != 0 {
+                    self.prg_bank = PRG_A_16;
+                }
+
+                if(self.ctrl_reg_r3 & BIT_1) != 0 {
+>>>>>>> remotes/origin/master
                     self.prg_bank = PRG_A_15;
                 }
 
                 // R0のbit3 = 0(PRGバンクサイズ = 32KB)でない時
+<<<<<<< HEAD
                 if(self.ctrl_reg_r0 & _BIT_3) != 0 {
                     if(self.ctrl_reg_r3 & _BIT_0) != 0 {
+=======
+                if(self.ctrl_reg_r0 & BIT_3) != 0 {
+                    if(self.ctrl_reg_r3 & BIT_0) != 0 {
+>>>>>>> remotes/origin/master
                         self.prg_bank = PRG_A_14;
                     }
                 }
@@ -212,10 +309,17 @@ impl Mmc1Reg {
     }
 
     fn shift_reg_proc(&mut self, addr: u16, data :u8){
+<<<<<<< HEAD
         self.sp_reg = data & (_BIT_7 | _BIT_0);
 
         // bit7のクリアビットが1 = 初期化
         if (self.sp_reg & _BIT_7) != 0 {
+=======
+        self.sp_reg = data & (BIT_7 | BIT_0);
+
+        // bit7のクリアビットが1 = 初期化
+        if (self.sp_reg & BIT_7) != 0 {
+>>>>>>> remotes/origin/master
             self.sp_reg = 0;
             self.shft_reg = SHFT_REG_INIT_VAL;
         } else {
@@ -256,7 +360,11 @@ impl MapperMMC {
     }
 
     pub fn write(&mut self, addr: u16, data: u8) {
+<<<<<<< HEAD
         if self.mapper == MMC_1 {
+=======
+        if self.bank_select == MMC_1 {
+>>>>>>> remotes/origin/master
             self.mmc_1_reg.shift_reg_proc(addr, data);
         }else{
             self.bank_select = data;
@@ -264,8 +372,12 @@ impl MapperMMC {
     }
 
     fn mmc_1_read(&self, mem: u8, addr: u16) -> u8 {
+<<<<<<< HEAD
         // TODO :MMC1 (このマッパーだけ激難すぎｗ)
         let bank_len = _MEM_SIZE_16K as usize;
+=======
+        let bank_len = MAPPER_1_PRG_ROM_BANK_SIZE;
+>>>>>>> remotes/origin/master
         let bank_max = self.prg_rom.len() / bank_len;
         match addr {
             // CHR-ROM Bank 0 (SxROM)
