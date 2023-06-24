@@ -6,7 +6,6 @@ pub const MMC_0: u8 = 0;
 pub const MMC_1: u8 = 1;
 pub const MMC_2: u8 = 2;
 pub const MMC_3: u8 = 3;
-
 const MAPPER_2_PRG_ROM_BANK_SIZE: usize = 16 * 1024;
 const MAPPER_3_CHR_ROM_BANK_SIZE: usize = 8 * 1024;
 const CHR_ROM: u8 = 0;
