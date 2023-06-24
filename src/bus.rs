@@ -120,8 +120,8 @@ impl Mem for Bus<'_> {
                 0
             }
             PRG_ROM..=PRG_ROM_END => {
-                MAPPER.lock().unwrap().read_prg_rom(addr)
-                // self.read_prg_rom(addr)
+                let mapper = MAPPER.lock().unwrap().mapper;
+                MAPPER.lock().unwrap().read_prg_rom(mapper, addr)
             }
             _ => {
                 warn!("Ignoreing mem access at {:X}", addr);

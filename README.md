@@ -159,6 +159,7 @@ https://postd.cc/nes-graphics-part-1/
 
 ### Mapper
 https://www.nesdev.org/wiki/Mapper
+http://www43.tok2.com/home/cmpslv/Famic/Fcmp1.htm
 http://pasofami.game.coocan.jp/nesalltitlelst.htm  
   
 ### iNES
