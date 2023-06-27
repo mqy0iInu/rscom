@@ -18,19 +18,23 @@ pub enum Mirroring {
 #[derive(Debug, PartialEq, Clone)]
 #[allow(non_camel_case_types)]
 pub enum RomType {
-    NROM,  // MMC0 Mapper 0(Mario)
+    NROM,  // MMC0 Mapper 0 (Mario)
     BXROM, // (TBD)
-    UXROM, // Mapper 2(DQ2)/94/180
-    SNROM, // MMC1 Mapper 1 (DQ3, Zelda)
+    UXROM, // Mapper 2 (DQ2)/94/180
+    UNROM, // Mapper 2 (魔界村,Rockman)
+    SNROM, // MMC1 Mapper 1 (DQ3,FF1,FF2,Zelda)
     SXROM, // MMC1 Mapper 1
     SOROM, // MMC1 Mapper 1
     SUROM, // MMC1 Mapper 1 (DQ4)
     CNROM, // Mapper 3 (DQ)
-    TKROM, // MMC3 Mapper 4 (Mother)/118
+    TKROM, // MMC3 Mapper 4 (Mother,Kirby)/118
+    TNROM, // MMC3 Mapper 4 (FF3)
     TLROM, // MMC3 Mapper 4/118
+    TSROM, // MMC3 Mapper 4 (Mario3)
     TXROM, // MMC3 Mapper 4
     TQROM, // MMC3 Mapper 119
-    UNKNOWN
+
+    UNKNOWN // (Fail　Safe)
 }
 
 pub struct Rom {
@@ -38,6 +42,7 @@ pub struct Rom {
     pub chr_rom: Vec<u8>,
     pub mapper: u8,
     pub mirroring: Mirroring,
+    pub is_batt: bool,
     pub is_chr_ram: bool,
     pub is_prg_ram: bool,
     pub rom_type: RomType,
@@ -67,7 +72,7 @@ impl Rom {
         // ||||+---- 1：ミラーリング制御または上記ミラーリングビットを無視し、代わりに4画面VRAMを提供する
         // ++++----- マッパー番号の下位ニブル
         let four_screen = raw[6] & _BIT_3 != 0;
-        let is_prg_ram: bool = raw[6] & _BIT_1 != 0;
+        let is_batt: bool = raw[6] & _BIT_1 != 0;
         let mirroring_type = raw[6] & _BIT_0 != 0;
         let mirroring = match (four_screen, mirroring_type) {
             (true, _) => Mirroring::FOUR_SCREEN,
@@ -77,15 +82,17 @@ impl Rom {
 
         let prg_rom_size = raw[4] as usize * PRG_ROM_PAGE_SIZE;
         let chr_rom_size = raw[5] as usize * CHR_ROM_PAGE_SIZE;
+        let is_prg_ram = (chr_rom_size == 0) && (is_batt != false);
 
         let skip_trainer = raw[6] & 0b100 != 0;
 
         let prg_rom_start = 16 + if skip_trainer { 512 } else { 0 };
         let chr_rom_start = prg_rom_start + prg_rom_size;
 
+        let mut is_chr_ram = false;
         let chr_rom = if chr_rom_size == 0 {
-            // chr_rom_size=0の場合、8KBのCHR_RAMが存在する
             let blank_chr_ram: Vec<u8> = vec![0; CHR_ROM_PAGE_SIZE];
+            is_chr_ram = true;
             blank_chr_ram
         } else {
             raw[chr_rom_start..(chr_rom_start + chr_rom_size)].to_vec()
@@ -94,30 +101,34 @@ impl Rom {
         // TODO :ROMタイプ判別
         let mut rom_type: RomType = RomType::UNKNOWN;
         match mapper {
-            0 => rom_type = RomType::NROM,
-            1 => { if (prg_rom_size >= (_MEM_SIZE_512K as usize))
-                && (chr_rom_size == 0) && (is_prg_ram != false) {
+            _MAPPER_0 => rom_type = RomType::NROM,
+            _MAPPER_1 => { if (prg_rom_size >= (_MEM_SIZE_512K as usize))
+                && (is_chr_ram != false) && (is_prg_ram != false) {
                     rom_type = RomType::SUROM;
                 }else{
                     rom_type = RomType::SNROM;
                 }
             },
-            2 => { if (prg_rom_size <= (_MEM_SIZE_128K as usize))
-                && (chr_rom_size == 0) && (is_prg_ram != true) {
+            _MAPPER_2 => { if (prg_rom_size <= (_MEM_SIZE_128K as usize))
+                && (is_chr_ram != false) && (is_prg_ram != true) {
                     rom_type = RomType::UXROM;
                 }
             },
-            3 => { if (chr_rom_size != 0) && (is_prg_ram != true) {
+            _MAPPER_3 => { if (chr_rom_size != 0) && (is_prg_ram != true) {
                     rom_type = RomType::CNROM;
                 }
             },
-            4 => { if (prg_rom_size >= (_MEM_SIZE_256K as usize))
-                && (chr_rom_size >= (_MEM_SIZE_128K as usize))
-                && (is_prg_ram != false) {
+            _MAPPER_4 => { if (prg_rom_size >= (_MEM_SIZE_256K as usize))
+                && (chr_rom_size >= (_MEM_SIZE_128K as usize)) && (is_prg_ram != false) {
                     rom_type = RomType::TKROM;
+                }else if (prg_rom_size >= (_MEM_SIZE_512K as usize))
+                && (is_chr_ram != false) && (is_prg_ram != false) {
+                    rom_type = RomType::TNROM;
+                }else{
+                    rom_type = RomType::TSROM;
                 }
             },
-            _ => panic!("[ERR] Unknown ROM Type (Mapper: {}, ROM Type: {:?})",mapper, rom_type),
+            _ => panic!("[ERR] Not Support ROM (Mapper: {}, ROM Type: {:?})",mapper, rom_type),
         }
 
         Ok(Rom {
@@ -125,7 +136,8 @@ impl Rom {
             chr_rom: chr_rom,
             mapper: mapper,
             mirroring: mirroring,
-            is_chr_ram: chr_rom_size == 0,
+            is_batt: is_batt,
+            is_chr_ram: is_chr_ram,
             is_prg_ram: is_prg_ram,
             rom_type: rom_type,
         })
@@ -137,6 +149,7 @@ impl Rom {
             chr_rom: vec![],
             mapper: 0,
             mirroring: Mirroring::VERTICAL,
+            is_batt: false,
             is_chr_ram: false,
             is_prg_ram: false,
             rom_type: RomType::NROM,
