@@ -371,7 +371,7 @@ impl<'a> CPU<'a> {
     pub fn jam(&mut self, _mode: &AddressingMode) {
         // Stop program counter (processor lock up).
         self.program_counter -= 1;
-        panic!("CALL JAM operation.");
+        // panic!("CALL JAM operation.");
     }
 
     pub fn lae(&mut self, _mode: &AddressingMode) {

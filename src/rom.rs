@@ -17,6 +17,7 @@ pub enum Mirroring {
 #[allow(non_camel_case_types)]
 pub enum RomType {
     NROM,  // MMC0 Mapper 0(Mario)
+    BXROM, // (TBD)
     UXROM, // Mapper 2(Mario), 2(DQ2)/94/180
     SNROM, // MMC1 Mapper 1 (DQ3, Zelda)
     SXROM, // MMC1 Mapper 1

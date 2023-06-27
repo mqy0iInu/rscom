@@ -12,12 +12,12 @@ const DUTY_25: f32 = 0.25;          // Duty 25％
 const DUTY_50: f32 = 0.5;           // Duty 50％
 const DUTY_75: f32 = 0.75;          // Duty 75％
 
-// const CH1 :u8 = 0b0000_0001;
-// const CH2 :u8 = 0b0000_0010;
-// const CH3 :u8 = 0b0000_0100;
-// const CH4 :u8 = 0b0000_1000;
-
 const MASTER_VOLUME: f32 = 0.25;
+
+const CH1 :u8 = 0b0000_0001;
+const CH2 :u8 = 0b0000_0010;
+const CH3 :u8 = 0b0000_0100;
+const CH4 :u8 = 0b0000_1000;
 
 pub struct APU {
     ch1_register: Ch1Register,
@@ -178,6 +178,77 @@ impl APU {
         self.counter = 0;
     }
 
+    fn chg_ch_freq(&mut self, ch: u8, freq: u16)
+    {
+        // if (ch & CH1) != 0 {
+        //     self.ch1_register.freq_high = ((freq & 0xF0) >> 8) as u8;
+        //     self.ch1_register.freq_low = (freq & 0x0F) as u8;
+        // }
+
+        // if (ch & CH2) != 0 {
+        //     self.ch2_register.freq = freq;
+        // }
+
+        // if (ch & CH2) != 0 {
+        //     self.ch3_register.freq = freq;
+        // }
+    }
+
+    fn frame_sequencer_proc(&mut self)
+    {
+        // f = 割り込みフラグセット
+        // l = 長さカウンタとスイープユニットのクロック生成
+        // e = エンベロープと三角波の線形カウンタのクロック生成
+        match self.frame_counter.mode() {
+            // モード0: 4ステップ 有効レート(おおよそ)
+            // ---------------------------------------
+            //     - - - f      60 Hz
+            //     - l - l     120 Hz
+            //     e e e e     240 Hz
+            4 => {
+                // 120Hz (長さカウンタとスイープユニットのクロック生成)
+                if self.counter == 2 || self.counter == 4 {
+                    self.chg_ch_freq(CH1 | CH2 | CH3, 120);
+                }
+                // 60Hz
+                if self.counter == 4 {
+                    // 割り込みフラグセット
+                    self.counter = 0;
+                    self.status.insert(StatusRegister::ENABLE_FRAME_IRQ);
+                }
+
+                // 240Hz (エンベロープと三角波の線形カウンタのクロック生成)
+                if (1..=4).contains(&self.counter) {
+                    self.chg_ch_freq(CH1 | CH2 | CH3, 240);
+                }
+            },
+
+            // モード1: 5ステップ 有効レート(おおよそ)
+            // ---------------------------------------
+            //     - - - - -   (割り込みフラグはセットしない)
+            //     l - l - -    96 Hz
+            //     e e e e -   192 Hz
+            5 => {
+                // 96Hz (長さカウンタとスイープユニットのクロック生成)
+                if self.counter == 1 || self.counter == 3 {
+                    self.chg_ch_freq(CH1 | CH2 | CH3, 96);
+                }
+
+                // 192Hz (エンベロープと三角波の線形カウンタのクロック生成)
+                if (1..=4).contains(&self.counter) {
+                    self.chg_ch_freq(CH1 | CH2 | CH3, 192);
+                }
+
+                if self.counter == 5 {
+                    // 割り込みフラグセット
+                    self.counter = 0;
+                    self.status.remove(StatusRegister::ENABLE_FRAME_IRQ);
+                }
+            },
+            _ => panic!("can't be"),
+        }
+    }
+
     pub fn tick(&mut self, cycles: u8) {
         self.cycles += cycles as usize;
 
@@ -186,22 +257,9 @@ impl APU {
             self.cycles -= interval;
             self.counter += 1;
 
-        match self.frame_counter.mode() {
-            4 => {
-                if self.counter == 2 || self.counter == 4 {
-                        // 長さカウンタとスイープユニットのクロック生成
-                }
-                if self.counter == 4 {
-                    // 割り込みフラグセット
-                    self.counter = 0;
-                    self.status.insert(StatusRegister::ENABLE_FRAME_IRQ);
-                }
-                    // エンベロープと三角波の線形カウンタのクロック生成
-                }
-                5 => {}
-            _ => panic!("can't be"),
+            // フレームシーケンサ
+            self.frame_sequencer_proc();
         }
-    }
     }
 }
 

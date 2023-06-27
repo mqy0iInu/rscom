@@ -31,7 +31,7 @@ pub const _MEM_SIZE_256K: u32 = 256 * 1024;
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/excitebike.nes";
 
 // [MapperMMC 2]
-pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 
 // [MapperMMC 3]
 // pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest.nes";
@@ -48,7 +48,7 @@ pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 
 // [MapperMMC 1]
 // pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 3 (J).nes";
-// pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 4 (J).nes";
+pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 4 (J).nes";
 
 // [MapperMMC 3]
 // pub const _NES_ROM_PATH: &str = "rom/nes/soromon_no_kagi.nes";
