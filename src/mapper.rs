@@ -1,3 +1,4 @@
+use log::{debug, info, trace};
 use crate::common;
 use common::*;
 use crate::rom::Mirroring;
@@ -32,9 +33,13 @@ const PGR_RAM_BANK_1: u8 = 1;
 const PGR_MEM_ROM: u8 = 0;
 const PGR_MEM_RAM: u8 = 1;
 
+const IGNORING_LOW_BIT_BANK: u8 = 0;
+const FIX_FIRST_BANK: u8 = 1;
+const FIX_LAST_BANK: u8 = 2;
+
 pub struct Mmc1Reg {
     sp_reg :u8,        // SP（シリアル・パラレル）レジスタ
-    shft_reg :u8,      // シフトレジスタ
+    shift_reg :u8,      // シフトレジスタ
     shift: u8,
     ctrl_reg_r0 :u8,   // コントロールレジスタ   R0
     ctrl_reg_r1 :u8,   //       〃               R1
@@ -42,11 +47,9 @@ pub struct Mmc1Reg {
     ctrl_reg_r3 :u8,   //       〃               R3
 
     // R0 (V-RAMコントロール)
-    chr_bank_size :u16, // CHRバンク(4K or 8KB)
-    prg_bank_size :u16, // PGRバンクサイズ(16K or 32KB)
-    prg_bank_even :u16, // 固定PRGバンク($8000 or $C000)
-    display_type: u8,   // 画面(1 or 4画面)
-    scroll_mode: Mirroring, // スクロールモード(H or V)
+    chr_bank_mode: u16,
+    prg_bank_mode: (u16, u16, u8),
+    mirror: Mirroring,
 
     // R1 (CHRバンク0)
     chr_bank_0: u8,
@@ -62,7 +65,7 @@ pub struct Mmc1Reg {
 impl Mmc1Reg {
     pub fn new() -> Self {
         Mmc1Reg {
-            shft_reg :SHFT_REG_INIT_VAL,
+            shift_reg :SHFT_REG_INIT_VAL,
             shift: 0,
             sp_reg: 0,
             ctrl_reg_r0: 0,
@@ -70,16 +73,37 @@ impl Mmc1Reg {
             ctrl_reg_r2: 0,
             ctrl_reg_r3: 0,
 
-            chr_bank_size: 0,
-            prg_bank_size: 0,
-            prg_bank_even: 0,
-            display_type: DISPLAY_TYPE_1,
-            scroll_mode: Mirroring::VERTICAL,
+            chr_bank_mode: _MEM_SIZE_8K,
+            prg_bank_mode: (_MEM_SIZE_32K, 0x8000, IGNORING_LOW_BIT_BANK),
+            mirror: Mirroring::VERTICAL,
 
             chr_bank_0: 0,
             chr_bank_1: 0,
             prg_mem_type: PGR_MEM_ROM,
             prg_bank: 0,
+        }
+    }
+
+    fn shift_reg_proc(&mut self, addr: u16, data :u8){
+        self.sp_reg = data & (_BIT_7 | _BIT_0);
+        let val: u8 = self.sp_reg & 0x01;
+
+        // bit7のクリアビットが1 = 初期化
+        if (self.sp_reg & _BIT_7) != 0 {
+            self.sp_reg = 0;
+            self.shift_reg = SHFT_REG_INIT_VAL;
+        } else {
+            if self.shift < 5 {
+                self.shift_reg = (val << _BIT_5) | (self.shift_reg >> 1);
+                self.shift += 1;
+            // 5回右シフトするとき、指定アドレスのレジスタに値を転送
+            }else {
+                self.shift_reg = (val << _BIT_5) | (self.shift_reg.wrapping_shl(1));
+                self.control_reg_write(addr, self.shift_reg);
+                self.sp_reg = SHFT_REG_INIT_VAL;
+                self.shift_reg = 0;
+                self.shift = 0;
+            }
         }
     }
 
@@ -89,88 +113,54 @@ impl Mmc1Reg {
             // コントロールレジスタ0 (V-RAMコントロール)
             0x8000..=0x9FFF => {
                 self.ctrl_reg_r0 = val & 0x1F;
+                let reg_r0 = self.ctrl_reg_r0;
 
-                if(self.ctrl_reg_r0 & _BIT_4) != 0 {
-                    self.chr_bank_size = 4 * 1024;
-                }else{
-                    self.chr_bank_size = 8 * 1024;
-                }
+                self.chr_bank_mode = match (reg_r0 & _BIT_4) >> 4 {
+                    1 => _MEM_SIZE_4K,
+                    0 | _ => _MEM_SIZE_8K,
+                };
 
-                if(self.ctrl_reg_r0 & _BIT_3) != 0 {
-                    self.prg_bank_size = 16 * 1024;
-                }else{
-                    self.prg_bank_size = 32 * 1024;
-                }
+                self.prg_bank_mode = match (reg_r0 & (_BIT_3 | _BIT_2)) >> 2 {
+                    3 => (_MEM_SIZE_16K, 0xC000, FIX_LAST_BANK),
+                    2 => (_MEM_SIZE_16K, 0x8000, FIX_FIRST_BANK),
+                    0 | 1 | _ => (_MEM_SIZE_32K, 0x8000, IGNORING_LOW_BIT_BANK),
+                };
 
-                // PGRバンクサイズが16KBの時のみ
-                if(self.ctrl_reg_r0 & _BIT_3) != 0 {
-                    if(self.ctrl_reg_r0 & _BIT_2) != 0 {
-                        self.prg_bank_even = 0x8000;
-                    }else{
-                        self.prg_bank_even = 0xC000;
-                    }
-                }
-
-                if(self.ctrl_reg_r0 & _BIT_1) != 0 {
-                    self.display_type = DISPLAY_TYPE_4;
-                }else{
-                    self.display_type = DISPLAY_TYPE_1;
-                }
-
-                if(self.ctrl_reg_r0 & _BIT_0) != 0 {
-                    self.scroll_mode = Mirroring::HORIZONTAL;
-                }else{
-                    self.scroll_mode = Mirroring::VERTICAL;
-                }
+                self.mirror = match (reg_r0 & (_BIT_1 | _BIT_0)) >> 1 {
+                    3 => Mirroring::HORIZONTAL,
+                    2 => Mirroring::VERTICAL,
+                    1 => Mirroring::ONE_SCREEN_UPPER,
+                    0 | _ => Mirroring::ONE_SCREEN_LOWER,
+                };
             },
             // コントロールレジスタ1 (CHRバンク0)
+            // 4bit0
+            // -----
+            // PSSxC
+            // ||| |
+            // ||| +- PPU $0000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
+            // |++--- 8 KB PRG RAM バンクを選択
+            // +----- 256 KB PRG ROM バンクを選択
             0xA000..=0xBFFF => {
                 self.ctrl_reg_r1 = val & 0x1F;
 
                 if(self.ctrl_reg_r1 & _BIT_4) != 0 {
                     self.chr_bank_0 = CHR_A_16;
                 }
-
-                if(self.ctrl_reg_r1 & _BIT_3) != 0 {
-                    self.chr_bank_0 = CHR_A_15;
-                }
-
-                if(self.ctrl_reg_r1 & _BIT_2) != 0 {
-                    self.chr_bank_0 = CHR_A_14;
-                }
-
-                if(self.ctrl_reg_r1 & _BIT_1) != 0 {
-                    self.chr_bank_0 = CHR_A_13;
-                }
-
-                if(self.ctrl_reg_r0 & _BIT_4) != 0 {
-                    if(self.ctrl_reg_r1 & _BIT_0) != 0 {
-                        self.chr_bank_0 = CHR_A_12;
-                    }
-                }
             },
             // コントロールレジスタ2 (CHRバンク1)
+            // 4bit0
+            // -----
+            // PSSxC
+            // ||| |
+            // ||| +- PPU $1000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
+            // |++--- 8 KB PRG RAM バンクを選択 (8 KB モードでは無視)
+            // +----- 256 KB PRG ROM バンクを選択 ( 8 KB モードでは無視されます)
             0xC000..=0xDFFF => {
                 self.ctrl_reg_r2 = val & 0x1F;
 
                 if(self.ctrl_reg_r2 & _BIT_4) != 0 {
                     self.chr_bank_1 = CHR_A_16;
-                }
-
-                if(self.ctrl_reg_r2 & _BIT_3) != 0 {
-                    self.chr_bank_1 = CHR_A_15;
-                }
-
-                if(self.ctrl_reg_r2 & _BIT_2) != 0 {
-                    self.chr_bank_1 = CHR_A_14;
-                }
-
-                if(self.ctrl_reg_r2 & _BIT_1) != 0 {
-                    self.chr_bank_1 = CHR_A_13;
-                }
-
-                if(self.ctrl_reg_r2 & _BIT_0) != 0 {
-                    self.chr_bank_1 = CHR_A_13;
                 }
             },
             // コントロールレジスタ3 (PRGバンク)
@@ -182,53 +172,8 @@ impl Mmc1Reg {
                 }else{
                     self.prg_mem_type = PGR_MEM_ROM;
                 }
-
-                if(self.ctrl_reg_r3 & _BIT_3) != 0 {
-                    if self.prg_mem_type != PGR_MEM_ROM {
-                        self.prg_bank = PRG_A_17;
-                    }else{
-                        self.prg_bank = PGR_RAM_BANK_1;
-                    }
-                }
-
-                if(self.ctrl_reg_r3 & _BIT_2) != 0 {
-                    self.prg_bank = PRG_A_16;
-                }
-
-                if(self.ctrl_reg_r3 & _BIT_1) != 0 {
-                    self.prg_bank = PRG_A_15;
-                }
-
-                // R0のbit3 = 0(PRGバンクサイズ = 32KB)でない時
-                if(self.ctrl_reg_r0 & _BIT_3) != 0 {
-                    if(self.ctrl_reg_r3 & _BIT_0) != 0 {
-                        self.prg_bank = PRG_A_14;
-                    }
-                }
             },
             _ => panic!("[ERR] Invalid Addr of MMC1 Ctrl Reg!!!")
-        }
-    }
-
-    fn shift_reg_proc(&mut self, addr: u16, data :u8){
-        self.sp_reg = data & (_BIT_7 | _BIT_0);
-
-        // bit7のクリアビットが1 = 初期化
-        if (self.sp_reg & _BIT_7) != 0 {
-            self.sp_reg = 0;
-            self.shft_reg = SHFT_REG_INIT_VAL;
-        } else {
-            let val = self.sp_reg & 0x01;
-            if self.shift < 5 {
-                self.shft_reg = val >> self.shift;
-                self.shift += 1;
-            // 5回右シフトするとき、指定アドレスのレジスタに値を転送
-            }else {
-                self.shft_reg = val.wrapping_shr(1);
-                self.control_reg_write(addr, self.shft_reg);
-                self.shft_reg = 0;
-                self.shift = 0;
-            }
         }
     }
 }
@@ -236,7 +181,10 @@ impl Mmc1Reg {
 pub struct MapperMMC {
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
+    // pub chr_ram: Vec<u8>,
+    pub ext_ram: Vec<u8>,
     pub mapper: u8,
+    pub is_ext_ram: bool,
     bank_select: u8,
 
     mmc_1_reg: Mmc1Reg,
@@ -247,16 +195,34 @@ impl MapperMMC {
         MapperMMC {
             prg_rom: vec![],
             chr_rom: vec![],
-            bank_select: 0,
+            // chr_ram: vec![0; _MEM_SIZE_8K as usize],
+            ext_ram: vec![0; _MEM_SIZE_8K as usize],
+            is_ext_ram: false,
             mapper: 0,
+            bank_select: 0,
 
             mmc_1_reg: Mmc1Reg::new(),
         }
     }
 
+    pub fn mmc_1_write(&mut self, addr: u16, data: u8) {
+        trace!("[Trace] MMC1 Write Addr ${:04X}", addr);
+        match addr {
+            // 拡張RAM(WRAM)
+            0x6000..=0x7FFF => {
+                self.ext_ram[(addr - 0x6000) as usize];
+            },
+            0x8000..=0xFFFF => {
+                self.mmc_1_reg.shift_reg_proc(addr, data);
+                panic!("MMC1 Conf Ref Write");
+            },
+            _ => panic!("[ERR] MMC1 Write Addr ${:04X} !!!", addr),
+        }
+    }
+
     pub fn write(&mut self, addr: u16, data: u8) {
         if self.mapper == MMC_1 {
-            self.mmc_1_reg.shift_reg_proc(addr, data);
+
         }else{
             self.bank_select = data;
         }
@@ -264,20 +230,29 @@ impl MapperMMC {
 
     fn mmc_1_read(&self, mem: u8, addr: u16) -> u8 {
         // TODO :MMC1 (このマッパーだけ激難すぎｗ)
-        let bank_len = _MEM_SIZE_16K as usize;
+        let mut bank_len = _MEM_SIZE_16K as usize;
+        if self.mmc_1_reg.prg_bank != _MEM_SIZE_16K as u8
+        {
+            bank_len = _MEM_SIZE_32K as usize;
+        }
         let bank_max = self.prg_rom.len() / bank_len;
         match addr {
-            // CHR-ROM Bank 0 (SxROM)
-            0xA000..=0xBFFF => {
+            // 拡張RAM(WRAM)
+            0x6000..=0x7FFF => {
+                self.ext_ram[(addr - 0x6000) as usize]
+            },
+            // PRG-ROM Bank
+            0x8000..=0xBFFF => {
                 // bank_select
-                let bank = self.bank_select & 0x01;
+                let bank = self.mmc_1_reg.ctrl_reg_r3 & 0x03;
+                trace!("[Trace] MMC1 Read Addr ${:04X}", addr);
                 self.prg_rom[(addr as usize - 0x8000 + bank_len * bank as usize) as usize]
             },
+            // PRG-ROM Bank(最後のバンク固定)
             0xC000..=0xFFFF => {
-                // 最後のバンク固定
                 self.prg_rom[(addr as usize - 0xC000 + bank_len * (bank_max - 1)) as usize]
             },
-            _ => panic!("can't be"),
+            _ => panic!("[ERR] MMC1 Read Addr ${:04X} !!!", addr),
         }
     }
 
@@ -320,20 +295,20 @@ impl MapperMMC {
         }
     }
 
-    pub fn read_prg_rom(&mut self, mapper: u8, addr: u16) -> u8 {
-        match mapper {
+    pub fn read_prg_rom(&mut self, addr: u16) -> u8 {
+        match self.mapper {
             MMC_0 | MMC_2 => self.mmc_2_read(addr),
             MMC_1 => self.mmc_1_read(PRG_ROM, addr),
             MMC_3 => self.mmc_3_prg_rom_read(addr),
-            _ => panic!("[ERR] Not Emu Support MapperMMC {}", mapper),
+            _ => panic!("[ERR] Not Emu Support MapperMMC {}", self.mapper),
         }
     }
 
-    pub fn read_chr_rom(&mut self, mapper: u8, addr: u16) -> u8 {
-        match mapper {
+    pub fn read_chr_rom(&mut self, addr: u16) -> u8 {
+        match self.mapper {
             MMC_1 => self.mmc_1_read(CHR_ROM, addr),
             MMC_3 => self.mmc_3_chr_rom_read(addr),
-            _ => panic!("[ERR] Not Emu Support MapperMMC {}", mapper),
+            _ => panic!("[ERR] Not Emu Support MapperMMC {}", self.mapper),
         }
     }
 }

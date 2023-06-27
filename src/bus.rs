@@ -29,7 +29,7 @@ impl<'a> Bus<'a> {
     where
         F: FnMut(&PPU, &mut GamePad) + 'call,
     {
-        let ppu = PPU::new(rom.chr_rom, rom.screen_mirroring, rom.is_chr_ram);
+        let ppu = PPU::new(rom.chr_rom, rom.mirroring, rom.is_ext_ram);
         Bus {
             cpu_vram: [0; 2048],
             // prg_rom: rom.prg_rom,
@@ -119,9 +119,12 @@ impl Mem for Bus<'_> {
                 // self.gamepad_2.read()
                 0
             }
+            0x6000..=0x7FFF => {
+                trace!("Ext RAM Read: ${:04X}",addr);
+                MAPPER.lock().unwrap().read_prg_rom(addr)
+            }
             PRG_ROM..=PRG_ROM_END => {
-                let mapper = MAPPER.lock().unwrap().mapper;
-                MAPPER.lock().unwrap().read_prg_rom(mapper, addr)
+                MAPPER.lock().unwrap().read_prg_rom(addr)
             }
             _ => {
                 warn!("Ignoreing mem access at {:X}", addr);
@@ -203,6 +206,14 @@ impl Mem for Bus<'_> {
                 for _ in 0..513 {
                     self.ppu.tick(1);
                 }
+            }
+            0x6000..=0x7FFF => {
+                MAPPER.lock().unwrap().write(addr, data);
+                trace!(
+                    "Ext RAM WRITE: ${:04X} => {:02X})",
+                    addr,
+                    data
+                );
             }
             PRG_ROM..=PRG_ROM_END => {
                 MAPPER.lock().unwrap().write(addr, data);

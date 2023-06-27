@@ -82,11 +82,12 @@ fn main() {
     let rom = load_rom(_NES_ROM_PATH);
     MAPPER.lock().unwrap().prg_rom = rom.prg_rom.clone();
     MAPPER.lock().unwrap().chr_rom = rom.chr_rom.clone();
+    MAPPER.lock().unwrap().is_ext_ram = rom.is_ext_ram.clone();
     MAPPER.lock().unwrap().mapper = rom.mapper.clone();
 
     info!(
         "ROM: mapper={}, mirroring={:?} chr_ram={}",
-        rom.mapper, rom.screen_mirroring, rom.is_chr_ram
+        rom.mapper, rom.mirroring, rom.is_ext_ram
     );
 
     let mut frame = Frame::new();
@@ -128,4 +129,31 @@ fn main() {
             trace(cpu);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_ptr_from_vec() {
+        let my_vec: Vec<u8> = vec![1, 2, 3, 4, 5];
+        let ptr: *const u8 = my_vec.as_ptr();
+
+        unsafe {
+            let value: u8 = *ptr;
+            assert_eq!(value, 1);
+        }
+    }
+
+    #[test]
+    fn test_ptr_print() {
+        let my_vec: Vec<u8> = vec![1, 2, 3, 4, 5];
+        let ptr: *const u8 = my_vec.as_ptr();
+
+        unsafe {
+            for i in 0..my_vec.len() {
+                let value: u8 = *ptr.offset(i as isize);
+                println!("Value at index {}: {}", i, value);
+            }
+        }
+    }
 }

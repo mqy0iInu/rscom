@@ -12,10 +12,12 @@ const DUTY_25: f32 = 0.25;          // Duty 25％
 const DUTY_50: f32 = 0.5;           // Duty 50％
 const DUTY_75: f32 = 0.75;          // Duty 75％
 
-const CH1 :u8 = 0b0000_0001;
-const CH2 :u8 = 0b0000_0010;
-const CH3 :u8 = 0b0000_0100;
-const CH4 :u8 = 0b0000_1000;
+// const CH1 :u8 = 0b0000_0001;
+// const CH2 :u8 = 0b0000_0010;
+// const CH3 :u8 = 0b0000_0100;
+// const CH4 :u8 = 0b0000_1000;
+
+const MASTER_VOLUME: f32 = 0.25;
 
 pub struct APU {
     ch1_register: Ch1Register,
@@ -28,16 +30,16 @@ pub struct APU {
     counter: usize,
 
     ch1_device: AudioDevice<SquareWave>,
-    ch1_sender: Sender<SquareNote>,
+    ch1_sender: Sender<SquareEvent>,
 
     ch2_device: AudioDevice<SquareWave>,
-    ch2_sender: Sender<SquareNote>,
+    ch2_sender: Sender<SquareEvent>,
 
     ch3_device: AudioDevice<TriangleWave>,
-    ch3_sender: Sender<TriangleNote>,
+    ch3_sender: Sender<TriangleEvent>,
 
     ch4_device: AudioDevice<NoiseWave>,
-    ch4_sender: Sender<NoiseNote>,
+    ch4_sender: Sender<NoiseEvent>,
 }
 
 impl APU {
@@ -88,14 +90,14 @@ impl APU {
 
         let volume = (self.ch1_register.volume() as f32) / 15.0;
 
-        let freq = CPU_CLOCK / (16.0 * (self.ch1_register.freq() as f32 + 1.0));
+        let hz = CPU_CLOCK / (16.0 * (self.ch1_register.hz() as f32 + 1.0));
 
         self.ch1_sender
-            .send(SquareNote {
-                freq: freq,
+            .send(SquareEvent::Note(SquareNote {
+                hz: hz,
                 volume: volume,
                 duty: duty,
-            })
+            }))
             .unwrap();
     }
 
@@ -112,29 +114,31 @@ impl APU {
 
         let volume = (self.ch2_register.volume as f32) / 15.0;
 
-        let freq = CPU_CLOCK / (16.0 * (self.ch2_register.freq as f32 + 1.0));
+        let hz = CPU_CLOCK / (16.0 * (self.ch2_register.frequency as f32 + 1.0));
 
         self.ch2_sender
-            .send(SquareNote {
-                freq: freq,
+            .send(SquareEvent::Note(SquareNote {
+                hz: hz,
                 volume: volume,
                 duty: duty,
-            })
+            }))
             .unwrap();
     }
 
     pub fn write3ch(&mut self, addr: u16, value: u8) {
         self.ch3_register.write(addr, value);
 
-        let freq = CPU_CLOCK / (32.0 * (self.ch2_register.freq as f32 + 1.0));
+        let hz = CPU_CLOCK / (32.0 * (self.ch2_register.frequency as f32 + 1.0));
 
-        self.ch3_sender.send(TriangleNote { freq: freq }).unwrap();
+        self.ch3_sender
+            .send(TriangleEvent::Note(TriangleNote { hz: hz }))
+            .unwrap();
     }
 
     pub fn write4ch(&mut self, addr: u16, value: u8) {
         self.ch4_register.write(addr, value);
 
-        let freq = CPU_CLOCK / NOIZE_TABLE[self.ch4_register.freq as usize] as f32;
+        let hz = CPU_CLOCK / NOIZE_TABLE[self.ch4_register.frequency as usize] as f32;
         let is_long = match self.ch4_register.kind {
             NoiseKind::Long => true,
             _ => false,
@@ -142,11 +146,11 @@ impl APU {
         let volume = (self.ch4_register.volume as f32) / 15.0;
 
         self.ch4_sender
-            .send(NoiseNote {
-                freq: freq,
+            .send(NoiseEvent::Note(NoiseNote {
+                hz: hz,
                 is_long: is_long,
                 volume: volume,
-            })
+            }))
             .unwrap();
     }
 
@@ -157,7 +161,11 @@ impl APU {
     }
 
     pub fn write_status(&mut self, data: u8) {
-        self.status.update(data)
+        self.status.update(data);
+
+        if !self.status.contains(StatusRegister::ENABLE_1CH) {
+            self.ch1_sender.send(SquareEvent::Stop()).unwrap()
+        }
     }
 
     pub fn irq(&self) -> bool {
@@ -170,77 +178,6 @@ impl APU {
         self.counter = 0;
     }
 
-    fn chg_ch_freq(&mut self, ch: u8, freq: u16)
-    {
-        // if (ch & CH1) != 0 {
-        //     self.ch1_register.freq_high = ((freq & 0xF0) >> 8) as u8;
-        //     self.ch1_register.freq_low = (freq & 0x0F) as u8;
-        // }
-
-        // if (ch & CH2) != 0 {
-        //     self.ch2_register.freq = freq;
-        // }
-
-        // if (ch & CH2) != 0 {
-        //     self.ch3_register.freq = freq;
-        // }
-    }
-
-    fn frame_sequencer_proc(&mut self)
-    {
-        // f = 割り込みフラグセット
-        // l = 長さカウンタとスイープユニットのクロック生成
-        // e = エンベロープと三角波の線形カウンタのクロック生成
-        match self.frame_counter.mode() {
-            // モード0: 4ステップ 有効レート(おおよそ)
-            // ---------------------------------------
-            //     - - - f      60 Hz
-            //     - l - l     120 Hz
-            //     e e e e     240 Hz
-            4 => {
-                // 120Hz (長さカウンタとスイープユニットのクロック生成)
-                if self.counter == 2 || self.counter == 4 {
-                    self.chg_ch_freq(CH1 | CH2 | CH3, 120);
-                }
-                // 60Hz
-                if self.counter == 4 {
-                    // 割り込みフラグセット
-                    self.counter = 0;
-                    self.status.insert(StatusRegister::ENABLE_FRAME_IRQ);
-                }
-
-                // 240Hz (エンベロープと三角波の線形カウンタのクロック生成)
-                if (1..=4).contains(&self.counter) {
-                    self.chg_ch_freq(CH1 | CH2 | CH3, 240);
-                }
-            },
-
-            // モード1: 5ステップ 有効レート(おおよそ)
-            // ---------------------------------------
-            //     - - - - -   (割り込みフラグはセットしない)
-            //     l - l - -    96 Hz
-            //     e e e e -   192 Hz
-            5 => {
-                // 96Hz (長さカウンタとスイープユニットのクロック生成)
-                if self.counter == 1 || self.counter == 3 {
-                    self.chg_ch_freq(CH1 | CH2 | CH3, 96);
-                }
-
-                // 192Hz (エンベロープと三角波の線形カウンタのクロック生成)
-                if (1..=4).contains(&self.counter) {
-                    self.chg_ch_freq(CH1 | CH2 | CH3, 192);
-                }
-
-                if self.counter == 5 {
-                    // 割り込みフラグセット
-                    self.counter = 0;
-                    self.status.remove(StatusRegister::ENABLE_FRAME_IRQ);
-                }
-            },
-            _ => panic!("can't be"),
-        }
-    }
-
     pub fn tick(&mut self, cycles: u8) {
         self.cycles += cycles as usize;
 
@@ -249,17 +186,30 @@ impl APU {
             self.cycles -= interval;
             self.counter += 1;
 
-            // フレームシーケンサ
-            self.frame_sequencer_proc();
+        match self.frame_counter.mode() {
+            4 => {
+                if self.counter == 2 || self.counter == 4 {
+                        // 長さカウンタとスイープユニットのクロック生成
+                }
+                if self.counter == 4 {
+                    // 割り込みフラグセット
+                    self.counter = 0;
+                    self.status.insert(StatusRegister::ENABLE_FRAME_IRQ);
+                }
+                    // エンベロープと三角波の線形カウンタのクロック生成
+                }
+                5 => {}
+            _ => panic!("can't be"),
         }
+    }
     }
 }
 
 struct Ch1Register {
     pub tone_volume: u8,
     sweep: u8,
-    freq_low: u8,
-    freq_high: u8,
+    hz_low: u8,
+    hz_high_key_on: u8,
 }
 
 impl Ch1Register {
@@ -267,8 +217,8 @@ impl Ch1Register {
         Ch1Register {
             tone_volume: 0x00,
             sweep: 0x00,
-            freq_low: 0x00,
-            freq_high: 0x00,
+            hz_low: 0x00,
+            hz_high_key_on: 0x00,
         }
     }
 
@@ -282,8 +232,8 @@ impl Ch1Register {
         self.tone_volume & 0x0F
     }
 
-    pub fn freq(&self) -> u16 {
-        (self.freq_high as u16 & 0x07 << 8) | (self.freq_low as u16)
+    pub fn hz(&self) -> u16 {
+        (self.hz_high_key_on as u16 & 0x07 << 8) | (self.hz_low as u16)
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
@@ -295,10 +245,10 @@ impl Ch1Register {
                 self.sweep = value;
             }
             0x4002 => {
-                self.freq_low = value;
+                self.hz_low = value;
             }
             0x4003 => {
-                self.freq_high = value;
+                self.hz_high_key_on = value;
             }
             _ => panic!("can't be"),
         }
@@ -316,7 +266,7 @@ struct Ch2Register {
     sweep_timer_count: u8,
     sweep_enabled: u8,
 
-    freq: u16,
+    frequency: u16,
 
     key_off_count: u8,
 }
@@ -334,7 +284,7 @@ impl Ch2Register {
             sweep_timer_count: 0,
             sweep_enabled: 0,
 
-            freq: 0,
+            frequency: 0,
 
             key_off_count: 0,
         }
@@ -355,10 +305,10 @@ impl Ch2Register {
                 self.sweep_enabled = (value & 0x80) >> 7;
             }
             0x4006 => {
-                self.freq = (self.freq & 0x0700) | value as u16;
+                self.frequency = (self.frequency & 0x0700) | value as u16;
             }
             0x4007 => {
-                self.freq = (self.freq & 0x00FF) | (value as u16 & 0x07) << 8;
+                self.frequency = (self.frequency & 0x00FF) | (value as u16 & 0x07) << 8;
                 self.key_off_count = (value & 0xF8) >> 3;
             }
             _ => panic!("can't be"),
@@ -372,7 +322,7 @@ struct Ch3Register {
     key_off_counter_flag: bool,
 
     // 400A, 400B
-    freq: u16,
+    frequency: u16,
     key_off_count: u8,
 }
 
@@ -381,7 +331,7 @@ impl Ch3Register {
         Ch3Register {
             length: 0,
             key_off_counter_flag: false,
-            freq: 0,
+            frequency: 0,
             key_off_count: 0,
         }
     }
@@ -394,10 +344,10 @@ impl Ch3Register {
             }
             0x4009 => {}
             0x400A => {
-                self.freq = (self.freq & 0x0700) | value as u16;
+                self.frequency = (self.frequency & 0x0700) | value as u16;
             }
             0x400B => {
-                self.freq = (self.freq & 0x00FF) | (value as u16 & 0x07) << 8;
+                self.frequency = (self.frequency & 0x00FF) | (value as u16 & 0x07) << 8;
                 self.key_off_count = (value & 0xF8) >> 3;
             }
             _ => panic!("can't be"),
@@ -417,7 +367,7 @@ struct Ch4Register {
     key_off_counter_flag: bool,
 
     // 400E
-    freq: u8,
+    frequency: u8,
     kind: NoiseKind,
 
     // 400F
@@ -430,7 +380,7 @@ impl Ch4Register {
             volume: 0,
             envelope_flag: false,
             key_off_counter_flag: false,
-            freq: 0,
+            frequency: 0,
             kind: NoiseKind::Long,
             key_off_count: 0,
         }
@@ -444,7 +394,7 @@ impl Ch4Register {
                 self.key_off_counter_flag = (value & 0x20) == 0;
             }
             0x400E => {
-                self.freq = value & 0x0F;
+                self.frequency = value & 0x0F;
                 self.kind = match value & 0x80 {
                     0 => NoiseKind::Long,
                     _ => NoiseKind::Short,
@@ -459,8 +409,14 @@ impl Ch4Register {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum SquareEvent {
+    Note(SquareNote),
+    Stop(),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 struct SquareNote {
-    freq: f32,
+    hz: f32,
     volume: f32,
     duty: f32,
 }
@@ -468,7 +424,7 @@ struct SquareNote {
 struct SquareWave {
     freq: f32,
     phase: f32,
-    receiver: Receiver<SquareNote>,
+    receiver: Receiver<SquareEvent>,
     note: SquareNote,
 }
 
@@ -479,23 +435,24 @@ impl AudioCallback for SquareWave {
         for x in out.iter_mut() {
             let res = self.receiver.recv_timeout(Duration::from_millis(0));
             match res {
-                Ok(note) => self.note = note,
+                Ok(SquareEvent::Note(note)) => self.note = note,
+                Ok(SquareEvent::Stop()) => self.note.volume = 0.0,
                 Err(_) => {}
             }
             *x = if self.phase <= self.note.duty {
                 self.note.volume
             } else {
                 -self.note.volume
-            };
-            self.phase = (self.phase + self.note.freq / self.freq) % 1.0;
+            } * MASTER_VOLUME;
+            self.phase = (self.phase + self.note.hz / self.freq) % 1.0;
         }
     }
 }
 
-fn init_square(sdl_context: &sdl2::Sdl) -> (AudioDevice<SquareWave>, Sender<SquareNote>) {
+fn init_square(sdl_context: &sdl2::Sdl) -> (AudioDevice<SquareWave>, Sender<SquareEvent>) {
     let audio_subsystem = sdl_context.audio().unwrap();
 
-    let (sender, receiver) = channel::<SquareNote>();
+    let (sender, receiver) = channel::<SquareEvent>();
 
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
@@ -509,7 +466,7 @@ fn init_square(sdl_context: &sdl2::Sdl) -> (AudioDevice<SquareWave>, Sender<Squa
             phase: 0.0,
             receiver: receiver,
             note: SquareNote {
-                freq: 0.0,
+                hz: 0.0,
                 volume: 0.0,
                 duty: 0.0,
             },
@@ -522,14 +479,19 @@ fn init_square(sdl_context: &sdl2::Sdl) -> (AudioDevice<SquareWave>, Sender<Squa
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum TriangleEvent {
+    Note(TriangleNote),
+    Stop(),
+}
+#[derive(Debug, Clone, PartialEq)]
 struct TriangleNote {
-    freq: f32,
+    hz: f32,
 }
 
 struct TriangleWave {
     freq: f32,
     phase: f32,
-    receiver: Receiver<TriangleNote>,
+    receiver: Receiver<TriangleEvent>,
     note: TriangleNote,
 }
 
@@ -540,7 +502,8 @@ impl AudioCallback for TriangleWave {
         for x in out.iter_mut() {
             let res = self.receiver.recv_timeout(Duration::from_millis(0));
             match res {
-                Ok(note) => self.note = note,
+                Ok(TriangleEvent::Note(note)) => self.note = note,
+                Ok(TriangleEvent::Stop()) => self.note.hz = 0.0,
                 Err(_) => {}
             }
             *x = (if self.phase <= 0.5 {
@@ -548,16 +511,17 @@ impl AudioCallback for TriangleWave {
             } else {
                 1.0 - self.phase
             } - 0.25)
-                * 4.0; // volume
-            self.phase = (self.phase + self.note.freq / self.freq) % 1.0;
+                * 4.0
+                * MASTER_VOLUME;
+            self.phase = (self.phase + self.note.hz / self.freq) % 1.0;
         }
     }
 }
 
-fn init_triangle(sdl_context: &sdl2::Sdl) -> (AudioDevice<TriangleWave>, Sender<TriangleNote>) {
+fn init_triangle(sdl_context: &sdl2::Sdl) -> (AudioDevice<TriangleWave>, Sender<TriangleEvent>) {
     let audio_subsystem = sdl_context.audio().unwrap();
 
-    let (sender, receiver) = channel::<TriangleNote>();
+    let (sender, receiver) = channel::<TriangleEvent>();
 
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
@@ -570,7 +534,7 @@ fn init_triangle(sdl_context: &sdl2::Sdl) -> (AudioDevice<TriangleWave>, Sender<
             freq: spec.freq as f32,
             phase: 0.0,
             receiver: receiver,
-            note: TriangleNote { freq: 0.0 },
+            note: TriangleNote { hz: 0.0 },
         })
         .unwrap();
 
@@ -581,16 +545,19 @@ fn init_triangle(sdl_context: &sdl2::Sdl) -> (AudioDevice<TriangleWave>, Sender<
 
 lazy_static! {
     pub static ref NOIZE_TABLE: Vec<u16> = vec![
-        0x0002, 0x0004, 0x0008, 0x0010, 0x0020,
-        0x0030, 0x0040, 0x0050, 0x0065, 0x007F,
-        0x00BE, 0x00FE, 0x017D, 0x01FC, 0x03F9,
-        0x07F2,
+        0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0030, 0x0040, 0x0050, 0x0065, 0x007F, 0x00BE,
+        0x00FE, 0x017D, 0x01FC, 0x03F9, 0x07F2,
     ];
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum NoiseEvent {
+    Note(NoiseNote),
+    Stop(),
+}
+#[derive(Debug, Clone, PartialEq)]
 struct NoiseNote {
-    freq: f32,
+    hz: f32,
     is_long: bool,
     volume: f32,
 }
@@ -598,7 +565,7 @@ struct NoiseNote {
 struct NoiseWave {
     freq: f32,
     phase: f32,
-    receiver: Receiver<NoiseNote>,
+    receiver: Receiver<NoiseEvent>,
     value: bool,
     long_random: NoiseRandom,
     short_random: NoiseRandom,
@@ -613,14 +580,15 @@ impl AudioCallback for NoiseWave {
         for x in out.iter_mut() {
             let res = self.receiver.recv_timeout(Duration::from_millis(0));
             match res {
-                Ok(note) => self.note = note,
+                Ok(NoiseEvent::Note(note)) => self.note = note,
+                Ok(NoiseEvent::Stop()) => self.note.volume = 0.0,
                 Err(_) => {}
             }
 
-            *x = if self.value { 0.0 } else { 1.0 } * self.note.volume;
+            *x = if self.value { 0.0 } else { 1.0 } * self.note.volume * MASTER_VOLUME;
 
             let last_phase = self.phase;
-            self.phase = (self.phase + self.note.freq / self.freq) % 1.0;
+            self.phase = (self.phase + self.note.hz / self.freq) % 1.0;
             if last_phase > self.phase {
                 self.value = if self.note.is_long {
                     self.long_random.next()
@@ -647,9 +615,7 @@ impl NoiseRandom {
     }
 
     pub fn next(&mut self) -> bool {
-        // 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。
-        // タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、
-        // ビット14には、ショートモード時にはビット0とビット6のEORを、 ロングモード時にはビット0とビット1のEORを入れます。
+        // 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。 タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、 ビット14には、ショートモード時にはビット0とビット6のEORを、 ロングモード時にはビット0とビット1のEORを入れます。
         // ロングモード時にはビット0とビット1のEORを入れます。
         let b = (self.value & 0x01) ^ ((self.value >> self.bit) & 0x01);
         self.value = self.value >> 1;
@@ -660,10 +626,10 @@ impl NoiseRandom {
     }
 }
 
-fn init_noise(sdl_context: &sdl2::Sdl) -> (AudioDevice<NoiseWave>, Sender<NoiseNote>) {
+fn init_noise(sdl_context: &sdl2::Sdl) -> (AudioDevice<NoiseWave>, Sender<NoiseEvent>) {
     let audio_subsystem = sdl_context.audio().unwrap();
 
-    let (sender, receiver) = channel::<NoiseNote>();
+    let (sender, receiver) = channel::<NoiseEvent>();
 
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
@@ -680,7 +646,7 @@ fn init_noise(sdl_context: &sdl2::Sdl) -> (AudioDevice<NoiseWave>, Sender<NoiseN
             long_random: NoiseRandom::long(),
             short_random: NoiseRandom::short(),
             note: NoiseNote {
-                freq: 0.0,
+                hz: 0.0,
                 is_long: true,
                 volume: 0.0,
             },

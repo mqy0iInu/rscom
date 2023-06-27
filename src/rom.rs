@@ -9,14 +9,33 @@ pub enum Mirroring {
     VERTICAL,
     HORIZONTAL,
     FOUR_SCREEN,
+    ONE_SCREEN_LOWER,
+    ONE_SCREEN_UPPER,
+}
+
+#[derive(Debug, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum RomType {
+    NROM,  // MMC0 Mapper 0(Mario)
+    UXROM, // Mapper 2(Mario), 2(DQ2)/94/180
+    SNROM, // MMC1 Mapper 1 (DQ3, Zelda)
+    SXROM, // MMC1 Mapper 1
+    SOROM, // MMC1 Mapper 1
+    SUROM, // MMC1 Mapper 1 (DQ4)
+    CNROM, // Mapper 3 (DQ)
+    TKROM, // MMC3 Mapper 4 (Mother)/118
+    TLROM, // MMC3 Mapper 4/118
+    TXROM, // MMC3 Mapper 4
+    TQROM, // MMC3 Mapper 119
 }
 
 pub struct Rom {
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
     pub mapper: u8,
-    pub screen_mirroring: Mirroring,
-    pub is_chr_ram: bool,
+    pub mirroring: Mirroring,
+    pub is_ext_ram: bool,
+    pub rom_type: RomType,
 }
 
 impl Rom {
@@ -34,7 +53,7 @@ impl Rom {
 
         let four_screen = raw[6] & 0b1000 != 0;
         let vertical_mirroring = raw[6] & 0b1 != 0;
-        let screen_mirroring = match (four_screen, vertical_mirroring) {
+        let mirroring = match (four_screen, vertical_mirroring) {
             (true, _) => Mirroring::FOUR_SCREEN,
             (false, true) => Mirroring::VERTICAL,
             (false, false) => Mirroring::HORIZONTAL,
@@ -56,12 +75,16 @@ impl Rom {
             raw[chr_rom_start..(chr_rom_start + chr_rom_size)].to_vec()
         };
 
+        // TODO :ROMタイプ判別
+        let rom_type = RomType::NROM;
+
         Ok(Rom {
             prg_rom: raw[prg_rom_start..(prg_rom_start + prg_rom_size)].to_vec(),
             chr_rom: chr_rom,
             mapper: mapper,
-            screen_mirroring: screen_mirroring,
-            is_chr_ram: chr_rom_size == 0,
+            mirroring: mirroring,
+            is_ext_ram: chr_rom_size == 0,
+            rom_type: rom_type,
         })
     }
 
@@ -70,8 +93,9 @@ impl Rom {
             prg_rom: vec![],
             chr_rom: vec![],
             mapper: 0,
-            screen_mirroring: Mirroring::VERTICAL,
-            is_chr_ram: false,
+            mirroring: Mirroring::VERTICAL,
+            is_ext_ram: false,
+            rom_type: RomType::NROM,
         };
     }
 }
