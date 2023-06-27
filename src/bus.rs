@@ -29,7 +29,7 @@ impl<'a> Bus<'a> {
     where
         F: FnMut(&PPU, &mut GamePad) + 'call,
     {
-        let ppu = PPU::new(rom.chr_rom, rom.mirroring, rom.is_ext_ram);
+        let ppu = PPU::new(rom.chr_rom, rom.mirroring, rom.is_chr_ram);
         Bus {
             cpu_vram: [0; 2048],
             // prg_rom: rom.prg_rom,

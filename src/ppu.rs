@@ -6,7 +6,7 @@ use crate::{cpu::IN_TRACE, rom::Mirroring};
 pub struct PPU {
     pub chr_rom: Vec<u8>,
     pub mirroring: Mirroring,
-    pub is_ext_ram: bool,
+    pub is_chr_ram: bool,
 
     pub palette_table: [u8; 32],
     pub vram: [u8; 2048],
@@ -40,11 +40,11 @@ pub struct PPU {
 }
 
 impl PPU {
-    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring, is_ext_ram: bool) -> Self {
+    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring, is_chr_ram: bool) -> Self {
         PPU {
             chr_rom: chr_rom,
             mirroring: mirroring,
-            is_ext_ram: is_ext_ram,
+            is_chr_ram: is_chr_ram,
             vram: [0; 2048],
             oam_data: [0; 64 * 4],
             oam_addr: 0,
@@ -137,7 +137,7 @@ impl PPU {
                 if mapper == 3 {
                     MAPPER.lock().unwrap().write(addr, value);
                 }else{
-                    if self.is_ext_ram {
+                    if self.is_chr_ram {
                         self.chr_rom[addr as usize] = value;
                     }
                 }

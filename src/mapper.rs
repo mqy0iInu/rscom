@@ -40,8 +40,10 @@ const FIX_FIRST_BANK: u8 = 1;
 const FIX_LAST_BANK: u8 = 2;
 
 pub struct Mmc1Reg {
+    pub rom_type: RomType,
+
     sp_reg :u8,        // SP（シリアル・パラレル）レジスタ
-    shift_reg :u8,      // シフトレジスタ
+    shift_reg :u8,     // シフトレジスタ
     shift: u8,
     ctrl_reg_r0 :u8,   // コントロールレジスタ   R0
     ctrl_reg_r1 :u8,   //       〃               R1
@@ -74,6 +76,8 @@ pub struct Mmc1Reg {
 impl Mmc1Reg {
     pub fn new() -> Self {
         Mmc1Reg {
+            rom_type: RomType::SNROM,
+
             shift_reg :SHFT_REG_INIT_VAL,
             shift: 0,
             sp_reg: 0,
@@ -151,36 +155,46 @@ impl Mmc1Reg {
             },
             // コントロールレジスタ1 (CHRバンク0)
             0xA000..=0xBFFF => {
-                // 4bit0
-                // -----
-                // PSSxC
-                // ||| |
-                // ||| +- PPU $0000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
-                // |++--- 8 KB PRG RAM バンクを選択
-                // +----- 256 KB PRG ROM バンクを選択
                 self.ctrl_reg_r1 = val & 0x1F;
 
-                if self.chr_bank_mode != _MEM_SIZE_8K {
-                    self.r1_prg_rom_bank_256k = (self.ctrl_reg_r1 & _BIT_4) >> 4;
+                match self.rom_type {
+                    RomType::SUROM => {
+                        // 4bit0
+                        // -----
+                        // PSSxC
+                        // ||| |
+                        // ||| +- PPU $0000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
+                        // |++--- 8 KB PRG RAM バンクを選択
+                        // +----- 256 KB PRG ROM バンクを選択
+                        if self.chr_bank_mode != _MEM_SIZE_8K {
+                            self.r1_prg_rom_bank_256k = (self.ctrl_reg_r1 & _BIT_4) >> 4;
+                        }
+                        self.r1_prg_ram_bank_8k = (self.ctrl_reg_r1 & (_BIT_3 | _BIT_2)) >> 2;
+                        self.r1_chr_ram_bank_4k = self.ctrl_reg_r1 & _BIT_0;
+                    },
+                    _ => panic!("Unknown MMC1 Rom Type"),
                 }
-                self.r1_prg_ram_bank_8k = (self.ctrl_reg_r1 & (_BIT_3 | _BIT_2)) >> 2;
-                self.r1_chr_ram_bank_4k = self.ctrl_reg_r1 & _BIT_0;
             },
             // コントロールレジスタ2 (CHRバンク1)
             0xC000..=0xDFFF => {
-                // 4bit0
-                // -----
-                // PSSxC
-                // ||| |
-                // ||| +- PPU $1000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
-                // |++--- 8 KB PRG RAM バンクを選択 (8 KB モードでは無視)
-                // +----- 256 KB PRG ROM バンクを選択 ( 8 KB モードでは無視されます)
                 self.ctrl_reg_r2 = val & 0x1F;
+                match self.rom_type {
+                    RomType::SUROM => {
+                        // 4bit0
+                        // -----
+                        // PSSxC
+                        // ||| |
+                        // ||| +- PPU $1000 で 4 KB CHR RAM バンクを選択 (8 KB モードでは無視)
+                        // |++--- 8 KB PRG RAM バンクを選択 (8 KB モードでは無視)
+                        // +----- 256 KB PRG ROM バンクを選択 ( 8 KB モードでは無視されます)
 
-                if self.chr_bank_mode != _MEM_SIZE_8K {
-                    self.r2_prg_rom_bank_256k = (self.ctrl_reg_r1 & _BIT_4) >> 4;
-                    self.r2_prg_ram_bank_8k = (self.ctrl_reg_r1 & (_BIT_3 | _BIT_2)) >> 2;
-                    self.r2_chr_ram_bank_4k = self.ctrl_reg_r1 & _BIT_0;
+                        if self.chr_bank_mode != _MEM_SIZE_8K {
+                            self.r2_prg_rom_bank_256k = (self.ctrl_reg_r1 & _BIT_4) >> 4;
+                            self.r2_prg_ram_bank_8k = (self.ctrl_reg_r1 & (_BIT_3 | _BIT_2)) >> 2;
+                            self.r2_chr_ram_bank_4k = self.ctrl_reg_r1 & _BIT_0;
+                        }
+                    },
+                        _ => panic!("Unknown MMC1 Rom Type"),
                 }
             },
             // コントロールレジスタ3 (PRGバンク)
@@ -210,11 +224,12 @@ pub struct MapperMMC {
     // pub chr_ram: Vec<u8>,
     pub ext_ram: Vec<u8>,
     pub mapper: u8,
-    pub is_ext_ram: bool,
+    pub is_chr_ram: bool,
+    pub is_prg_ram: bool,
     pub rom_type: RomType,
     bank_select: u8,
 
-    mmc_1_reg: Mmc1Reg,
+    pub mmc_1_reg: Mmc1Reg,
 }
 
 impl MapperMMC {
@@ -224,7 +239,8 @@ impl MapperMMC {
             chr_rom: vec![],
             // chr_ram: vec![0; _MEM_SIZE_8K as usize],
             ext_ram: vec![0; _MEM_SIZE_8K as usize],
-            is_ext_ram: false,
+            is_chr_ram: false,
+            is_prg_ram: false,
             mapper: 0,
             rom_type: RomType::NROM,
             bank_select: 0,

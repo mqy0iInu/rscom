@@ -82,12 +82,15 @@ fn main() {
     let rom = load_rom(_NES_ROM_PATH);
     MAPPER.lock().unwrap().prg_rom = rom.prg_rom.clone();
     MAPPER.lock().unwrap().chr_rom = rom.chr_rom.clone();
-    MAPPER.lock().unwrap().is_ext_ram = rom.is_ext_ram.clone();
+    MAPPER.lock().unwrap().is_chr_ram = rom.is_chr_ram.clone();
+    MAPPER.lock().unwrap().is_prg_ram = rom.is_prg_ram.clone();
     MAPPER.lock().unwrap().mapper = rom.mapper.clone();
+    MAPPER.lock().unwrap().rom_type = rom.rom_type.clone();
+    MAPPER.lock().unwrap().mmc_1_reg.rom_type = rom.rom_type.clone();
 
     info!(
         "ROM: mapper={}, mirroring={:?} chr_ram={}",
-        rom.mapper, rom.mirroring, rom.is_ext_ram
+        rom.mapper, rom.mirroring, rom.is_chr_ram
     );
 
     let mut frame = Frame::new();
