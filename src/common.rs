@@ -122,11 +122,6 @@ pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 // [MapperMMC 3]
 // pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest.nes";
 
-// [Mapper 4]
-// pub const _NES_ROM_PATH: &str = "rom/nes/Hoshi no Kirby (J).nes";
-// pub const _NES_ROM_PATH: &str = "rom/nes/Super Mario Bros 3  (J).nes";
-// pub const _NES_ROM_PATH: &str = "rom/nes/Final Fantasy 3  (J).nes";
-
 // =========================================================================
 // [動作NG]
 // =========================================================================
@@ -141,6 +136,11 @@ pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 
 // [MapperMMC 3]
 // pub const _NES_ROM_PATH: &str = "rom/nes/soromon_no_kagi.nes";
+
+// [Mapper 4]
+// pub const _NES_ROM_PATH: &str = "rom/nes/Hoshi no Kirby (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Super Mario Bros 3  (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Final Fantasy 3  (J).nes";
 
 // [Mapper 184]
 // pub const _NES_ROM_PATH: &str = "rom/nes/Atlantis no Nazo (J).nes";

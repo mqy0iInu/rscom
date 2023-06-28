@@ -211,12 +211,18 @@ pub struct Mapper4 {
 
     mirroring_reg: u8,          // ミラーリングレジスタ($A000-$BFFEの偶数アドレス)
     prg_ram_protect_reg: u8,    // PRG-RAM保護レジスタ ($A001-$BFFFの奇数アドレス)
+    mirror: Mirroring,
+    prg_ram_cs: bool,         // PRG-RAM CS(チップセレクト)
+    prg_ram_wp: bool,         // PRG-RAM WP(ライトプロテクト)
 
     irq_latch_reg: u8,          // IRQラッチレジスタ  ($C000-$DFFEの偶数アドレス)
     irq_reload_reg: u8,         // IRQリロードレジスタ($C001-$DFFFの奇数アドレス)
+    irq_reload_flg: bool,
 
     irq_di_reg: u8,             // IRQ無効レジスタ($E000-$FFFEの偶数アドレス)
     irq_ei_reg: u8,             // IRQ有効レジスタ($E001-$FFFFの奇数アドレス)
+    irq_flg: bool,
+
 }
 
 impl Mapper4 {
@@ -231,12 +237,16 @@ impl Mapper4 {
 
             mirroring_reg: 0,          // ミラーリングレジスタ($A000-$BFFEの偶数アドレス)
             prg_ram_protect_reg: 0,    // PRG-RAM保護レジスタ ($A001-$BFFFの奇数アドレス)
-
+            mirror: Mirroring::VERTICAL,
+            prg_ram_cs: false,         // PRG-RAM CS(チップセレクト)
+            prg_ram_wp: false,         // PRG-RAM WP(ライトプロテクト)
             irq_latch_reg: 0,          // IRQラッチレジスタ  ($C000-$DFFEの偶数アドレス)
             irq_reload_reg: 0,         // IRQリロードレジスタ($C001-$DFFFの奇数アドレス)
+            irq_reload_flg: false,
 
             irq_di_reg: 0,             // IRQ無効レジスタ($E000-$FFFEの偶数アドレス)
             irq_ei_reg: 0,             // IRQ有効レジスタ($E001-$FFFFの奇数アドレス)
+            irq_flg: false,
         }
     }
 
@@ -286,15 +296,35 @@ impl Mapper4 {
     }
 
     fn mirroring_reg_write(&mut self, val: u8) {
+        // 7  bit  0
+        // ---- ----
+        // xxxx xxxM
+        //         |
+        //         +- Nametable mirroring (0: vertical; 1: horizontal)
         self.mirroring_reg = val;
+        self.mirror = match self.mirroring_reg & _BIT_0 {
+            1 => Mirroring::HORIZONTAL,
+            0 | _ => Mirroring::VERTICAL,
+        }
     }
 
     fn prg_ram_protect_reg_write(&mut self, val: u8) {
+        // 7  bit  0
+        // ---- ----
+        // RWXX xxxx
+        // ||||
+        // ||++------ N/A(Nothing on the MMC3, see MMC6)
+        // |+-------- Write protection (0: allow writes; 1: deny writes)
+        // +--------- PRG RAM chip enable (0: disable; 1: enable)
         self.prg_ram_protect_reg = val;
+        self.prg_ram_cs = (self.mirroring_reg & _BIT_7) != 0;
+        self.prg_ram_wp = (self.mirroring_reg & _BIT_6) != 0;
     }
 
     fn irq_latch_reg_write(&mut self, val: u8) {
         self.irq_latch_reg = val;
+        self.prg_ram_protect_reg = 0; // IRQカウンタをクリア
+        // TODO :現在のスキャンラインのPPUサイクル260でリロード???
     }
 
     fn irq_reload_reg_write(&mut self, val: u8) {
@@ -302,11 +332,15 @@ impl Mapper4 {
     }
 
     fn irq_di_reg_write(&mut self, val: u8) {
+        // 割込み（IRQ）をマスク
         self.irq_di_reg = val;
+        self.irq_flg = false;
     }
 
     fn irq_ei_reg_write(&mut self, val: u8) {
+        // 割込み（IRQ）を許可
         self.irq_ei_reg = val;
+        self.irq_flg = true;
     }
 }
 
@@ -376,7 +410,7 @@ impl MapperMMC {
         match addr {
             // 拡張RAM(WRAM)
             0x6000..=0x7FFF => {
-                self.ext_ram[(addr - 0x6000) as usize];
+                self.ext_ram[(addr - 0x6000) as usize] = data;
             },
             0x8000..=0xFFFF => {
                 self.mmc_1.mapper_1.shift_reg_proc(addr, data, self.rom_type.clone());
@@ -390,7 +424,11 @@ impl MapperMMC {
         match addr {
             // 拡張RAM(WRAM)
             0x6000..=0x7FFF => {
-                self.ext_ram[(addr - 0x6000) as usize];
+                if (self.mmc_3.mapper_4.prg_ram_cs != true) && (self.mmc_3.mapper_4.prg_ram_wp != true) {
+                    self.ext_ram[(addr - 0x6000) as usize] = data;
+                }else{
+                    info!("Mapper 4, WRAM Write Protect")
+                }
             },
 
             // レジスタ
@@ -512,7 +550,11 @@ impl MapperMMC {
 
             // [For CPU]
             0x6000..=0x7FFF => {
-                self.ext_ram[(addr - 0x6000) as usize]
+                let mut val: u8 = 0;
+                if self.mmc_3.mapper_4.prg_ram_cs != true {
+                    val = self.ext_ram[(addr - 0x6000) as usize];
+                }
+                val
             },
             0x8000..=0x9FFF => {
                 if self.mmc_3.mapper_4.prg_bank_mode == (BANK_VARIABLE, BANK_LAST_2_FIXED) {
