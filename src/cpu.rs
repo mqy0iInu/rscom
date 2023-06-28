@@ -334,19 +334,19 @@ impl<'a> CPU<'a> {
     }
 
     pub fn anc(&mut self, _mode: &AddressingMode) {
-        todo!("anc")
+        // todo!("anc")
     }
     pub fn arr(&mut self, _mode: &AddressingMode) {
-        todo!("arr")
+        // todo!("arr")
     }
     pub fn asr(&mut self, _mode: &AddressingMode) {
-        todo!("asr")
+        // todo!("asr")
     }
     pub fn lxa(&mut self, _mode: &AddressingMode) {
-        todo!("lxa")
+        // todo!("lxa")
     }
     pub fn sha(&mut self, _mode: &AddressingMode) {
-        todo!("sha")
+        // todo!("sha")
     }
     pub fn sbx(&mut self, _mode: &AddressingMode) {
         //  A&X minus #{imm} into X
@@ -365,7 +365,7 @@ impl<'a> CPU<'a> {
         } else {
             self.status | FLAG_OVERFLOW
         };
-        todo!("sbx")
+        // todo!("sbx")
     }
 
     pub fn jam(&mut self, _mode: &AddressingMode) {
@@ -387,7 +387,7 @@ impl<'a> CPU<'a> {
         self.register_x = self.register_a;
         self._push(self.register_a);
         self.update_zero_and_negative_flags(self.register_a);
-        todo!("lae")
+        // todo!("lae")
     }
 
     pub fn shx(&mut self, _mode: &AddressingMode) {
@@ -395,7 +395,7 @@ impl<'a> CPU<'a> {
         let addr = self.get_operand_address(_mode);
         let h = ((addr & 0xFF00) >> 8) as u8;
         self.mem_write(addr, (self.register_x & h).wrapping_add(1));
-        todo!("shx")
+        // todo!("shx")
     }
 
     pub fn shy(&mut self, _mode: &AddressingMode) {
@@ -405,14 +405,14 @@ impl<'a> CPU<'a> {
         let addr = self.get_operand_address(_mode);
         let h = ((addr & 0xFF00) >> 8) as u8;
         self.mem_write(addr, (self.register_y & h).wrapping_add(1));
-        todo!("shy")
+        // todo!("shy")
     }
 
     pub fn ane(&mut self, _mode: &AddressingMode) {
         // TXA + AND #{imm}
         self.txa(_mode);
         self.and(_mode);
-        todo!("ane")
+        // todo!("ane")
     }
 
     pub fn shs(&mut self, _mode: &AddressingMode) {
@@ -422,7 +422,7 @@ impl<'a> CPU<'a> {
         let addr = self.get_operand_address(_mode);
         let h = ((addr & 0xFF00) >> 8) as u8;
         self.mem_write(addr, self.register_a & self.register_x & h);
-        todo!("shs")
+        // todo!("shs")
     }
 
     pub fn rra(&mut self, _mode: &AddressingMode) {

@@ -67,6 +67,8 @@ pub const _ADDR_A_29: u8 = 29;
 pub const _ADDR_A_30: u8 = 30;
 pub const _ADDR_A_31: u8 = 31;
 
+pub const _MEM_SIZE_1K:   u16 =   1 * 1024;
+pub const _MEM_SIZE_2K:   u16 =   2 * 1024;
 pub const _MEM_SIZE_4K:   u16 =   4 * 1024;
 pub const _MEM_SIZE_8K:   u16 =   8 * 1024;
 pub const _MEM_SIZE_16K:  u16 =  16 * 1024;

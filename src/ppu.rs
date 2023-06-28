@@ -134,9 +134,9 @@ impl PPU {
                 match mapper {
                     3 | 4 => { MAPPER.lock().unwrap().write(addr, value); },
                     _ => { if self.is_chr_ram {
-                                self.chr_rom[addr as usize] = value;
-                            }
-                        },
+                            self.chr_rom[addr as usize] = value;
+                        }
+                    },
                 }
             }
             0x2000..=0x2FFF => {

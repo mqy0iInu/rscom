@@ -203,7 +203,7 @@ impl Mapper1 {
 
 pub struct Mapper4 {
     bank_sel_reg: u8,           // バンクセレクトレジスタ($8000～$9FFEの偶数アドレス)
-    bank_data_reg: u8,          // バンクデータレジスタ  ($8000～$9FFEの奇数アドレス)
+    bank_data_reg: [u8; 8],     // バンクデータレジスタ  ($8000～$9FFEの奇数アドレス)
     bank_reg_sel: u8,
     chr_bank_mode:    (u8, u8), // ($0000-$0FFF, $1000-$1FFF)
     prg_bank_mode:    (u8, u8), // ($8000-$9FFF, $C000-$DFFF)
@@ -229,9 +229,9 @@ impl Mapper4 {
     pub fn new() -> Self {
         Mapper4 {
             bank_sel_reg: 0,           // バンクセレクトレジスタ($8000～$9FFEの偶数アドレス)
-            bank_data_reg: 0,          // バンクデータレジスタ  ($8000～$9FFEの奇数アドレス)
+            bank_data_reg: [0; 8],          // バンクデータレジスタ  ($8000～$9FFEの奇数アドレス)
             bank_reg_sel: 0,
-            chr_bank_mode:    (CHR_BANK_2KB, CHR_BANK_2KB),
+            chr_bank_mode:    (CHR_BANK_2KB, CHR_BANK_1KB),
             prg_bank_mode:    (BANK_VARIABLE, BANK_LAST_2_FIXED),
             chr_a12_inv_mode: (TWO_2KB_BANK, FOUR_1KB_BANK),
 
@@ -292,7 +292,12 @@ impl Mapper4 {
     }
 
     fn bank_data_reg_write(&mut self, val: u8) {
-        self.bank_data_reg = val;
+        // 7  bit  0
+        // ---- ----
+        // DDDD DDDD
+        // |||| ||||
+        // ++++-++++- バンクセレクトレジスタに最後に書き込まれた値に基づく新しいバンク値
+        self.bank_data_reg[self.bank_reg_sel as usize] = val;
     }
 
     fn mirroring_reg_write(&mut self, val: u8) {
@@ -329,6 +334,7 @@ impl Mapper4 {
 
     fn irq_reload_reg_write(&mut self, val: u8) {
         self.irq_reload_reg = val;
+        self.irq_reload_flg = true;
     }
 
     fn irq_di_reg_write(&mut self, val: u8) {
@@ -460,7 +466,7 @@ impl MapperMMC {
                     self.mmc_3.mapper_4.irq_ei_reg_write(data);
                 }
             },
-            _ => panic!("[ERR] MMC4 Write Addr ${:04X} !!!", addr),
+            _ => info!("[ERR] MMC4 Write Addr ${:04X} !!!", addr),
         }
     }
 
@@ -537,15 +543,64 @@ impl MapperMMC {
         }
     }
 
+    fn mapper_4_ppu_read(&self, addr: u16, offset: usize, bank_a: usize, bank_b: usize) -> u8 {
+        let mut chr_bank_len = _MEM_SIZE_2K as usize;
+
+        match addr {
+            0x0000..=0x0FFF => {
+                if self.mmc_3.mapper_4.chr_a12_inv_mode == (CHR_BANK_2KB, CHR_BANK_1KB) {
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_a];
+                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
+                }else{
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_b];
+                    chr_bank_len = _MEM_SIZE_1K as usize;
+                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
+                }
+            },
+            0x1000..=0x1FFF => {
+                if self.mmc_3.mapper_4.chr_a12_inv_mode == (CHR_BANK_2KB, CHR_BANK_1KB) {
+                    chr_bank_len = _MEM_SIZE_1K as usize;
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_a];
+                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
+                }else{
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_b];
+                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
+                }
+            },
+            _ => panic!("[ERR] Mapper 4 PPU Read Addr ${:04X} !!!", addr),
+        }
+    }
+
     fn mapper_4_read(&self, addr: u16) -> u8 {
         // TODO :Mapper4 Read (このマッパー結構難いｗ)
-        let bank_len = _MEM_SIZE_16K as usize;
+        let bank_len = _MEM_SIZE_8K as usize;
         let bank_max = self.prg_rom.len() / bank_len;
+
         match addr {
             // [For PPU]
-            0x0000..=0x1FFF => {
-                let bank = self.bank_select & 0x0F;
-                self.chr_rom[(addr as usize + bank_len * bank as usize) as usize]
+            0x0000..=0x03FF => {
+                self.mapper_4_ppu_read(addr, 0, 0, 2)
+            },
+            0x0400..=0x07FF => {
+                self.mapper_4_ppu_read(addr, 0x400, 0, 3)
+            },
+            0x0800..=0x0BFF => {
+                self.mapper_4_ppu_read(addr, 0x0800, 1, 4)
+            },
+            0x0C00..=0x0FFF => {
+                self.mapper_4_ppu_read(addr, 0x0C00, 1, 5)
+            },
+            0x1000..=0x13FF => {
+                self.mapper_4_ppu_read(addr, 0x1000, 2, 0)
+            },
+            0x1400..=0x17FF => {
+                self.mapper_4_ppu_read(addr, 0x1400, 3, 0)
+            },
+            0x1800..=0x1BFF => {
+                self.mapper_4_ppu_read(addr, 0x1800, 4, 1)
+            },
+            0x1C00..=0x1FFF => {
+                self.mapper_4_ppu_read(addr, 0x1C00, 5, 1)
             },
 
             // [For CPU]
@@ -559,7 +614,7 @@ impl MapperMMC {
             0x8000..=0x9FFF => {
                 if self.mmc_3.mapper_4.prg_bank_mode == (BANK_VARIABLE, BANK_LAST_2_FIXED) {
                     // バンク切り替え
-                    let bank = self.bank_select & 0x0F;
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[6]; // R6からバンクセレクト
                     self.prg_rom[(addr as usize - 0x8000 + bank_len * bank as usize) as usize]
                 }else{
                     // 最後から2番目のバンクに固定
@@ -567,7 +622,7 @@ impl MapperMMC {
                 }
             },
             0xA000..=0xBFFF => {
-                let bank = self.bank_select & 0x0F;
+                let bank = self.mmc_3.mapper_4.bank_data_reg[7]; // R7からバンクセレクト
                 self.prg_rom[(addr as usize - 0x8000 + bank_len * bank as usize) as usize]
             },
             0xC000..=0xDFFF => {
@@ -576,14 +631,14 @@ impl MapperMMC {
                     self.prg_rom[(addr as usize - 0xC000 + bank_len * (bank_max - 2)) as usize]
                 }else{
                     // バンク切り替え
-                    let bank = self.bank_select & 0x0F;
+                    let bank = self.mmc_3.mapper_4.bank_data_reg[6]; // R6からバンクセレクト
                     self.prg_rom[(addr as usize - 0xC000 + bank_len * bank as usize) as usize]
                 }
             },
             0xE000..=0xFFFF => { // 最後のバンクに固定
                 self.prg_rom[(addr as usize - 0xE000 + bank_len * (bank_max - 1)) as usize]
             },
-            _ => panic!("[ERR] MMC2 Read Addr ${:04X} !!!", addr),
+            _ => panic!("[ERR] Mapper 4 Read Addr ${:04X} !!!", addr),
         }
     }
 
