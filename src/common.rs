@@ -76,18 +76,25 @@ pub const _MEM_SIZE_128K: u32 = 128 * 1024;
 pub const _MEM_SIZE_256K: u32 = 256 * 1024;
 pub const _MEM_SIZE_512K: u32 = 512 * 1024;
 
-pub const MMC_0: u8 = 0;
-pub const MMC_1: u8 = 1;
-pub const MMC_2: u8 = 2;
-pub const MMC_3: u8 = 3;
-pub const MMC_4: u8 = 4;
+pub const _MMC_0: u8 = 0;
+pub const _MMC_1: u8 = 1;
+pub const _MMC_2: u8 = 2;
+pub const _MMC_3: u8 = 3;
+pub const _MMC_4: u8 = 4;
 
 pub const _MAPPER_0: u8 = 0;
 pub const _MAPPER_1: u8 = 1;
 pub const _MAPPER_2: u8 = 2;
 pub const _MAPPER_3: u8 = 3;
 pub const _MAPPER_4: u8 = 4;
+pub const _MAPPER_105: u8 = 105;
+pub const _MAPPER_115: u8 = 115;
+pub const _MAPPER_118: u8 = 118;
+pub const _MAPPER_119: u8 = 119;
 
+pub const _CHR_ROM: u8 = 0;
+pub const _CHR_RAM: u8 = 1;
+pub const _PRG_ROM: u8 = 2;
 // =========================================================================
 // [動作OK]
 // =========================================================================
@@ -116,9 +123,10 @@ pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest.nes";
 
 // [Mapper 4]
-// pub const _NES_ROM_PATH: &str = "rom/Hoshi no Kirby - Yume no Izumi no Monogatari  (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Hoshi no Kirby (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Super Mario Bros 3  (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Final Fantasy 3  (J).nes";
+
 // =========================================================================
 // [動作NG]
 // =========================================================================

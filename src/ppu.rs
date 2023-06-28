@@ -79,10 +79,9 @@ impl PPU {
                 } else {
                     let result = self.internal_data_buf;
                     let mapper = MAPPER.lock().unwrap().mapper;
-                    if mapper == 3 {
-                        self.internal_data_buf = MAPPER.lock().unwrap().read_chr_rom(addr);
-                    }else{
-                        self.internal_data_buf = self.chr_rom[addr as usize];
+                    match mapper {
+                        3 | 4 => self.internal_data_buf = MAPPER.lock().unwrap().read_chr_rom(addr),
+                        _ => self.internal_data_buf = self.chr_rom[addr as usize],
                     }
                     result
                 }
@@ -131,15 +130,13 @@ impl PPU {
 
         match addr {
             0x0000..=0x1FFF => {
-                // FIXME
-                debug!("write CHR_ROM {:04X} => {:02X}", addr, value);
                 let mapper = MAPPER.lock().unwrap().mapper;
-                if mapper == 3 {
-                    MAPPER.lock().unwrap().write(addr, value);
-                }else{
-                    if self.is_chr_ram {
-                        self.chr_rom[addr as usize] = value;
-                    }
+                match mapper {
+                    3 | 4 => { MAPPER.lock().unwrap().write(addr, value); },
+                    _ => { if self.is_chr_ram {
+                                self.chr_rom[addr as usize] = value;
+                            }
+                        },
                 }
             }
             0x2000..=0x2FFF => {
