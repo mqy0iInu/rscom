@@ -1,4 +1,5 @@
-use log::{debug, info, trace};
+use log::{info, warn};
+// use log::{debug, error, info, log_enabled, trace, warn, Level};
 use crate::{common, rom::RomType};
 use common::*;
 use crate::rom::Mirroring;
@@ -381,7 +382,7 @@ impl Mmc1 {
 pub struct MapperMMC {
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
-    // pub chr_ram: Vec<u8>,
+    pub chr_ram: Vec<u8>,
     pub ext_ram: Vec<u8>,
     pub mapper: u8,
     pub is_chr_ram: bool,
@@ -398,7 +399,7 @@ impl MapperMMC {
         MapperMMC {
             prg_rom: vec![],
             chr_rom: vec![],
-            // chr_ram: vec![0; _MEM_SIZE_8K as usize],
+            chr_ram: vec![0; _MEM_SIZE_8K as usize],
             ext_ram: vec![0; _MEM_SIZE_8K as usize],
             is_chr_ram: false,
             is_prg_ram: false,
@@ -427,16 +428,24 @@ impl MapperMMC {
 
     fn mapper_4_write(&mut self, addr: u16, data: u8)
     {
+        // warn!("Mapper 4, Write (Addr: ${:04X}, Val: 0x{:02X})", addr, data);
+
         match addr {
+            // [For PPU]
+            // CHR-RAM
+            0x0000..=0x1FFF => {
+                self.chr_ram[addr as usize] = data;
+            },
+
+            // [For CPU]
             // 拡張RAM(WRAM)
             0x6000..=0x7FFF => {
                 if (self.mmc_3.mapper_4.prg_ram_cs != true) && (self.mmc_3.mapper_4.prg_ram_wp != true) {
                     self.ext_ram[(addr - 0x6000) as usize] = data;
                 }else{
-                    info!("Mapper 4, WRAM Write Protect")
+                    warn!("Mapper 4, WRAM Write Protect")
                 }
             },
-
             // レジスタ
             0x8000..=0x9FFF => {
                 if (addr % 2) == 0 { // 偶数アドレス
@@ -466,7 +475,7 @@ impl MapperMMC {
                     self.mmc_3.mapper_4.irq_ei_reg_write(data);
                 }
             },
-            _ => info!("[ERR] MMC4 Write Addr ${:04X} !!!", addr),
+            _ => panic!("[Warrning] MMC4 Write Addr ${:04X} !!!", addr),
         }
     }
 
@@ -623,7 +632,7 @@ impl MapperMMC {
             },
             0xA000..=0xBFFF => {
                 let bank = self.mmc_3.mapper_4.bank_data_reg[7]; // R7からバンクセレクト
-                self.prg_rom[(addr as usize - 0x8000 + bank_len * bank as usize) as usize]
+                self.prg_rom[(addr as usize - 0xA000 + bank_len * bank as usize) as usize]
             },
             0xC000..=0xDFFF => {
                 if self.mmc_3.mapper_4.prg_bank_mode == (BANK_VARIABLE, BANK_LAST_2_FIXED) {

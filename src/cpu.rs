@@ -568,7 +568,7 @@ impl<'a> CPU<'a> {
         self._push_u16(self.program_counter + 2 - 1);
         self.program_counter = addr;
         // 後で+2するので整合性のため-2しておく
-        self.program_counter -= 2;
+        self.program_counter = self.program_counter.wrapping_sub(2);
     }
 
     pub fn _push(&mut self, value: u8) {

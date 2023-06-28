@@ -268,382 +268,382 @@ pub fn call(cpu: &mut CPU, op: &OpCode) {
 
     "ADC" => {
       cpu.adc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "AND" => {
       cpu.and(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ASL" => {
       cpu.asl(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BCC" => {
       cpu.bcc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BCS" => {
       cpu.bcs(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BEQ" => {
       cpu.beq(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BIT" => {
       cpu.bit(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BMI" => {
       cpu.bmi(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BNE" => {
       cpu.bne(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BPL" => {
       cpu.bpl(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BRK" => {
       cpu.brk(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BVC" => {
       cpu.bvc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "BVS" => {
       cpu.bvs(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CLC" => {
       cpu.clc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CLD" => {
       cpu.cld(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CLI" => {
       cpu.cli(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CLV" => {
       cpu.clv(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CMP" => {
       cpu.cmp(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CPX" => {
       cpu.cpx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "CPY" => {
       cpu.cpy(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "DEC" => {
       cpu.dec(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "DEX" => {
       cpu.dex(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "DEY" => {
       cpu.dey(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "EOR" => {
       cpu.eor(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "INC" => {
       cpu.inc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "INX" => {
       cpu.inx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "INY" => {
       cpu.iny(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "JMP" => {
       cpu.jmp(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "JSR" => {
       cpu.jsr(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LDA" => {
       cpu.lda(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LDX" => {
       cpu.ldx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LDY" => {
       cpu.ldy(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LSR" => {
       cpu.lsr(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "NOP" => {
       cpu.nop(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ORA" => {
       cpu.ora(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "PHA" => {
       cpu.pha(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "PHP" => {
       cpu.php(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "PLA" => {
       cpu.pla(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "PLP" => {
       cpu.plp(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ROL" => {
       cpu.rol(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ROR" => {
       cpu.ror(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "RTI" => {
       cpu.rti(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "RTS" => {
       cpu.rts(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SBC" => {
       cpu.sbc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SEC" => {
       cpu.sec(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SED" => {
       cpu.sed(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SEI" => {
       cpu.sei(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "STA" => {
       cpu.sta(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "STX" => {
       cpu.stx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "STY" => {
       cpu.sty(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TAX" => {
       cpu.tax(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TAY" => {
       cpu.tay(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TSX" => {
       cpu.tsx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TXA" => {
       cpu.txa(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TXS" => {
       cpu.txs(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "TYA" => {
       cpu.tya(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ANC" => {
       cpu.anc(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SAX" => {
       cpu.sax(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ARR" => {
       cpu.arr(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ASR" => {
       cpu.asr(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LXA" => {
       cpu.lxa(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SHA" => {
       cpu.sha(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SBX" => {
       cpu.sbx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "DCP" => {
       cpu.dcp(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ISB" => {
       cpu.isb(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "JAM" => {
       cpu.jam(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LAE" => {
       cpu.lae(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "LAX" => {
       cpu.lax(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "RLA" => {
       cpu.rla(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "RRA" => {
       cpu.rra(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SLO" => {
       cpu.slo(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SRE" => {
       cpu.sre(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SHX" => {
       cpu.shx(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SHY" => {
       cpu.shy(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "ANE" => {
       cpu.ane(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     "SHS" => {
       cpu.shs(&op.addressing_mode);
-      cpu.program_counter += op.bytes - 1
+      cpu.program_counter = cpu.program_counter.wrapping_add(op.bytes.wrapping_sub(1))
     }
 
     _ => {
