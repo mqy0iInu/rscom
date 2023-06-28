@@ -552,64 +552,61 @@ impl MapperMMC {
         }
     }
 
-    fn mapper_4_ppu_read(&self, addr: u16, offset: usize, bank_a: usize, bank_b: usize) -> u8 {
-        let mut chr_bank_len = _MEM_SIZE_2K as usize;
+    fn mapper_4_chr_rom_addr(&self, addr: usize) -> usize {
+        let d7 = self.bank_select & 0x80;
+        let bank_len: usize = 1 * 1024;
+        let r0: usize = (self.mmc_3.mapper_4.bank_data_reg[0] & 0xFE) as usize;
+        let r1: usize = (self.mmc_3.mapper_4.bank_data_reg[1] & 0xFE) as usize;
+        let r2: usize = (self.mmc_3.mapper_4.bank_data_reg[2] & 0xFF) as usize;
+        let r3: usize = (self.mmc_3.mapper_4.bank_data_reg[3] & 0xFF) as usize;
+        let r4: usize = (self.mmc_3.mapper_4.bank_data_reg[4] & 0xFF) as usize;
+        let r5: usize = (self.mmc_3.mapper_4.bank_data_reg[5] & 0xFF) as usize;
 
-        match addr {
-            0x0000..=0x0FFF => {
-                if self.mmc_3.mapper_4.chr_a12_inv_mode == (CHR_BANK_2KB, CHR_BANK_1KB) {
-                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_a];
-                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
-                }else{
-                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_b];
-                    chr_bank_len = _MEM_SIZE_1K as usize;
-                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
-                }
-            },
-            0x1000..=0x1FFF => {
-                if self.mmc_3.mapper_4.chr_a12_inv_mode == (CHR_BANK_2KB, CHR_BANK_1KB) {
-                    chr_bank_len = _MEM_SIZE_1K as usize;
-                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_a];
-                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
-                }else{
-                    let bank = self.mmc_3.mapper_4.bank_data_reg[bank_b];
-                    self.chr_rom[(addr as usize - offset + chr_bank_len * bank as usize) as usize]
-                }
-            },
-            _ => panic!("[ERR] Mapper 4 PPU Read Addr ${:04X} !!!", addr),
+        if d7 == 0 {
+            match addr {
+                // R0 (2KB)
+                0x0000..=0x07FF => addr - (bank_len * 0) + r0 * bank_len,
+                // R1 (2KB)
+                0x0800..=0x0FFF => addr - (bank_len * 2) + r1 * bank_len,
+                // R2
+                0x1000..=0x13FF => addr - (bank_len * 4) + r2 * bank_len,
+                // R3
+                0x1400..=0x17FF => addr - (bank_len * 5) + r3 * bank_len,
+                // R4
+                0x1800..=0x1BFF => addr - (bank_len * 6) + r4 * bank_len,
+                // R5
+                0x1C00..=0x1FFF => addr - (bank_len * 7) + r5 * bank_len,
+                _ => { warn!("[ERR] Mapper 4 PPU Read Addr ${:04X} !!!", addr); 0 },
+            }
+        } else {
+            match addr {
+                // R2
+                0x0000..=0x03FF => addr - (bank_len * 0) + r2 * bank_len,
+                // R3
+                0x0400..=0x07FF => addr - (bank_len * 1) + r3 * bank_len,
+                // R4
+                0x0800..=0x0BFF => addr - (bank_len * 2) + r4 * bank_len,
+                // R5
+                0x0C00..=0x0FFF => addr - (bank_len * 3) + r5 * bank_len,
+                // R0 (2KB)
+                0x1000..=0x17FF => addr - (bank_len * 4) + r0 * bank_len,
+                // R1 (2KB)
+                0x1800..=0x1FFF => addr - (bank_len * 6) + r1 * bank_len,
+                _ => { warn!("[ERR] Mapper 4 PPU Read Addr ${:04X} !!!", addr); 0 },
+            }
         }
     }
 
     fn mapper_4_read(&self, addr: u16) -> u8 {
         // TODO :Mapper4 Read (このマッパー結構難いｗ)
-        let bank_len = _MEM_SIZE_8K as usize;
-        let bank_max = self.prg_rom.len() / bank_len;
+        let bank_len: usize = 8 * 1024;
+        let bank_max: usize = self.prg_rom.len() / bank_len;
+        let ppu_addr: usize = self.mapper_4_chr_rom_addr(addr as usize);
 
         match addr {
             // [For PPU]
-            0x0000..=0x03FF => {
-                self.mapper_4_ppu_read(addr, 0, 0, 2)
-            },
-            0x0400..=0x07FF => {
-                self.mapper_4_ppu_read(addr, 0x400, 0, 3)
-            },
-            0x0800..=0x0BFF => {
-                self.mapper_4_ppu_read(addr, 0x0800, 1, 4)
-            },
-            0x0C00..=0x0FFF => {
-                self.mapper_4_ppu_read(addr, 0x0C00, 1, 5)
-            },
-            0x1000..=0x13FF => {
-                self.mapper_4_ppu_read(addr, 0x1000, 2, 0)
-            },
-            0x1400..=0x17FF => {
-                self.mapper_4_ppu_read(addr, 0x1400, 3, 0)
-            },
-            0x1800..=0x1BFF => {
-                self.mapper_4_ppu_read(addr, 0x1800, 4, 1)
-            },
-            0x1C00..=0x1FFF => {
-                self.mapper_4_ppu_read(addr, 0x1C00, 5, 1)
+            0x0000..=0x1FFF => {
+                self.chr_rom[ppu_addr]
             },
 
             // [For CPU]
@@ -621,31 +618,31 @@ impl MapperMMC {
                 val
             },
             0x8000..=0x9FFF => {
-                if self.mmc_3.mapper_4.prg_bank_mode == (BANK_VARIABLE, BANK_LAST_2_FIXED) {
+                if (self.mmc_3.mapper_4.bank_sel_reg & _BIT_6) == 0 {
                     // バンク切り替え
                     let bank = self.mmc_3.mapper_4.bank_data_reg[6]; // R6からバンクセレクト
-                    self.prg_rom[(addr as usize - 0x8000 + bank_len * bank as usize) as usize]
+                    self.prg_rom[(addr as usize + bank_len * bank as usize) - 0x8000]
                 }else{
                     // 最後から2番目のバンクに固定
-                    self.prg_rom[(addr as usize - 0x8000 + bank_len * (bank_max - 2)) as usize]
+                    self.prg_rom[(addr as usize + (bank_max - 2) * bank_len) - 0x8000]
                 }
             },
             0xA000..=0xBFFF => {
                 let bank = self.mmc_3.mapper_4.bank_data_reg[7]; // R7からバンクセレクト
-                self.prg_rom[(addr as usize - 0xA000 + bank_len * bank as usize) as usize]
+                self.prg_rom[(addr as usize - bank_len + bank_len * bank as usize) - 0x8000]
             },
             0xC000..=0xDFFF => {
-                if self.mmc_3.mapper_4.prg_bank_mode == (BANK_VARIABLE, BANK_LAST_2_FIXED) {
+                if (self.mmc_3.mapper_4.bank_sel_reg & _BIT_6) == 0 {
                     // 最後から2番目のバンクに固定
-                    self.prg_rom[(addr as usize - 0xC000 + bank_len * (bank_max - 2)) as usize]
+                    self.prg_rom[(addr as usize - (bank_len * 2) + (bank_max - 2) * bank_len) - 0x8000]
                 }else{
                     // バンク切り替え
                     let bank = self.mmc_3.mapper_4.bank_data_reg[6]; // R6からバンクセレクト
-                    self.prg_rom[(addr as usize - 0xC000 + bank_len * bank as usize) as usize]
+                    self.prg_rom[(addr as usize - (bank_len * 2) + bank_len * bank as usize) - 0x8000]
                 }
             },
             0xE000..=0xFFFF => { // 最後のバンクに固定
-                self.prg_rom[(addr as usize - 0xE000 + bank_len * (bank_max - 1)) as usize]
+                self.prg_rom[(addr as usize - (bank_len * 3) + (bank_max - 1) * bank_len) - 0x8000]
             },
             _ => panic!("[ERR] Mapper 4 Read Addr ${:04X} !!!", addr),
         }
@@ -698,6 +695,26 @@ impl MapperMMC {
             _MAPPER_3 => self.mapper_3_read(addr),
             _MAPPER_4 | _MAPPER_118 | _MAPPER_119 => self.mmc_3_read(addr),
             _ => panic!("[ERR] Not Emu Support MapperMMC {}", self.mapper),
+        }
+    }
+
+    // pub fn mirror_prg_rom_addr(&self, addr: usize) -> usize
+    // {
+    //     todo!("mirror_prg_rom_addr() func")
+    // }
+
+    pub fn mirror_chr_rom_addr(&mut self, addr: usize) -> usize
+    {
+        match addr {
+            // [For PPU]
+            0x0000..=0x1FFF => {
+                match self.mapper {
+                    _MAPPER_4 => self.mapper_4_chr_rom_addr(addr),
+                    _ => panic!("[ERR] Not Emu Support MapperMMC {}", self.mapper),
+                }
+            },
+            0x8000..=0xFFFF => {0},
+            _ => 0,
         }
     }
 }
