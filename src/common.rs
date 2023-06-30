@@ -117,7 +117,7 @@ pub const _PRG_ROM: u8 = 2;
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/xevious.nes";
 
 // [MapperMMC 2]
-// pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
+pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Makaimura (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Rockman (J).nes";
 
@@ -140,7 +140,7 @@ pub const _PRG_ROM: u8 = 2;
 // pub const _NES_ROM_PATH: &str = "rom/nes/soromon_no_kagi.nes";
 
 // [Mapper 4]
-pub const _NES_ROM_PATH: &str = "rom/nes/Hoshi no Kirby (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Hoshi no Kirby (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Super Mario Bros 3  (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Final Fantasy 3  (J).nes";
 

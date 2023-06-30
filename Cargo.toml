@@ -1,6 +1,10 @@
 [package]
 name = "rscom"
 version = "0.1.0"
+readme = "README.md"
+keywords = ["nes", "famicom", "emulator"]
+categories = ["emulators"]
+license = "MIT"
 edition = "2021"
 
 [dependencies]
