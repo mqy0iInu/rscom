@@ -322,6 +322,7 @@ impl<'a> CPU<'a> {
         self._push(self.status);
         self.program_counter = self.mem_read_u16(0xFFFE);
         self.status |= FLAG_BREAK;
+        self.bus.tick(2);
     }
 
     fn find_ops(&mut self, opscode: u8) -> Option<OpCode> {
@@ -730,8 +731,7 @@ impl<'a> CPU<'a> {
     }
 
     pub fn brk(&mut self, _mode: &AddressingMode) {
-        // FLAG_INTERRRUPTが立っている場合は
-        if self.status & FLAG_INTERRRUPT != 0 {
+        if self.status & FLAG_BREAK != 0 {
             return;
         }
 

@@ -112,12 +112,12 @@ pub const _PRG_ROM: u8 = 2;
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/popeye.nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/ikki.nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/sky_destroyer.nes";
-// pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/Super_Mario_Bros.nes";
+pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/Super_Mario_Bros.nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/tower_of_druaga.nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/mapper_0/xevious.nes";
 
 // [MapperMMC 2]
-pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
+// pub const _NES_ROM_PATH: &str = "rom/nes/Dragon Quest 2 (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Makaimura (J).nes";
 // pub const _NES_ROM_PATH: &str = "rom/nes/Rockman (J).nes";
 
