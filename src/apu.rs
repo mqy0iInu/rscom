@@ -4,7 +4,7 @@ use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-const CPU_CLOCK: f32 = 1_789_772.5; // 1.789 MHz
+const CPU_CLOCK: f32 = 1_789_772.5;  // 1.789 MHz
 const _CLOCK_DIV: usize = 7457;      // 7457分周
 
 const _DUTY_12P5: f32 = 0.125;       // Duty 12.5％
@@ -19,16 +19,40 @@ const _CH2 :u8 = 0b0000_0010;
 const _CH3 :u8 = 0b0000_0100;
 const _CH4 :u8 = 0b0000_1000;
 
+bitflags! {
+    pub struct StatusRegister: u8 {
+        const ENABLE_1CH       = 0b0000_0001;
+        const ENABLE_2CH       = 0b0000_0010;
+        const ENABLE_3CH       = 0b0000_0100;
+        const ENABLE_4CH       = 0b0000_1000;
+        const ENABLE_5CH       = 0b0001_0000;
+
+        const ENABLE_FRAME_IRQ = 0b0100_0000;
+        const ENABLE_DMC_IRQ   = 0b1000_0000;
+    }
+
+    pub struct FrameCounter: u8 {
+        const DISABLE_IRQ    = 0b0100_0000;
+        const SEQUENCER_MODE = 0b1000_0000;
+    }
+}
+
 lazy_static! {
-    pub static ref  NOISE_TBL: Vec<u16> = vec![
-        0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0030, 0x0040, 0x0050, 0x0065, 0x007F, 0x00BE,
-        0x00FE, 0x017D, 0x01FC, 0x03F9, 0x07F2,
-    ];
+    pub static ref NOISE_TBL: Vec<f32> = {
+        let noise_tbl: Vec<u16> = vec![
+            0x0002, 0x0004, 0x0008, 0x0010, 0x0020,
+            0x0030, 0x0040, 0x0050, 0x0065, 0x007F,
+            0x00BE, 0x00FE, 0x017D, 0x01FC, 0x03F9, 0x07F2,
+        ];
+
+        noise_tbl.iter().map(|&x| x as f32).collect()
+    };
 
     pub static ref  LENGTH_COUNTER_TBL: Vec<u8> = vec![
-            0x05, 0x7F, 0x0A, 0x01, 0x14, 0x02, 0x28, 0x03, 0x50, 0x04, 0x1E, 0x05, 0x07, 0x06, 0x0D,
-            0x07, 0x06, 0x08, 0x0C, 0x09, 0x18, 0x0A, 0x30, 0x0B, 0x60, 0x0C, 0x24, 0x0D, 0x08, 0x0E,
-            0x10, 0x0F,];
+        0x05, 0x7F, 0x0A, 0x01, 0x14, 0x02, 0x28, 0x03,
+        0x50, 0x04, 0x1E, 0x05, 0x07, 0x06, 0x0D, 0x07,
+        0x06, 0x08, 0x0C, 0x09, 0x18, 0x0A, 0x30, 0x0B,
+        0x60, 0x0C, 0x24, 0x0D, 0x08, 0x0E, 0x10, 0x0F,];
 }
 
 #[allow(dead_code)]
@@ -188,7 +212,7 @@ impl APU {
     pub fn write4ch(&mut self, addr: u16, value: u8) {
         self.ch4_register.write(addr, value);
 
-        let hz = CPU_CLOCK / NOISE_TBL[self.ch4_register.frequency as usize] as f32;
+        let hz = CPU_CLOCK / NOISE_TBL[self.ch4_register.frequency as usize];
         let is_long = match self.ch4_register.kind {
             NoiseKind::Long => true,
             _ => false,
@@ -201,6 +225,14 @@ impl APU {
                 is_long: is_long,
                 volume: volume,
             }))
+            .unwrap();
+
+        self.ch4_sender
+            .send(NoiseEvent::Envelope(Envelope::new(
+                self.ch4_register.volume,
+                self.ch4_register.envelope_flag,
+                !self.ch4_register.key_off_counter_flag,
+            )))
             .unwrap();
 
         self.ch4_sender
@@ -734,10 +766,10 @@ impl SquareNote {
 
     fn duty(&self) -> f32 {
         match self.duty {
-            0x00 => 0.125,
-            0x01 => 0.25,
-            0x02 => 0.50,
-            0x03 => 0.75,
+            0x00 => _DUTY_12P5,
+            0x01 => _DUTY_25,
+            0x02 => _DUTY_50,
+            0x03 => _DUTY_75,
             _ => panic!("can't be",),
         }
     }
@@ -1015,7 +1047,9 @@ impl NoiseRandom {
     }
 
     pub fn next(&mut self) -> bool {
-        // 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。 タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、 ビット14には、ショートモード時にはビット0とビット6のEORを、 ロングモード時にはビット0とビット1のEORを入れます。
+        // 15ビットシフトレジスタにはリセット時に1をセットしておく必要があります。
+        // タイマによってシフトレジスタが励起されるたびに1ビット右シフトし、
+        // ビット14には、ショートモード時にはビット0とビット6のEORを、
         // ロングモード時にはビット0とビット1のEORを入れます。
         let b = (self.value & 0x01) ^ ((self.value >> self.bit) & 0x01);
         self.value = self.value >> 1;
@@ -1061,13 +1095,6 @@ fn init_noise(sdl_context: &sdl2::Sdl) -> (AudioDevice<NoiseWave>, Sender<NoiseE
     (device, sender)
 }
 
-bitflags! {
-    pub struct FrameCounter: u8 {
-        const DISABLE_IRQ    = 0b0100_0000;
-        const SEQUENCER_MODE = 0b1000_0000;
-    }
-}
-
 impl FrameCounter {
     pub fn new() -> Self {
         FrameCounter::from_bits_truncate(0b1100_0000)
@@ -1081,25 +1108,8 @@ impl FrameCounter {
         }
     }
 
-    pub fn irq(&self) -> bool {
-        !self.contains(FrameCounter::DISABLE_IRQ)
-    }
-
     pub fn update(&mut self, data: u8) {
         *self.0.bits_mut() = data;
-    }
-}
-
-bitflags! {
-    pub struct StatusRegister: u8 {
-        const ENABLE_1CH       = 0b0000_0001;
-        const ENABLE_2CH       = 0b0000_0010;
-        const ENABLE_3CH       = 0b0000_0100;
-        const ENABLE_4CH       = 0b0000_1000;
-        const ENABLE_5CH       = 0b0001_0000;
-
-        const ENABLE_FRAME_IRQ = 0b0100_0000;
-        const ENABLE_DMC_IRQ   = 0b1000_0000;
     }
 }
 

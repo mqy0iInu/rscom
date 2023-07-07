@@ -56,7 +56,7 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("Rust NES Emulator", (256.0 * 2.0) as u32, (240.0 * 2.0) as u32)
+        .window("rscom -Rust NES Emulator-", (256.0 * 2.0) as u32, (240.0 * 2.0) as u32)
         .position_centered()
         .build()
         .unwrap();
